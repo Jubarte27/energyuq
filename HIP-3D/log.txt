@@ -1,0 +1,121 @@
+Problem is anisotropic with tilted transversely isotropy using sigma=0.750000
+Grid size is (248,248,248) with spacing (12.50,12.50,12.50); simulated area (3087.50,3087.50,3087.50) 
+Grid is extended by 16 absortion points and 4 border points at each extreme
+Wave is propagated at internal+absortion points of size (280,280,280)
+Total grid size: 288 x 288 x 288
+Source at coordinates (144,144,144)
+Will run 1000 time steps of 0.001000 to reach time 1.000000
+Recomended maximum time step is 0.000685; used time step is 0.001000
+Slice of TTI.rsf at iteration; 00000; time(s); 0.000000; max;  0.00e+00; min;  0.00e+00; src;  0.00e+00;
+ch1dxx=0.145963; ch1dyy=0.354037; ch1dzz=0.500000; ch1dxy=0.454649; ch1dxz=0.540302; ch1dyz=0.841471
+vsv=2.255367e+02; vpz=5.220160e+02, v2pz=2.725007e+05
+v2sz=5.086678e+04; v2pz=2.725007e+05, v2px=4.033010e+05, v2pn=3.270008e+05
+HIP source using device(0) AMD Radeon RX 7700 XT with compute capability 11.0.
+GPU memory usage = 1822 MiB
+Slice of TTI.rsf at iteration; 00010; time(s); 0.010000; max;  7.79e-07; min; -5.11e-04; src; -3.14e-04;
+Slice of TTI.rsf at iteration; 00020; time(s); 0.020000; max;  8.61e-07; min; -5.19e-03; src; -3.24e-03;
+Slice of TTI.rsf at iteration; 00030; time(s); 0.030000; max;  8.90e-07; min; -3.51e-02; src; -2.24e-02;
+Slice of TTI.rsf at iteration; 00040; time(s); 0.040000; max;  6.32e-07; min; -1.55e-01; src; -1.02e-01;
+Slice of TTI.rsf at iteration; 00050; time(s); 0.050000; max;  8.22e-07; min; -4.21e-01; src; -2.87e-01;
+Slice of TTI.rsf at iteration; 00060; time(s); 0.060000; max;  8.70e-07; min; -6.16e-01; src; -4.46e-01;
+Slice of TTI.rsf at iteration; 00070; time(s); 0.070000; max;  6.30e-07; min; -2.27e-01; src; -1.79e-01;
+Slice of TTI.rsf at iteration; 00080; time(s); 0.080000; max;  8.79e-01; min; -1.06e-01; src;  5.74e-01;
+Slice of TTI.rsf at iteration; 00090; time(s); 0.090000; max;  1.37e+00; min; -7.56e-02; src;  9.99e-01;
+Slice of TTI.rsf at iteration; 00100; time(s); 0.100000; max;  6.17e-01; min; -5.76e-02; src;  5.15e-01;
+Slice of TTI.rsf at iteration; 00110; time(s); 0.110000; max;  2.53e-01; min; -3.64e-01; src; -2.21e-01;
+Slice of TTI.rsf at iteration; 00120; time(s); 0.120000; max;  1.88e-01; min; -6.05e-01; src; -4.43e-01;
+Slice of TTI.rsf at iteration; 00130; time(s); 0.130000; max;  1.41e-01; min; -3.47e-01; src; -2.70e-01;
+Slice of TTI.rsf at iteration; 00140; time(s); 0.140000; max;  1.09e-01; min; -1.43e-01; src; -9.21e-02;
+Slice of TTI.rsf at iteration; 00150; time(s); 0.150000; max;  8.70e-02; min; -1.12e-01; src; -1.97e-02;
+Slice of TTI.rsf at iteration; 00160; time(s); 0.160000; max;  7.24e-02; min; -8.46e-02; src; -2.75e-03;
+Slice of TTI.rsf at iteration; 00170; time(s); 0.170000; max;  6.18e-02; min; -6.10e-02; src; -2.59e-04;
+Slice of TTI.rsf at iteration; 00180; time(s); 0.180000; max;  5.42e-02; min; -4.25e-02; src; -1.65e-05;
+Slice of TTI.rsf at iteration; 00190; time(s); 0.190000; max;  4.83e-02; min; -3.05e-02; src; -7.22e-07;
+Slice of TTI.rsf at iteration; 00200; time(s); 0.200000; max;  4.37e-02; min; -2.68e-02; src; -2.17e-08;
+Slice of TTI.rsf at iteration; 00210; time(s); 0.210000; max;  3.99e-02; min; -2.46e-02; src; -4.52e-10;
+Slice of TTI.rsf at iteration; 00220; time(s); 0.220000; max;  3.67e-02; min; -2.34e-02; src; -6.54e-12;
+Slice of TTI.rsf at iteration; 00230; time(s); 0.230000; max;  3.40e-02; min; -2.23e-02; src; -6.57e-14;
+Slice of TTI.rsf at iteration; 00240; time(s); 0.240000; max;  3.17e-02; min; -2.15e-02; src; -4.60e-16;
+Slice of TTI.rsf at iteration; 00250; time(s); 0.250000; max;  2.97e-02; min; -2.07e-02; src; -2.24e-18;
+Slice of TTI.rsf at iteration; 00260; time(s); 0.260000; max;  2.80e-02; min; -2.00e-02; src; -7.65e-21;
+Slice of TTI.rsf at iteration; 00270; time(s); 0.270000; max;  2.64e-02; min; -1.93e-02; src; -1.82e-23;
+Slice of TTI.rsf at iteration; 00280; time(s); 0.280000; max;  2.50e-02; min; -1.87e-02; src; -3.04e-26;
+Slice of TTI.rsf at iteration; 00290; time(s); 0.290000; max;  2.37e-02; min; -1.82e-02; src; -3.55e-29;
+Slice of TTI.rsf at iteration; 00300; time(s); 0.300000; max;  2.26e-02; min; -1.77e-02; src; -2.90e-32;
+Slice of TTI.rsf at iteration; 00310; time(s); 0.310000; max;  2.16e-02; min; -1.72e-02; src; -1.66e-35;
+Slice of TTI.rsf at iteration; 00320; time(s); 0.320000; max;  2.07e-02; min; -1.67e-02; src; -6.68e-39;
+Slice of TTI.rsf at iteration; 00330; time(s); 0.330000; max;  1.98e-02; min; -1.63e-02; src; -1.98e-42;
+Slice of TTI.rsf at iteration; 00340; time(s); 0.340000; max;  1.90e-02; min; -1.59e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00350; time(s); 0.350000; max;  1.83e-02; min; -1.55e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00360; time(s); 0.360000; max;  1.76e-02; min; -1.52e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00370; time(s); 0.370000; max;  1.70e-02; min; -1.48e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00380; time(s); 0.380000; max;  1.64e-02; min; -1.45e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00390; time(s); 0.390000; max;  1.59e-02; min; -1.42e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00400; time(s); 0.400000; max;  1.54e-02; min; -1.39e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00410; time(s); 0.410000; max;  1.49e-02; min; -1.37e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00420; time(s); 0.420000; max;  1.44e-02; min; -1.34e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00430; time(s); 0.430000; max;  1.40e-02; min; -1.32e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00440; time(s); 0.440000; max;  1.36e-02; min; -1.29e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00450; time(s); 0.450000; max;  1.32e-02; min; -1.27e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00460; time(s); 0.460000; max;  1.29e-02; min; -1.25e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00470; time(s); 0.470000; max;  1.56e-02; min; -1.23e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00480; time(s); 0.480000; max;  1.54e-02; min; -1.21e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00490; time(s); 0.490000; max;  1.50e-02; min; -1.19e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00500; time(s); 0.500000; max;  1.46e-02; min; -1.50e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00510; time(s); 0.510000; max;  1.43e-02; min; -1.46e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00520; time(s); 0.520000; max;  1.41e-02; min; -1.42e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00530; time(s); 0.530000; max;  1.38e-02; min; -1.40e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00540; time(s); 0.540000; max;  1.35e-02; min; -1.37e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00550; time(s); 0.550000; max;  1.32e-02; min; -1.34e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00560; time(s); 0.560000; max;  1.29e-02; min; -1.32e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00570; time(s); 0.570000; max;  1.26e-02; min; -1.29e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00580; time(s); 0.580000; max;  1.24e-02; min; -1.26e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00590; time(s); 0.590000; max;  1.21e-02; min; -1.23e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00600; time(s); 0.600000; max;  1.19e-02; min; -1.21e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00610; time(s); 0.610000; max;  1.17e-02; min; -1.18e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00620; time(s); 0.620000; max;  1.15e-02; min; -1.16e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00630; time(s); 0.630000; max;  1.13e-02; min; -1.14e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00640; time(s); 0.640000; max;  1.12e-02; min; -1.18e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00650; time(s); 0.650000; max;  1.11e-02; min; -1.18e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00660; time(s); 0.660000; max;  1.10e-02; min; -1.17e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00670; time(s); 0.670000; max;  1.08e-02; min; -1.37e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00680; time(s); 0.680000; max;  1.13e-02; min; -1.63e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00690; time(s); 0.690000; max;  1.06e-02; min; -1.59e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00700; time(s); 0.700000; max;  1.22e-02; min; -1.58e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00710; time(s); 0.710000; max;  1.32e-02; min; -1.57e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00720; time(s); 0.720000; max;  1.23e-02; min; -1.53e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00730; time(s); 0.730000; max;  1.18e-02; min; -1.51e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00740; time(s); 0.740000; max;  1.31e-02; min; -1.48e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00750; time(s); 0.750000; max;  1.29e-02; min; -1.49e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00760; time(s); 0.760000; max;  1.13e-02; min; -1.47e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00770; time(s); 0.770000; max;  1.33e-02; min; -1.45e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00780; time(s); 0.780000; max;  1.26e-02; min; -1.44e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00790; time(s); 0.790000; max;  1.45e-02; min; -1.41e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00800; time(s); 0.800000; max;  1.29e-02; min; -1.41e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00810; time(s); 0.810000; max;  1.57e-02; min; -1.37e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00820; time(s); 0.820000; max;  1.34e-02; min; -1.37e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00830; time(s); 0.830000; max;  1.33e-02; min; -1.36e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00840; time(s); 0.840000; max;  1.32e-02; min; -1.36e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00850; time(s); 0.850000; max;  1.21e-02; min; -1.36e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00860; time(s); 0.860000; max;  1.33e-02; min; -1.40e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00870; time(s); 0.870000; max;  1.35e-02; min; -1.34e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00880; time(s); 0.880000; max;  1.34e-02; min; -1.26e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00890; time(s); 0.890000; max;  1.36e-02; min; -1.27e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00900; time(s); 0.900000; max;  1.25e-02; min; -1.35e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00910; time(s); 0.910000; max;  1.48e-02; min; -1.30e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00920; time(s); 0.920000; max;  1.43e-02; min; -1.36e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00930; time(s); 0.930000; max;  1.27e-02; min; -1.28e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00940; time(s); 0.940000; max;  1.16e-02; min; -1.47e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00950; time(s); 0.950000; max;  1.49e-02; min; -1.35e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00960; time(s); 0.960000; max;  1.33e-02; min; -1.21e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00970; time(s); 0.970000; max;  1.33e-02; min; -1.25e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00980; time(s); 0.980000; max;  1.37e-02; min; -1.27e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 00990; time(s); 0.990000; max;  1.30e-02; min; -1.22e-02; src; -0.00e+00;
+Slice of TTI.rsf at iteration; 01000; time(s); 1.000000; max;  1.08e-02; min; -1.23e-02; src; -0.00e+00;
+Total Time iters = 12.32996
+Total Time Dump = 2.18377
+Execution time (s) is 9.441264
+MSamples/s 2325
+Memory High Water Mark is 2960592 kB
+HIP_Finalize: SUCCESS
+Total Model Time = 14.64130

@@ -1,0 +1,5 @@
+easyvvuq==1.3
+numpy
+chaospy
+matplotlib==3.10.7
+scipy==1.16.3
