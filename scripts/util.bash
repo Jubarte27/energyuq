@@ -17,5 +17,5 @@ not() {
 
 SCRIPT_DIR=$(dirname "$(readlink -e "${BASH_SOURCE[0]}")")
 # shellcheck disable=SC2034
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/../" && pwd)"
 source "$SCRIPT_DIR/log.bash"

@@ -1,11 +1,10 @@
 from subprocess import CompletedProcess
-from typing import Protocol
+from typing import Protocol, ClassVar
 
 
 class Program(Protocol):
-    @staticmethod
-    def name() -> str: ...
-    @staticmethod
-    def run(params: list) -> CompletedProcess[str]: ...
-    @staticmethod
-    def report(): ...
+    name: str
+    @classmethod
+    def run(cls, params: list) -> CompletedProcess[str]: ...
+    @classmethod
+    def report(cls): ...

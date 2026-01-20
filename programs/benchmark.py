@@ -2,45 +2,30 @@ from subprocess import CompletedProcess
 import subprocess
 import numpy as np
 import os
+from typing import Protocol, ClassVar
 
 from .program import Program
 
-class Fletcher(Program):
-    name = "Fletcher"
+class Benchmark(Program):
+    short_name: str
     @classmethod
     def run(cls, params: list) -> CompletedProcess[str]:
         params = [int(x) for x in params]
-        BSIZE_X = params[0]
-        BSIZE_Y = params[1]
+        N_THREADS = params[0]
 
-        fletcher_exe = f"{os.path.dirname(__file__)}/HIP-3D/ModelagemFletcher.exe"
+        executable = f"{os.path.dirname(__file__)}../scripts/execute.sh"
 
-        # Get the corresponding powers of two
-        BSIZE_X = 2**BSIZE_X
-        BSIZE_Y = 2**BSIZE_Y
+        print(f"Running {cls.name} with {N_THREADS} threads")
 
-        print(f"Running Fletcher with BSIZE_X={BSIZE_X}, BSIZE_Y={BSIZE_Y}")
-
-        # Print current working directory for debugging
+        # for debugging
         print(f"Current working directory: {os.getcwd()}")
 
         # Run the executable and capture output
         return subprocess.run(
             [
-                fletcher_exe,
-                "TTI",
-                "472",
-                "472",
-                "472",
-                "16",
-                "12.5",
-                "12.5",
-                "12.5",
-                "0.001",
-                "0.01",
-                str(BSIZE_X),
-                str(BSIZE_Y),
-                "1",
+                executable,
+                cls.short_name,
+                str(N_THREADS),
             ],
             capture_output=True,
             text=True,
