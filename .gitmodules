@@ -1,0 +1,3 @@
+[submodule "hpc-benchmarks"]
+	path = hpc-benchmarks
+	url = https://github.com/wbmaas/hpc-benchmarks
