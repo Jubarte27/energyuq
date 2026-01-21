@@ -1,17 +1,18 @@
 from subprocess import CompletedProcess
 import subprocess
+from typing import Unpack
 import numpy as np
 import os
 
-from .program import Program
+from .program import Program, RunArgs
 
 class Fletcher(Program):
     name = "Fletcher"
+
     @classmethod
-    def run(cls, params: list) -> CompletedProcess[str]:
-        params = [int(x) for x in params]
-        BSIZE_X = params[0]
-        BSIZE_Y = params[1]
+    def run(cls, params: list[str]) -> CompletedProcess[str]:
+        BSIZE_X = int(params[0])
+        BSIZE_Y = int(params[1])
 
         fletcher_exe = f"{os.path.dirname(__file__)}/HIP-3D/ModelagemFletcher.exe"
 
@@ -23,9 +24,8 @@ class Fletcher(Program):
 
         # Print current working directory for debugging
         print(f"Current working directory: {os.getcwd()}")
-
         # Run the executable and capture output
-        return subprocess.run(
+        result = subprocess.run(
             [
                 fletcher_exe,
                 "TTI",
@@ -46,8 +46,10 @@ class Fletcher(Program):
             text=True,
         )
 
+        return result
+
     @classmethod
-    def report(cls):
+    def report(cls) -> dict[str, list] | None:
         msamples = np.array([0.0])
         # Check if Report.csv exists
         report_path = "Report.csv"
@@ -73,12 +75,16 @@ class Fletcher(Program):
             print(f"Report.csv NOT found at {report_path}")
             print(f"Files in current directory: {os.listdir('.')}")
 
-        # output csv file
-        header = "f"
-        np.savetxt(
-            "output.csv",
-            np.atleast_2d(msamples).T,
-            delimiter=",",
-            comments="",
-            header=header,
-        )
+        # # output csv file
+        # header = "f"
+        # np.savetxt(
+        #     "output.csv",
+        #     np.atleast_2d(msamples).T,
+        #     delimiter=",",
+        #     comments="",
+        #     header=header,
+        # )
+
+        if msamples:
+            return {"f": list(msamples)}
+        return None

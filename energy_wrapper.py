@@ -32,10 +32,13 @@ def cpu_set():
 def run(program: type[Program]):
     with open("input.csv", "r") as f:
         x = f.readline().split(",")
-        n_threads = x[N_THREADS_POS]
 
     output_CompletedProcess(program.name, program.run(x))
 
+def report():
+    with open('output.csv', 'wt') as f:
+        f.write('energy_uq\n')
+        # f.write()
 
 def energy_report():
     result = subprocess.run(
