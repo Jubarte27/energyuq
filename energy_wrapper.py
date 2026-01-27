@@ -1,105 +1,141 @@
 #!/usr/bin/env python3
 import numpy as np
 import subprocess
-import textwrap
 from programs import *
+from machines import *
 
-N_THREADS_POS = 1
-FREQUECNY_POS = 2
+from textwrap import indent
 
-
-def main(program: type[Program]):
-    cpu_set()
-    run(program)
-    program.report()
+FREQUECNY_POS = 1
+# POWER_CAP_POS = 2
 
 
-def cpu_set():
+def main(program: type[Program], machine: type[Machine]):
+    cpu_set(machine)
+    start, end = run(program)
+    report(start, end)
+    # program.report()
+
+
+def cpu_set(machine: type[Machine]):
     with open("input.csv", "r") as f:
         x = np.array(f.readline().split(",")).astype("int")
 
-    frequency = x[FREQUECNY_POS]
+    frequency = machine.freq[x[FREQUECNY_POS]]
 
     result = subprocess.run(
-        ["sudo", "cpupower", "frequency-set", "--freq", str(frequency)],
+        ["cpupower", "frequency-set", "--freq", str(frequency)],
         capture_output=True,
         text=True,
     )
 
-    output_required_CompletedProcess("Frequency set", result)
+    output_CompletedProcess("Frequency set", result, True)
+    if result.returncode != 0:
+        exit(result.returncode)
+    # power_cap = x[POWER_CAP_POS]
+    # power_cap *= 10**6
+    # set_sysfs("/sys/class/powercap/intel-rapl:0/?????", power_cap, "Power cap")
 
 
 def run(program: type[Program]):
     with open("input.csv", "r") as f:
         x = f.readline().split(",")
 
-    output_CompletedProcess(program.name, program.run(x))
+    start = energy_uj()
+    print()
+    result = program.run(x)
+    print()
+    end = energy_uj()
 
-def report():
-    with open('output.csv', 'wt') as f:
-        f.write('energy_uq\n')
-        # f.write()
+    output_CompletedProcess(program.name, result)
 
-def energy_report():
+    return start, end
+
+
+def report(start_energy: int, end_energy: int):
+    used_energy = end_energy - start_energy
+    if used_energy < 0:
+        max_energy = max_energy_range_uj()
+        used_energy = (end_energy + max_energy) - start_energy
+
+    with open("output.csv", "w") as f:
+        f.write("energy_uj\n")
+        f.write(f"{float(used_energy)}\n")
+
+
+def prepare_report():
+    return
+
+
+def max_energy_range_uj() -> int:
     result = subprocess.run(
-        ["sudo", "cat", "/sys/class/powercap/intel-rapl:0/energy_uj"],
+        ["cat", "/sys/class/powercap/intel-rapl:0/max_energy_range_uj"],
         capture_output=True,
         text=True,
     )
+    output_CompletedProcess("max_energy_range_uj", result)
+    if result.returncode != 0:
+        exit(result.returncode)
+    return int(result.stdout)
 
-def set_sysfs(full_path, value, name=None):
+def energy_uj() -> int:
     result = subprocess.run(
-        ["sudo", "tee", full_path],
+        ["cat", "/sys/class/powercap/intel-rapl:0/energy_uj"],
+        capture_output=True,
+        text=True,
+    )
+    output_CompletedProcess("energy_uj", result)
+    if result.returncode != 0:
+        exit(result.returncode)
+    return int(result.stdout)
+
+
+def set_sysfs(full_path: str, value: object, name=None):
+    result = subprocess.run(
+        ["tee", full_path],
         input=str(value),
         capture_output=True,
         text=True,
     )
-    output_required_CompletedProcess(full_path if name is None else name, result)
 
+    output_CompletedProcess(full_path if name is None else name, result)
 
-def output_CompletedProcess(name: str, result: subprocess.CompletedProcess):
-    print(
-        h_string(
-            f"{name} set",
-            h_string("Return code", result.returncode),
-            h_string("Stdout", result.stdout),
-            h_string("Stderr", result.stderr)
-        )
-    )
-
-def output_required_CompletedProcess(name, result):
-    output_CompletedProcess(name, result)
     if result.returncode != 0:
         exit(result.returncode)
 
-def hierarquical_string(*args):
-    INDENT = "\t"
-    if len(args) == 0:
+
+def output_CompletedProcess(name: str, result: subprocess.CompletedProcess, quiet_success = False):
+    success = result.returncode == 0
+    if quiet_success and success:
+        pretty_str = pretty_out(f"{name}", "Done")
+    else:
+        pretty_str = pretty_out(
+            f"{name}",
+            pretty_out("ExitStatus", result.returncode),
+            pretty_out("Stdout", result.stdout),
+            pretty_out("Stderr", result.stderr),
+        )
+    print(pretty_str)
+
+
+def pretty_out(name: str, *args):
+    # Removes falsey values, like "", 0, [], etc
+    args = [arg for arg in args if arg]
+    if len(args) < 1:
         return ""
-    if len(args) == 1:
-        return args[0]
+    INDENTATION = "    "
 
-    name, children = args[0], args[1:]
-    # ignore falsy values ("", None, 0, etc)
-    children_text = [ str(child) for child in children if child ]
-
-    if len(children_text) == 0:
-        return name
-    
-    if len(children_text) == 1:
-        child = children_text[0]
-        return f'{name}: {child}'
-    
-    def indent(string: str):
-        return textwrap.indent(string.rstrip().rstrip('\n'), INDENT)
-    
-    return name + '\n' + "\n".join([indent(s) for s in children_text])
-
-h_string = hierarquical_string
-
-
+    out = "\n".join(str(arg) for arg in args)
+    out = out.rstrip("\n")
+    if "\n" in out:
+        out = f"{name}\n{indent(out, INDENTATION)}"
+    else:
+        out = f"{name}: {out}"
+    return out
 
 
 if __name__ == "__main__":
-    program = Fletcher
-    main(program)
+    program = NONE
+    machine = Glados
+    print("Running on Glados")
+    main(program, machine)

@@ -2,7 +2,7 @@
 main() {
     set_log_depth 0
     ensure create_venv
-    ensure HIP_installation
+    # ensure HIP_installation
 }
 _setConfigArgs() {
     while [ "${1:-}" != '' ]; do

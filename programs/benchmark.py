@@ -1,38 +1,36 @@
-from subprocess import CompletedProcess
-import subprocess
-import numpy as np
+from subprocess import CompletedProcess, run
 import os
-from typing import Protocol, ClassVar, Unpack
+from typing import ClassVar
+from .program import Program
 
-from .program import Preparation, Program, RunArgs
-
-class Benchmark(Program):
-    short_name: str
-
+class ExecuteSH(Program):
     @classmethod
-    def run(cls, params: list[str]) -> CompletedProcess[str]:
-        N_THREADS = int(params[0])
-
-        executable = f"{os.path.dirname(__file__)}../scripts/execute.sh"
-
+    def run(cls, params: list) -> CompletedProcess[str]:
+        params = [int(x) for x in params]
+        N_THREADS = params[0]
+        execute = f"{os.path.dirname(__file__)}/../scripts/execute.sh"
         print(f"Running {cls.name} with {N_THREADS} threads")
-
-        # for debugging
-        print(f"Current working directory: {os.getcwd()}")
-
-        # Run the executable and capture output
-        result = subprocess.run(
-            [
-                executable,
-                cls.short_name,
-                str(N_THREADS),
-            ],
+        # print(f"Current working directory: {os.getcwd()}")
+        return run(
+            [execute, cls.name, str(N_THREADS)],
             capture_output=True,
             text=True,
         )
-
-        return result
-
     @classmethod
-    def report(cls) -> None:
-        return None
+    def report(cls):
+        pass
+
+class FFT(ExecuteSH):
+    name: ClassVar[str] = "FFT"
+
+class HPCG(ExecuteSH):
+     name: ClassVar[str] = "HPCG"
+
+class JA(ExecuteSH):
+     name: ClassVar[str] = "JA"
+
+class LULESH(ExecuteSH):
+     name: ClassVar[str] = "LULESH"
+
+class NONE(ExecuteSH):
+     name: ClassVar[str] = "NONE"

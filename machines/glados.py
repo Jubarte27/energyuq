@@ -1,16 +1,13 @@
+from typing import ClassVar
 from .machine import Machine
 
 
+# Todo: Consultar essas informações programaticamente, sem necessidade de fazer estes arquivos
 class Glados(Machine):
-
-    @staticmethod
-    def name() -> str:
-        return "Glados"
-
-    @staticmethod
-    def freq() -> list[int]:
-        return [
-            2200000,
-            2800000,
-            3300000,
-        ]
+    name: ClassVar[str] = "Glados"
+    freq: ClassVar[list[int]] = [
+        2200000,
+        2800000,
+        3300000,
+    ]
+    physical_core_count: ClassVar[int] = 16

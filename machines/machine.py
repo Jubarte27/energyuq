@@ -1,9 +1,7 @@
-from typing import Protocol
+from typing import ClassVar, Protocol
 
 
 class Machine(Protocol):
-    @staticmethod
-    def name() -> str: ...
-    @staticmethod
-    def freq() -> list[int]: ...
-
+    name: ClassVar[str]
+    freq: ClassVar[list[int]]
+    physical_core_count: ClassVar[int]

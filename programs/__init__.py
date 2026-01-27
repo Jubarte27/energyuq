@@ -1,5 +1,3 @@
-from . import fletcher
-Fletcher = fletcher.Fletcher
-
-from . import program
-Program = program.Program
+from .fletcher import Fletcher
+from .program import Program
+from .benchmark import FFT, HPCG, JA, LULESH, NONE

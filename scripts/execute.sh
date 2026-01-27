@@ -1,20 +1,24 @@
 #!/bin/bash
+
 main() {
+	
     set_log_depth 0
 
-    find_exec "$BENCHMARK"
-
-    export OMP_PROC_BIND=CLOSE
-    export OMP_PLACES=CORES
-
-	echo "Running with $N_THREADS threads"
-	export OMP_NUM_THREADS=$N_THREADS
-
-    if [ -z "$EXEC" ]; then
+	if [ -z "$EXEC" ]; then
         exit 1
     fi
-    
-    $EXEC
+	export OMP_PROC_BIND=CLOSE
+	export OMP_PLACES=CORES
+	export OMP_NUM_THREADS=$NT
+
+	OUT_DIR=${OUT_DIR:-"$PROJECT_DIR/.benchmark-results"}
+	echo "Running $NAME with $NT threads"
+	{
+		echo "OMP_NUM_THREADS=$OMP_NUM_THREADS"
+		echo "OMP_PROC_BIND=$OMP_PROC_BIND"
+		echo "OMP_PLACES=$OMP_PLACES"
+		$EXEC
+	} | tee "$OUT_DIR/$NAME.$NT.txt"
 }
 
 find_exec() {
@@ -71,6 +75,10 @@ find_exec() {
                     ;;
             esac
             ;;
+		NONE)
+			EXEC="echo \"Running None\""
+			NAME="$1"
+			;;
         *)
             log_error "Unknown benchmark \"$1\""
             ;;
@@ -105,18 +113,43 @@ _setConfigArgs() {
         esac
         shift
     done
+	if [ "${1:-}" == '' ]; then
+		log_error "First argument must be the name of a benchmark"
+	fi
+	if [ "${2:-}" == '' ]; then
+		log_error "Second argument must be the number of threads"
+	elif ! [[ "$2" =~ ^[+-]?[0-9]+$ ]]; then
+		log_error "The number of threads must be an integer"
+	fi
 
-    ## Positional
+	find_exec "$1"
+	case "$1" in
+		FFT | HPCG | JA | LULESH)
+			EXEC="${!1}"
+			NAME="$1"
+			;;
+		NONE)
+			EXEC="echo \"Running None\""
+			NAME="$1"
+			;;
+		*)
+			log_error "Unknown benchmark \"$1\""
+	esac
+	
+	NT=$2
 
-    BENCHMARK=$1
-    N_THREADS=$2
+
 }
 
+
 set_env() {
-    BENCHMARK_DIR="$PROJECT_DIR/hpc-benchmarks"
+	BENCHMARK_DIR="$PROJECT_DIR/hpc-benchmarks"
+
+	EXEC=""
+	NAME=""
 }
 
 SCRIPT_DIR=$(dirname "$(readlink -e "${BASH_SOURCE[0]}")") && source "$SCRIPT_DIR/util.bash"
-_setConfigArgs "$@"
 set_env
+_setConfigArgs "$@"
 main "$@"

@@ -62,3 +62,7 @@ venv.bak/
 *.a
 *.dll
 *.lib
+
+#=====================================
+.results
+.benchmark-results

@@ -2,43 +2,74 @@
 # need to have pyenv installed
 main() {
     set_log_depth 0
+    if ! [ -d "$BENCHMARKS_DIR" ]; then
+        (cd "$PROJECT_DIR" && git clone https://github.com/wbmaas/hpc-benchmarks)
+    fi
+
+    cd "$BENCHMARKS_DIR" || exit 1
+
+    if [ "$JUSTCLEAN" == "true" ]; then
+        rm -f .python-version
+        clean
+        return
+    fi
+
     pyenv_setup
 
-    cd "$BENCHMARKS_DIR" || 1
+    silent_make FFT
+    silent_make JA
+    silent_make PO
+    silent_make ST
+    silent_make LULESH
+    silent_make HPCG
 
-    dirty_make FFT
-    dirty_make JA
-    dirty_make PO
-    dirty_make ST
-    dirty_make LULESH
-    dirty_make HPCG
-    dirty_make RODINIA/hotspot
+    silent_make RODINIA/hotspot
+    silent_make RODINIA/lud
+    silent_make RODINIA/streamcluster
+    silent_make RODINIA/data/hotspot/inputGen
 
-    dirty_make NAS > /dev/null
-    dirty_make NAS BT CLASS=B > /dev/null
-    dirty_make NAS CG CLASS=B > /dev/null
-    dirty_make NAS FT CLASS=B > /dev/null
-    dirty_make NAS LU CLASS=B > /dev/null
-    dirty_make NAS MG CLASS=B > /dev/null
-    dirty_make NAS SP CLASS=B > /dev/null
-    dirty_make NAS UA CLASS=B > /dev/null
+    {
+        silent_make NAS
+        silent_make NAS BT CLASS=B
+        silent_make NAS CG CLASS=B
+        silent_make NAS FT CLASS=B
+        silent_make NAS LU CLASS=B
+        silent_make NAS MG CLASS=B
+        silent_make NAS SP CLASS=B
+        silent_make NAS UA CLASS=B
+    } > /dev/null
 
     # cd "$BENCHMARKS_DIR/parboil" && ./parboil list
     cd "$BENCHMARKS_DIR/parboil" && ./parboil compile stencil omp_base
     # cd "$BENCHMARKS_DIR/parboil" && ./parboil run     stencil omp_base default
 }
 
+clean() {
+    clean_make FFT;
+    clean_make HPCG;
+    clean_make JA;
+    clean_make LULESH;
+    clean_make PO;
+    clean_make ST;
+
+    clean_make RODINIA/hotspot
+    clean_make RODINIA/lud
+    clean_make RODINIA/streamcluster
+    clean_make RODINIA/data/hotspot/inputGen
+
+    silent_make NAS veryclean
+}
+
 clean_make() {
     make --silent -C "$1" clean
 }
 
-dirty_make() {
-    local DIR=$1
-    shift 1
-    make --silent -C "$DIR" "$@"
+silent_make() {
+    make --silent -C "$@"
 }
 
 pyenv_setup() {
+    eval "$(pyenv init - bash)"
     pyenv install --skip-existing 2
     cd "$BENCHMARKS_DIR" || exit 1
     pyenv local 2
@@ -48,7 +79,9 @@ _setConfigArgs() {
     while [ "${1:-}" != '' ]; do
         case "$1" in
             ## Options
-            
+            -c | --clean)
+                JUSTCLEAN=true
+                ;;
             ## end of Options
             [!-]*)
                 break
