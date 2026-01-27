@@ -9,8 +9,8 @@ main() {
     cd "$BENCHMARKS_DIR" || exit 1
 
     if [ "$JUSTCLEAN" == "true" ]; then
-        rm -f .python-version
         clean
+        cd "$BENCHMARKS_DIR" && rm -f .python-version
         return
     fi
 
@@ -58,6 +58,8 @@ clean() {
     clean_make RODINIA/data/hotspot/inputGen
 
     silent_make NAS veryclean
+
+    cd "$BENCHMARKS_DIR/parboil" && ./parboil clean stencil omp_base
 }
 
 clean_make() {
