@@ -20,6 +20,15 @@ def main(program: type[Program], machine: type[Machine]):
 def cpu_set(machine: type[Machine]):
     with open("input.csv", "r") as f:
         x = np.array(f.readline().split(",")).astype("int")
+    
+    result = subprocess.run(
+        ["cpupower", "frequency-set", "--governor", "userspace"],
+        capture_output=True,
+        text=True,
+    )
+    output_CompletedProcess("Governor set", result, True)
+    if result.returncode != 0:
+        exit(result.returncode)
 
     frequency = machine.freq[x[FREQUECNY_POS]]
 
@@ -28,7 +37,6 @@ def cpu_set(machine: type[Machine]):
         capture_output=True,
         text=True,
     )
-
     output_CompletedProcess("Frequency set", result, True)
     if result.returncode != 0:
         exit(result.returncode)

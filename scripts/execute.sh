@@ -12,6 +12,9 @@ main() {
 	export OMP_NUM_THREADS=$NT
 
 	OUT_DIR=${OUT_DIR:-"$PROJECT_DIR/.benchmark-results"}
+    if ! [ -d "$OUT_DIR" ]; then
+        mkdir "$OUT_DIR"
+    fi
 	echo "Running $NAME with $NT threads"
 	{
 		echo "OMP_NUM_THREADS=$OMP_NUM_THREADS"
