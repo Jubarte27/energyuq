@@ -1,4 +1,4 @@
-import easyvvuq as uq
+from . import easyvvuq as uq
 import pandas as pd
 from pathlib import Path
 import pickle
@@ -33,4 +33,4 @@ def load(directory = "run_results/"):
 
     data_frame = pd.read_pickle(f"{directory}/data_frame")
     results = analysis.analyse(data_frame)
-    return analysis, sampler, data_frame, vary, qoi_cols, results
+    return analysis, sampler, data_frame, qoi_cols, results
