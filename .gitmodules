@@ -2,5 +2,5 @@
 	path = hpc-benchmarks
 	url = https://github.com/wbmaas/hpc-benchmarks
 [submodule "util/EasyVVUQ"]
-	path = util/EasyVVUQ
+	path = EasyVVUQ
 	url = https://github.com/Jubarte27/EasyVVUQ
