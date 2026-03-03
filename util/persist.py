@@ -1,4 +1,4 @@
-from . import easyvvuq as uq
+import easyvvuq as uq
 import pandas as pd
 from pathlib import Path
 import pickle
