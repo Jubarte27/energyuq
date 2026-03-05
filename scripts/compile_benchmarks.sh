@@ -9,8 +9,9 @@ main() {
     cd "$BENCHMARKS_DIR" || exit 1
 
     if [ "$JUSTCLEAN" == "true" ]; then
-        clean
+        clean || exit 1
         cd "$BENCHMARKS_DIR" && rm -f .python-version
+        git restore "$BENCHMARKS_DIR/**/*.pyc" ## python 2 é feio
         return
     fi
 

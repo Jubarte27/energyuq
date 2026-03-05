@@ -2,6 +2,8 @@
 main() {
     set_log_depth 0
     ensure create_venv
+    ensure install_local_easyvvuq
+    ensure install_jupyter
     # ensure HIP_installation
 }
 _setConfigArgs() {
@@ -19,6 +21,8 @@ _setConfigArgs() {
         esac
         shift
     done
+
+    EasyVVUQ_DIR="$PROJECT_DIR/EasyVVUQ"
 }
 
 HIP_installation() {
@@ -37,7 +41,34 @@ create_venv() {
     # shellcheck disable=SC1091
     source "$PROJECT_DIR/.venv/bin/activate"
 
-    pip install --upgrade pip -r "$PROJECT_DIR/requirements.txt"
+    pip install --upgrade pip
+    pip install -r "$PROJECT_DIR/requirements.txt"
+}
+
+install_local_easyvvuq() {
+    enter_new_func "Installing easyvvuq"
+
+    cd "$PROJECT_DIR" || exit 1
+    if [ ! -f "$EasyVVUQ_DIR/requirements.txt" ]; then
+        git submodule init && git submodule update
+    fi
+    pip install setuptools wheel build
+    pip install -e "$EasyVVUQ_DIR"
+}
+
+install_jupyter() {
+    enter_new_func "Installing jupyter"
+
+    pip install jupyter notebook
+}
+
+python39() {
+    enter_new_func "Installing python 3.9"
+
+    eval "$(pyenv init - bash)"
+    pyenv install --skip-existing 3.9
+    cd "$PROJECT_DIR" || exit 1
+    pyenv local 3.9
 }
 
 SCRIPT_DIR=$(dirname "$(readlink -e "${BASH_SOURCE[0]}")") && source "$SCRIPT_DIR/util.bash"
