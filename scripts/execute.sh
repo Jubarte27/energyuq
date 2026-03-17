@@ -86,6 +86,7 @@ find_exec() {
             log_error "Unknown benchmark \"$1\""
             ;;
     esac
+    NAME="$1"
 }
 
 fft()    { cd "$BENCHMARK_DIR/FFT"    && ./fft_omp; }
@@ -126,22 +127,7 @@ _setConfigArgs() {
 	fi
 
 	find_exec "$1"
-	case "$1" in
-		FFT | HPCG | JA | LULESH)
-			EXEC="${!1}"
-			NAME="$1"
-			;;
-		NONE)
-			EXEC="echo \"Running None\""
-			NAME="$1"
-			;;
-		*)
-			log_error "Unknown benchmark \"$1\""
-	esac
-	
 	NT=$2
-
-
 }
 
 

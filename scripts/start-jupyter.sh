@@ -10,7 +10,7 @@ main() {
     # shellcheck disable=SC1091
     source "$PROJECT_DIR/.venv/bin/activate"
 
-    cd "$PROJECT_DIR" && jupyter notebook --allow-root
+    cd "$PROJECT_DIR" && jupyter notebook --allow-root --NotebookApp.token='' --NotebookApp.password=''
 }
 
 _setConfigArgs() {
