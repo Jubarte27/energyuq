@@ -28,7 +28,7 @@ def cpu_set(machine: type[Machine]):
     )
     output_CompletedProcess("Governor set", result, True)
     if result.returncode != 0:
-        exit(result.returncode)
+        raise Exception(f"Unable to set governor using cpupower, am i root? code: {result.returncode}")
 
     frequency = machine.freq[x[FREQUECNY_POS]]
 
@@ -39,7 +39,7 @@ def cpu_set(machine: type[Machine]):
     )
     output_CompletedProcess("Frequency set", result, True)
     if result.returncode != 0:
-        exit(result.returncode)
+        raise Exception(f"Unable to set frequency using cpupower, am i root? code: {result.returncode}")
     # power_cap = x[POWER_CAP_POS]
     # power_cap *= 10**6
     # set_sysfs("/sys/class/powercap/intel-rapl:0/?????", power_cap, "Power cap")

@@ -11,7 +11,7 @@ def save(analysis: uq.analysis.SCAnalysis, sampler: uq.sampling.SCSampler, data_
     data_frame.to_pickle(f"{directory}/data_frame")
 
     with open(f"{directory}/vary", "wb") as f:
-        pickle.dump(vary, f)
+        pickle.dump(vary.vary_dict, f)
 
     with open(f"{directory}/QOI", "wb") as f:
         pickle.dump(qoi_cols, f)
@@ -22,6 +22,7 @@ def read_pickle(path):
 
 def load(directory = "run_results/"):
     vary = read_pickle(f"{directory}/vary")
+    print(type(vary))
 
     sampler = uq.sampling.SCSampler(vary=vary)
     sampler.load_state(f"{directory}/sampler")
