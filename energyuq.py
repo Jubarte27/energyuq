@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 from typing import Any, Union
 import typing
-from collections.abc import Callable
+from easyvvuq.db.sql import CampaignDB
 import dill
 import numpy as np
 import easyvvuq as uq
@@ -15,11 +15,15 @@ from util import persist
 import energy_wrapper
 from programs import *
 from machines import *
-import re
+from util.path import change_dir_permissions, latest_dir, next_file, next_dir
+
+
+params_type = dict[str, dict[str, Any]]
+vary_type = dict[str, cp.Distribution]
 
 # Quantity of Interest
 QOI = "energy_uj"
-MACHINE = Glados
+RESULTS_DIR = "run_results"
 
 
 class ExecuteWrapper:
@@ -56,10 +60,6 @@ class ExecuteWrapper:
             raise RuntimeError("action did not finish yet")
         else:
             return True
-
-
-params_type = dict[str, dict[str, Any]]
-vary_type = dict[str, cp.Distribution]
 
 
 def default_params(machine: type[Machine]) -> tuple[params_type, vary_type]:
@@ -117,12 +117,37 @@ def create_dir(path: Path):
     path.mkdir(parents=True, exist_ok=True)
 
 
-def create_file(path: Path):
-    path.touch()
-
-
 def campaign_path(root: Path):
     return root.joinpath("campaign")
+
+
+def create_campaign(program: type[Program], machine: type[Machine], root: Path):
+    path = campaign_path(root)
+    create_dir(path)
+    change_dir_permissions(path, 0o777)
+
+    params, vary = default_params(machine)
+    campaign = uq.Campaign(
+        name="energy",
+        db_location="sqlite:///" + path.as_posix() + "/campaign.db",
+        work_dir=path.as_posix(),
+    )
+    setattr(campaign, "root_path", root)
+    
+    # the database was empty, create a new app
+    if campaign.get_active_app() is None:
+        campaign.add_app(name=campaign.campaign_name, params=params, actions=energy_wraper_actions(program, machine, root))
+        sampler = uq.sampling.SCSampler(
+            vary=vary,
+            polynomial_order=1,
+            quadrature_rule="C",
+            sparse=True,
+            midpoint_level1=True,
+            dimension_adaptive=True,
+        )
+        campaign.set_sampler(sampler)
+    
+    return campaign
 
 
 def prepare_campaign(
@@ -131,27 +156,8 @@ def prepare_campaign(
     """
     Creates a campaign and runs the first execution
     """
-    create_dir(campaign_path(root))
 
-    params, vary = default_params(machine)
-    campaign = uq.Campaign(
-        name="energy",
-        params=params,
-        actions=energy_wraper_actions(program, machine, root),
-        work_dir=campaign_path(root).as_posix(),
-    )
-    setattr(campaign, "root_path", root)
-
-    sampler = uq.sampling.SCSampler(
-        vary=vary,
-        polynomial_order=1,
-        quadrature_rule="C",
-        sparse=True,
-        midpoint_level1=True,
-        dimension_adaptive=True,
-    )
-    campaign.set_sampler(sampler)
-
+    campaign = create_campaign(program, machine, root)
     campaign.execute(sequential=True).collate(progress_bar=True)
 
     return campaign
@@ -161,9 +167,6 @@ def prepare_analysis(campaign: uq.campaign.Campaign) -> uq.analysis.SCAnalysis:
     analysis = uq.analysis.SCAnalysis(
         sampler=campaign.get_active_sampler(), qoi_cols=[QOI]
     )
-
-    # perform analysis (basically estimates moments, Sobol analysis, and updates internal state of analysis)
-    campaign.apply_analysis(analysis)
 
     return analysis
 
@@ -231,51 +234,30 @@ def refine_and_analyse(
     refine_sampling_plan(campaign, analysis, number_of_refinements)
     campaign.apply_analysis(analysis)
 
+def run_dir(*, name: str = "energy", dir: Union[str, None] = None, campaign: Union[uq.campaign.Campaign, None] = None):
+    if dir:
+        return Path(dir)
+    if campaign:
+        if hasattr(campaign, "root_path"):
+            return getattr(campaign, "root_path")
+        
+        name = campaign.get_active_app()["name"]
+    
+    return next_dir(RESULTS_DIR, name)
 
 def create(
     program: type[Program], machine: type[Machine], /, dir: Union[str, None] = None
 ):
-    if dir is None:
-        root = next_dir("run_results", "energy")
-    else:
-        root = Path(dir)
+    root = run_dir(dir=dir)
     create_dir(root)
 
     ### campaign and analysis are the only independent ones, maybe we could cut a few steps at the saving stage????
     campaign = prepare_campaign(program, machine, root)
     analysis = prepare_analysis(campaign)
+    # perform analysis (basically estimates moments, Sobol analysis, and updates internal state of analysis)
+    campaign.apply_analysis(analysis)
 
     return campaign, analysis
-
-
-def next_path(
-    dir: Union[str, Path],
-    prefix: str = "",
-    suffix="",
-    restriction: Callable[[Path], bool] = lambda _: True,
-) -> Path:
-    name_pattern = re.compile(f"{re.escape(prefix)}([0-9]+){re.escape(suffix)}")
-    parent = Path(dir)
-    last = max(
-        (
-            int(m.group(1))
-            for p in parent.iterdir()
-            if restriction(p)
-            and (name := p.relative_to(parent).as_posix())
-            and (m := name_pattern.fullmatch(name))
-            and m
-        ),
-        default=-1,
-    )
-    return Path(parent, f"{prefix}{last + 1}{suffix}")
-
-
-def next_dir(dir: Union[str, Path], base_name: str) -> Path:
-    return next_path(dir, prefix=base_name + "_", restriction=Path.is_dir)
-
-
-def next_file(dir: Union[str, Path], base_name: str) -> Path:
-    return next_path(dir, prefix=base_name + "_", restriction=Path.is_file)
 
 
 def save(
@@ -284,17 +266,35 @@ def save(
     /,
     dir: Union[str, None] = None,
 ):
-    data_frame = campaign.get_collation_result()
-    sampler = get_sampler(campaign)
-    vary = sampler.vary
-
-    if not dir:
-        path = getattr(
-            campaign, "root_path", next_dir("run_results", campaign.campaign_name)
-        ).joinpath("pickles")
-    else:
-        path = Path(dir)
+    path = run_dir(dir=dir, campaign=campaign)
 
     create_dir(path)
 
-    persist.save(analysis, sampler, data_frame, vary, [QOI], path.as_posix())
+    analysis.save_state(path.joinpath("analisys").as_posix())
+
+
+def load(
+    program: type[Program],
+    machine: type[Machine],
+    campaign_name: str,
+    /,
+    dir: Union[str, None] = None,
+) -> tuple[uq.campaign.Campaign, uq.analysis.SCAnalysis]:
+
+    if not dir:
+        path = latest_dir(RESULTS_DIR, campaign_name)
+        if path is None:
+            raise Exception(
+                "No directory was informed and could not find using the default pattern"
+            )
+    else:
+        path = Path(dir)
+
+    campaign = create_campaign(program, machine, path)
+    analysis = prepare_analysis(campaign)
+    analysis.load_state(path.joinpath("analysis"))
+    
+    # perform analysis (basically estimates moments, Sobol analysis, and updates internal state of analysis)
+    campaign.apply_analysis(analysis)
+
+    return campaign, analysis
