@@ -6,7 +6,7 @@ import pickle
 def save(analysis: uq.analysis.SCAnalysis, sampler: uq.sampling.SCSampler, data_frame: pd.DataFrame, vary, qoi_cols, directory = "run_results/"):
     Path(directory).mkdir(exist_ok=True)
 
-    analysis.save_state(f"{directory}/analisys")
+    analysis.save_state(f"{directory}/analysis")
     sampler.save_state(f"{directory}/sampler")
     data_frame.to_pickle(f"{directory}/data_frame")
 
@@ -30,7 +30,7 @@ def load(directory = "run_results/"):
     qoi_cols = read_pickle(f"{directory}/QOI")
 
     analysis = uq.analysis.SCAnalysis(sampler=sampler, qoi_cols=qoi_cols)
-    analysis.load_state(f"{directory}/analisys")
+    analysis.load_state(f"{directory}/analysis")
 
     data_frame = pd.read_pickle(f"{directory}/data_frame")
     results = analysis.analyse(data_frame)

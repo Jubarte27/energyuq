@@ -270,7 +270,7 @@ def save(
 
     create_dir(path)
 
-    analysis.save_state(path.joinpath("analisys").as_posix())
+    analysis.save_state(path.joinpath("analysis").as_posix())
 
 
 def load(
@@ -292,7 +292,7 @@ def load(
 
     campaign = create_campaign(program, machine, path)
     analysis = prepare_analysis(campaign)
-    analysis.load_state(path.joinpath("analysis"))
+    analysis.load_state(path.absolute().joinpath("analysis"))
     
     # perform analysis (basically estimates moments, Sobol analysis, and updates internal state of analysis)
     campaign.apply_analysis(analysis)
