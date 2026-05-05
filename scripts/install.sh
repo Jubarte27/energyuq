@@ -4,12 +4,17 @@ main() {
     ensure create_venv
     ensure install_local_easyvvuq
     ensure install_jupyter
-    # ensure HIP_installation
+    if [ "$COMPILE_HPC" == "true" ] ; then
+        ensure compile_hpc_benchmarks
+    fi
 }
 _setConfigArgs() {
     while [ "${1:-}" != '' ]; do
         case "$1" in
             ## Options
+            --hpc)
+                COMPILE_HPC=true
+                ;;
             
             ## end of Options
             [!-]*)
@@ -23,12 +28,6 @@ _setConfigArgs() {
     done
 
     EasyVVUQ_DIR="$PROJECT_DIR/EasyVVUQ"
-}
-
-HIP_installation() {
-    enter_new_func "Making HIP"
-
-    cd "$PROJECT_DIR/HIP-3D" && make
 }
 
 create_venv() {
@@ -69,6 +68,12 @@ python39() {
     pyenv install --skip-existing 3.9
     cd "$PROJECT_DIR" || exit 1
     pyenv local 3.9
+}
+
+compile_hpc_benchmarks() {
+    enter_new_func "Compiling HPC benchmarks"
+
+    "${SCRIPT_DIR}/compile-hpc-benchmarks.sh"
 }
 
 SCRIPT_DIR=$(dirname "$(readlink -e "${BASH_SOURCE[0]}")") && source "$SCRIPT_DIR/util.bash"

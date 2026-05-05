@@ -1,18 +1,16 @@
 from subprocess import CompletedProcess, run
 import os
-from typing import ClassVar
+from typing import ClassVar, Iterable
+from util.data import ExecutionParams
 from .program import Program
 
 class ExecuteSH(Program):
     @classmethod
-    def run(cls, params: list) -> CompletedProcess[str]:
-        params = [int(x) for x in params]
-        N_THREADS = params[0]
-        execute = f"{os.path.dirname(__file__)}/../scripts/execute.sh"
-        print(f"Running {cls.name} with {N_THREADS} threads")
-        # print(f"Current working directory: {os.getcwd()}")
+    def run(cls, params: ExecutionParams, args: Iterable[str]) -> CompletedProcess[str]:
+        execute = f"{os.path.dirname(__file__)}/../scripts/execute-hpc-benchmarks.sh"
+        print(f"Running {cls.name} with {params.n_threads} threads")
         return run(
-            [execute, cls.name, str(N_THREADS)],
+            [execute, cls.name, str(params.n_threads)],
             capture_output=True,
             text=True,
         )

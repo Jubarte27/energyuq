@@ -41,7 +41,7 @@ profile_default/
 ipython_config.py
 
 # Environments
-.env
+# .env
 .venv
 env/
 venv/
@@ -67,3 +67,5 @@ venv.bak/
 .results
 .benchmark-results
 run_results
+
+dakota/

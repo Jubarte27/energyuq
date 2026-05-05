@@ -1,0 +1,16 @@
+- o que pegar de cada framework
+
+- ROCM
+    - https://repo.radeon.com/rocm/installer/rocm-runfile-installer/rocm-rel-7.2.2/ubuntu/24.04/
+
+
+
+- dakota ubuntu
+    - pip install sphinx myst-parser sphinx-rtd-theme sphinxcontrib-bibtex h5py
+    - apt install gcc g++ gfortran cmake libboost-all-dev libblas-dev liblapack-dev libopenmpi-dev openmpi-bin gsl-bin libgsl-dev python perl libhdf5-dev doxygen texlive-latex-base openjdk-11-jre-headless
+    - wget https://github.com/snl-dakota/dakota/releases/download/v6.23.0/dakota-6.23.0-public-src-cli.tar.gz -O dak.tar.gz 
+    - tar -xzvf dak.tar.gz
+    - cd dakota-6.23.0-public-src-cli
+    - mkdir dak-build
+    - to be continued ..... https://snl-dakota.github.io/docs/6.23.0/users/compiling/configure.html
+    - /usr/lib/x86_64-linux-gnu/libmpi_cxx.so

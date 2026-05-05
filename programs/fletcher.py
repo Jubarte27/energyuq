@@ -1,19 +1,20 @@
 from subprocess import CompletedProcess
 import subprocess
-from typing import ClassVar
+from typing import ClassVar, Iterable
 import numpy as np
 import os
 
+from util.data import ExecutionParams
 from .program import Program
 
 class Fletcher(Program):
     name: ClassVar[str] = "Fletcher"
 
     @classmethod
-    def run(cls, params: list) -> CompletedProcess[str]:
-        params = [int(x) for x in params]
-        BSIZE_X = params[0]
-        BSIZE_Y = params[1]
+    def run(cls, params: ExecutionParams, args: Iterable[str]) -> CompletedProcess[str]:
+        int_params = [int(x) for x in args]
+        BSIZE_X = int_params[0]
+        BSIZE_Y = int_params[1]
 
         fletcher_exe = f"{os.path.dirname(__file__)}/HIP-3D/ModelagemFletcher.exe"
 
