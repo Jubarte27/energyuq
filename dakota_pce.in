@@ -1,4 +1,5 @@
 environment,
+	method_pointer = 'BandB'
 	tabular_data
 		tabular_data_file = 'pce_samples.dat'
         custom_annotated header
@@ -6,25 +7,92 @@ environment,
 variables,
     mixed
 	active all
-	discrete_uncertain_set
-		integer         =     2
-		num_set_values  =     3     		6
-		set_values      =    0 1 2      1 2 4 8 16 32
-		descriptors     =   'CLK'  		'N_THREADS'
-		categorical     = 'no'
-	
-	continuous_design = 3
-		initial_point   -1.0    1.5   2.0
-		upper_bounds    10.0   10.0  10.0
-		lower_bounds   -10.0  -10.0 -10.0
-		descriptors      'x1'  'x2'  'x3'
 	discrete_design_range = 2
-		initial_point      2     2
-		lower_bounds       1     1
-		upper_bounds       4     9
-		descriptors      'y1'   'y2'
+		initial_point        2           32
+		lower_bounds         0            1
+		upper_bounds         2           32
+		descriptors      'CLK'  'N_THREADS'
 
 
+method
+	id_method 'comin'
+	conmin_frcg
+
+method
+	id_method '1pac'
+	nl2sol
+
+method
+	id_method 'tupac'
+	mesh_adaptive_search
+
+method
+	id_method 'wets'
+	coliny_solis_wets
+
+method
+	id_method 'dir'
+	coliny_direct
+
+method
+	id_method 'nu'
+	ncsu_direct
+
+method
+	id_method 'alladin'
+	genie_direct
+
+method
+	id_method 'globo'
+	efficient_global
+
+method
+	id_method 'stock'
+	multifidelity_stoch_collocation
+		sparse_grid_level_sequence 4 3 2
+
+
+method
+	id_method 'blu'
+	multilevel_blue
+
+method
+	id_method 'gp'
+	gpais
+
+method
+	id_method 'simp'
+	sampling
+		samples 20
+
+method
+	id_method 'bae'
+	bayes_calibration
+		queso
+			chain_samples = 100
+method
+	id_method 'imp'
+	importance_sampling
+		adapt_import
+
+method
+  id_method = 'SubNLP'
+  coliny_ea
+    seed = 12345
+    max_iterations = 100
+    max_function_evaluations = 100
+
+method
+  id_method = 'BandB'
+  branch_and_bound
+    output verbose
+    method_pointer = 'wets'
+
+method
+	id_method 'chaos'
+	polynomial_chaos
+		sparse_grid_level = 2
+		variance_based_decomp
 
 method,
 	id_method = 'ada'
@@ -43,5 +111,5 @@ interface
 responses
     response_functions = 1
     descriptors = 'energy_uj'
-	no_gradients
+	numerical_gradients
 	no_hessians

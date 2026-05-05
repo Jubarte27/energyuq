@@ -3,6 +3,7 @@ from typing import Iterable, Union
 from programs import *
 from machines import *
 from util.data import ExecutionParams
+from time import perf_counter
 
 from textwrap import indent
 
@@ -11,8 +12,8 @@ def prepare_and_exeute(machine: type[Machine], program: type[Program], params: E
         args = []
     
     cpu_set(machine, params.freq_level)
-    start, end = run(program, params, args)
-    return report(start, end)
+    start, end, t = run(program, params, args)
+    return report(start, end, t)
     
 
 def cpu_set(machine: type[Machine], freq_level: int):
@@ -43,24 +44,33 @@ def cpu_set(machine: type[Machine], freq_level: int):
 def run(program: type[Program], params: ExecutionParams, parameter_list: Iterable[str]):
 
     start = energy_uj()
+    t = perf_counter()
+
     print()
     result = program.run(params, parameter_list)
     print()
+
+    t = perf_counter() - t
     end = energy_uj()
 
     output_CompletedProcess(program.name, result)
 
-    return start, end
+    return start, end, t
 
 
-def report(start_energy: int, end_energy: int):
+def report(start_energy: int, end_energy: int, elapsed: float):
     used_energy = end_energy - start_energy
+    max_energy = max_energy_range_uj()
+
     if used_energy < 0:
-        max_energy = max_energy_range_uj()
         used_energy = (end_energy + max_energy) - start_energy
+    
+    energy_scaled = used_energy / max_energy
 
     return {
         "energy_uj": used_energy,
+        "energy_scaled": energy_scaled,
+        "time": elapsed
     }
 
 

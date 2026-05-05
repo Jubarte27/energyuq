@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 from dakota import interfacing
 
-import base_wrapper
+import base_wrapper as base_wrapper
 from programs import *
 from machines import *
 from util.data import ExecutionParams

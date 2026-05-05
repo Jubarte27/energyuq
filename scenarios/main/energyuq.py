@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 from easyvvuq.actions import CreateRunDirectory, Encode, Decode, ExecutePython, Actions
 
 from util import persist
-import energy_wrapper
+import wrappers.easy_wrapper as easy_wrapper
 from programs import *
 from machines import *
 from util.path import change_dir_permissions, latest_dir, next_file, next_dir
@@ -23,6 +23,7 @@ vary_type = dict[str, cp.Distribution]
 
 # Quantity of Interest
 QOI = "energy_uj"
+QOIS = ["energy_uj", "energy_scaled", "time"]
 RESULTS_DIR = "run_results"
 
 
@@ -88,7 +89,7 @@ def energy_wraper_actions(
     )
 
     # CSV output file decoder
-    decoder = uq.decoders.SimpleCSV(target_filename="output.csv", output_columns=[QOI])
+    decoder = uq.decoders.SimpleCSV(target_filename="output.csv", output_columns=QOIS)
 
     # Local execution of the wrapper around benchmarks
     parent_path = root.joinpath("output").absolute()
@@ -100,7 +101,7 @@ def energy_wraper_actions(
         file_path = next_file(parent_path, program.name)
         with open(file_path.as_posix(), "w") as f:
             with redirect_stdout(f):
-                energy_wrapper.main(program, machine)
+                easy_wrapper.main(program, machine)
 
     execute = ExecuteWrapper(wrapper)
 
@@ -240,8 +241,9 @@ def run_dir(*, name: str = "energy", dir: Union[str, None] = None, campaign: Uni
     if campaign:
         if hasattr(campaign, "root_path"):
             return getattr(campaign, "root_path")
-        
-        name = campaign.get_active_app()["name"]
+        app = campaign.get_active_app()
+        if app:
+            name = app["name"]
     
     return next_dir(RESULTS_DIR, name)
 
