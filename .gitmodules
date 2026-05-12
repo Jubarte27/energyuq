@@ -4,3 +4,6 @@
 [submodule "util/EasyVVUQ"]
 	path = EasyVVUQ
 	url = https://github.com/Jubarte27/EasyVVUQ
+[submodule "snl-dakota"]
+	path = snl-dakota
+	url = https://github.com/Jubarte27/dakota
