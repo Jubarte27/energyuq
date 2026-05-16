@@ -46,6 +46,7 @@ configure_dakota() {
       -DDAKOTA_PYTHON_WRAPPER=ON \
       -DDAKOTA_HAVE_GSL=ON \
       -DHAVE_QUESO=ON \
+      -DENABLE_SPEC_MAINT=ON \
       "$DAK_SRC"
 }
 
@@ -60,8 +61,8 @@ build_dakota() {
     enter_new_func "Building Dakota"
     
     cd "$DAK_BUILD" || exit
-    make -j "$(nproc --ignore=2)"
-    make -j "$(nproc --ignore=2)" install
+    make -s -j "$(nproc --ignore=2)"
+    make -s -j "$(nproc --ignore=2)" install
 }
 
 create_venv() {
