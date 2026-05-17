@@ -1,9 +1,9 @@
 [submodule "hpc-benchmarks"]
 	path = hpc-benchmarks
 	url = https://github.com/wbmaas/hpc-benchmarks
-[submodule "util/EasyVVUQ"]
+[submodule "easy/EasyVVUQ"]
 	path = easy/EasyVVUQ
 	url = https://github.com/Jubarte27/EasyVVUQ
-[submodule "snl-dakota"]
+[submodule "dakota/snl-dakota"]
 	path = dakota/snl-dakota
 	url = https://github.com/Jubarte27/dakota
