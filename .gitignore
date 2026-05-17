@@ -68,7 +68,6 @@ venv.bak/
 .benchmark-results
 run_results
 
-dakota/
 /**/dakota-*/
 /**/.dakota-*/
 /**/dak-*/

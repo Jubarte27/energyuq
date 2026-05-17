@@ -1,7 +1,7 @@
 from subprocess import CompletedProcess, run
 import os
 from typing import ClassVar, Iterable
-from util.data import ExecutionParams
+from ..util.data import ExecutionParams
 from .program import Program
 
 class ExecuteSH(Program):

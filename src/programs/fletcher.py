@@ -4,7 +4,7 @@ from typing import ClassVar, Iterable
 import numpy as np
 import os
 
-from util.data import ExecutionParams
+from ..util.data import ExecutionParams
 from .program import Program
 
 class Fletcher(Program):

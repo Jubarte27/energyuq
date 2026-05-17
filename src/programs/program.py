@@ -1,6 +1,6 @@
 from subprocess import CompletedProcess
 from typing import ClassVar, Iterable, Protocol
-from util.data import ExecutionParams
+from ..util.data import ExecutionParams
 
 class Program(Protocol):
 

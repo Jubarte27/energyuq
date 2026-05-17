@@ -20,7 +20,7 @@ cleanup() {
 install_dakota() {
     enter_new_func "Installing Dakota"
 
-    ensure get_dev
+    ensure get_source
     ensure configure_dakota
     ensure build_dakota
     # ensure test_dakota
@@ -65,6 +65,12 @@ build_dakota() {
     make -s -j "$(nproc --ignore=2)" install
 }
 
+get_source() {
+    git submodule update --init "$DAK_SRC"
+    cd "$DAK_SRC" || exit
+    git submodule update --init packages/external/ packages/pecos/ packages/surfpack/
+}
+
 create_venv() {
     enter_new_func "Creating python venv"
     
@@ -82,15 +88,14 @@ create_venv() {
 
 install_python() {
     enter_new_func "Installing python"
-
-    if ! command -v python3 &> /dev/null; then
-        # do i need this?
-        if ! command -v pyenv &> /dev/null; then
+    if ! command -v pyenv &> /dev/null; then
+        if ! command -v python3 &> /dev/null; then
+            # never tested?
             apt install python3
-        else
-            pyenv install 3.10
-            pyenv local 3.10
         fi
+    else
+        pyenv install 3.14
+        pyenv local 3.14
     fi
 
     # do i need this?
@@ -104,12 +109,6 @@ install_deps() {
 
     log "$INFO" "Hoping they are here already"
     # apt install gcc g++ gfortran cmake libboost-all-dev libblas-dev liblapack-dev libopenmpi-dev openmpi-bin gsl-bin libgsl-dev perl libhdf5-dev doxygen texlive-latex-base openjdk-11-jre-headless libatlas-base-dev
-}
-
-get_dev() {
-    git submodule update --init "$DAK_SRC"
-    cd "$DAK_SRC" || exit
-    git submodule update --init packages/external/ packages/pecos/ packages/surfpack/
 }
 
 _setConfigArgs() {
@@ -131,13 +130,13 @@ _setConfigArgs() {
         shift
     done
 
-    BASE_DIR="${1:-$PROJECT_DIR}"
+    BASE_DIR="${1:-"$PROJECT_DIR/dakota"}"
+    DEV_DIR="$BASE_DIR/dev"
 
     DAK_SRC="$BASE_DIR/snl-dakota"
-    DAK_INSTALL="$BASE_DIR/dakota-dev"
-    DAK_BUILD="$BASE_DIR/dak-build-dev"
-
-    DAK_VENV="$BASE_DIR/.dakota-dev-venv"
+    DAK_INSTALL="$DEV_DIR/install"
+    DAK_BUILD="$DEV_DIR/build"
+    DAK_VENV="$DEV_DIR/.venv"
 
 
     # MPICXX=$(find /usr/ -iname mpicxx)

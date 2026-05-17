@@ -1,26 +1,24 @@
-#!/usr/bin/env python3
-import numpy as np
 import subprocess
-from programs import *
-from machines import *
+from typing import Iterable, Union
+from ..programs import *
+from ..machines import *
+from ..util.data import ExecutionParams
+from time import perf_counter
 
 from textwrap import indent
 
-FREQUECNY_POS = 1
-# POWER_CAP_POS = 2
-
-
-def main(program: type[Program], machine: type[Machine]):
-    cpu_set(machine)
-    start, end = run(program)
-    report(start, end)
-    # program.report()
-
-
-def cpu_set(machine: type[Machine]):
-    with open("input.csv", "r") as f:
-        x = np.array(f.readline().split(",")).astype("int")
+def prepare_and_exeute(machine: type[Machine], program: type[Program], params: ExecutionParams, args: Union[None, Iterable[str]]):
+    if not args:
+        args = []
     
+    cpu_set(machine, params.freq_level)
+    start, end, t = run(program, params, args)
+    return report(start, end, t)
+    
+
+def cpu_set(machine: type[Machine], freq_level: int):
+    frequency = machine.freq[freq_level]
+
     result = subprocess.run(
         ["cpupower", "frequency-set", "--governor", "userspace"],
         capture_output=True,
@@ -29,8 +27,6 @@ def cpu_set(machine: type[Machine]):
     output_CompletedProcess("Governor set", result, True)
     if result.returncode != 0:
         raise Exception(f"Unable to set governor using cpupower, am i root? code: {result.returncode}")
-
-    frequency = machine.freq[x[FREQUECNY_POS]]
 
     result = subprocess.run(
         ["cpupower", "frequency-set", "--freq", str(frequency)],
@@ -45,34 +41,37 @@ def cpu_set(machine: type[Machine]):
     # set_sysfs("/sys/class/powercap/intel-rapl:0/?????", power_cap, "Power cap")
 
 
-def run(program: type[Program]):
-    with open("input.csv", "r") as f:
-        x = f.readline().split(",")
+def run(program: type[Program], params: ExecutionParams, parameter_list: Iterable[str]):
 
     start = energy_uj()
+    t = perf_counter()
+
     print()
-    result = program.run(x)
+    result = program.run(params, parameter_list)
     print()
+
+    t = perf_counter() - t
     end = energy_uj()
 
     output_CompletedProcess(program.name, result)
 
-    return start, end
+    return start, end, t
 
 
-def report(start_energy: int, end_energy: int):
+def report(start_energy: int, end_energy: int, elapsed: float):
     used_energy = end_energy - start_energy
+    max_energy = max_energy_range_uj()
+
     if used_energy < 0:
-        max_energy = max_energy_range_uj()
         used_energy = (end_energy + max_energy) - start_energy
+    
+    energy_scaled = used_energy / max_energy
 
-    with open("output.csv", "w") as f:
-        f.write("energy_uj\n")
-        f.write(f"{float(used_energy)}\n")
-
-
-def prepare_report():
-    return
+    return {
+        "energy_uj": used_energy,
+        "energy_scaled": energy_scaled,
+        "time": elapsed
+    }
 
 
 def max_energy_range_uj() -> int:
@@ -140,10 +139,3 @@ def pretty_out(name: str, *args):
     else:
         out = f"{name}: {out}"
     return out
-
-
-if __name__ == "__main__":
-    program = NONE
-    machine = Glados
-    print("Running on Glados")
-    main(program, machine)

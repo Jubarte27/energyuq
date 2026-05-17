@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 from dakota import interfacing
 
-import base_wrapper as base_wrapper
-from programs import *
-from machines import *
-from util.data import ExecutionParams
+from ..wrappers import base_wrapper
+from ..programs import *
+from ..machines import *
+from ..util.data import ExecutionParams
 
 FREQUECNY_POS = 1
 # POWER_CAP_POS = 2

@@ -2,8 +2,8 @@
 	path = hpc-benchmarks
 	url = https://github.com/wbmaas/hpc-benchmarks
 [submodule "util/EasyVVUQ"]
-	path = EasyVVUQ
+	path = easy/EasyVVUQ
 	url = https://github.com/Jubarte27/EasyVVUQ
 [submodule "snl-dakota"]
-	path = snl-dakota
+	path = dakota/snl-dakota
 	url = https://github.com/Jubarte27/dakota

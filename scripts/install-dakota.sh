@@ -13,14 +13,18 @@ main() {
 cleanup() {
     enter_new_func "Cleaning up"
     if ! [ "$KEEP_AFTER_INSTALL" = true ]; then
-        rm -rf "$DAK_SRC" "$DAK_BUILD" "$BASE_DIR/.dakota-venv"
+        rm -rf "$DAK_SRC" "$DAK_BUILD" "$DAK_VENV"
     fi
 }
 
 install_dakota() {
     enter_new_func "Installing Dakota"
 
-    ensure get_source
+    if [ "$RELEASE" == "true" ]; then
+        ensure get_release
+    else
+        ensure get_dev
+    fi
     ensure configure_dakota
     ensure build_dakota
     # ensure test_dakota
@@ -29,11 +33,16 @@ install_dakota() {
 configure_dakota() {
     enter_new_func "Configuring Dakota"
 
+    local extras=()
+    if ! [ "$RELEASE" == "true" ]; then
+      extras+=("-DENABLE_SPEC_MAINT=ON")
+    fi
+
     #   -DMPI_CXX_COMPILER="$MPICXX" \
     #   -DBLAS_LIBS="$BLAS_LIB" \
     #   -DLAPACK_LIBS="$LAPACK_LIB" \
-    mkdir "$DAK_BUILD"
-    cd "$DAK_BUILD" || exit
+    mkdir -p "$DAK_BUILD"
+    ensure cd "$DAK_BUILD"
     cmake -DCMAKE_INSTALL_PREFIX="$DAK_INSTALL" \
       -DDAKOTA_HAVE_MPI=ON \
       -DDAKOTA_HAVE_HDF5=ON \
@@ -46,41 +55,51 @@ configure_dakota() {
       -DDAKOTA_PYTHON_WRAPPER=ON \
       -DDAKOTA_HAVE_GSL=ON \
       -DHAVE_QUESO=ON \
+      "${extras[@]}" \
       "$DAK_SRC"
 }
 
 test_dakota() {
     enter_new_func "Testing Dakota"
 
-    cd "$DAK_BUILD" || exit
+    ensure cd "$DAK_BUILD"
     ctest -j "$(nproc --ignore=2)"
 }
 
 build_dakota() {
     enter_new_func "Building Dakota"
     
-    cd "$DAK_BUILD" || exit
+    ensure cd "$DAK_BUILD"
     make -j "$(nproc --ignore=2)"
     make -j "$(nproc --ignore=2)" install
 }
 
-get_source() {
-    enter_new_func "Downloading source files"
+get_release() {
+    enter_new_func "Downloading release source files"
 
     wget https://github.com/snl-dakota/dakota/releases/download/v6.23.0/$DAK_VERSION.tar.gz -O dak.tar.gz
     tar -xzvf dak.tar.gz
     rm dak.tar.gz
 }
 
+get_dev() {
+    enter_new_func "Downloading git source files"
+
+    ensure cd "$PROJECT_DIR"
+    git submodule update --init "$DAK_SRC"
+    ensure cd "$DAK_SRC"
+    git submodule update --init packages/external/ packages/pecos/ packages/surfpack/
+}
+
 create_venv() {
     enter_new_func "Creating python venv"
     
-    if [ ! -f "$BASE_DIR/.dakota-venv/bin/activate" ]; then
-        python3 -m venv "$BASE_DIR/.dakota-venv"
+    if [ ! -f "$DAK_VENV/bin/activate" ]; then
+        python3 -m venv "$DAK_VENV"
     fi
     
     # shellcheck disable=SC1091
-    source "$BASE_DIR/.dakota-venv/bin/activate"
+    source "$DAK_VENV/bin/activate"
 
     pip install --upgrade pip
     pip install sphinx myst-parser sphinx-rtd-theme sphinxcontrib-bibtex h5py
@@ -88,15 +107,14 @@ create_venv() {
 
 install_python() {
     enter_new_func "Installing python"
-
-    if ! command -v python3 &> /dev/null; then
-        # do i need this?
-        if ! command -v pyenv &> /dev/null; then
+    if ! command -v pyenv &> /dev/null; then
+        if ! command -v python3 &> /dev/null; then
+            # never tested?
             apt install python3
-        else
-            pyenv install 3.10
-            pyenv local 3.10
         fi
+    else
+        pyenv install --skip-existing 3.14
+        pyenv local 3.14
     fi
 
     # do i need this?
@@ -120,6 +138,10 @@ _setConfigArgs() {
                 KEEP_AFTER_INSTALL=true
                 ;;
             
+            -p|--release)
+                RELEASE=true
+                ;;
+            
             ## end of Options
             [!-]*)
                 break
@@ -131,12 +153,20 @@ _setConfigArgs() {
         shift
     done
 
-    BASE_DIR="${1:-$PROJECT_DIR}"
+    BASE_DIR="${1:-"$PROJECT_DIR/dakota"}"
+    DEV_DIR="$BASE_DIR/dev"
 
-    DAK_VERSION=dakota-6.23.0-public-src-cli
-    DAK_SRC="$BASE_DIR/$DAK_VERSION"
-    DAK_INSTALL="$BASE_DIR/dakota"
-    DAK_BUILD="$BASE_DIR/dak-build"
+    if [ "$RELEASE" == "true" ]; then
+        DAK_VERSION=dakota-6.23.0-public-src-cli
+        DAK_SRC="$BASE_DIR/$DAK_VERSION"
+    else
+        DAK_SRC="$BASE_DIR/snl-dakota"
+        BASE_DIR="$DEV_DIR"
+    fi
+
+    DAK_INSTALL="$BASE_DIR/install"
+    DAK_BUILD="$BASE_DIR/build"
+    DAK_VENV="$BASE_DIR/.venv"
 
 
     # MPICXX=$(find /usr/ -iname mpicxx)
