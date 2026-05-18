@@ -7,3 +7,4 @@
 [submodule "dakota/snl-dakota"]
 	path = dakota/snl-dakota
 	url = https://github.com/Jubarte27/dakota
+	branch = devel
