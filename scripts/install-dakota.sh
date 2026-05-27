@@ -1,6 +1,7 @@
 #!/bin/env bash
-
+set -o pipefail
 main() {
+    find "$BASE_DIR" -iname "*.log" -type f -delete
     set_log_depth 0
     ensure install_deps
     ensure install_python
@@ -12,8 +13,11 @@ main() {
 
 cleanup() {
     enter_new_func "Cleaning up"
-    if ! [ "$KEEP_AFTER_INSTALL" = true ]; then
-        rm -rf "$DAK_SRC" "$DAK_BUILD" "$DAK_VENV"
+    if ! [ "$KEEP_AFTER_INSTALL" = "true" ]; then
+        rm -rf "$DAK_BUILD" "$DAK_VENV"
+        if [ "$RELEASE" = "true" ]; then
+            rm -rf "$DAK_SRC"
+        fi
     fi
 }
 
@@ -33,17 +37,30 @@ install_dakota() {
 configure_dakota() {
     enter_new_func "Configuring Dakota"
 
+    ensure cd "$BASE_DIR"
+
     local extras=()
     if ! [ "$RELEASE" == "true" ]; then
       extras+=("-DENABLE_SPEC_MAINT=ON")
     fi
 
-    #   -DMPI_CXX_COMPILER="$MPICXX" \
-    #   -DBLAS_LIBS="$BLAS_LIB" \
-    #   -DLAPACK_LIBS="$LAPACK_LIB" \
     mkdir -p "$DAK_BUILD"
     ensure cd "$DAK_BUILD"
-    cmake -DCMAKE_INSTALL_PREFIX="$DAK_INSTALL" \
+    # ensure cmake -C "$BASE_DIR/BuildDakotaTemplate.cmake" -DCMAKE_INSTALL_PREFIX="$DAK_INSTALL" $DAK_SRC
+    
+    #   -DTrilinos_DIR="/usr/lib/x86_64-linux-gnu/cmake/Trilinos" \
+    make_me > >(tee "$BASE_DIR/configure.log") 2> >(tee "$BASE_DIR/configureerr.log" >&2)
+}
+
+make_me() {
+    if ! cmake --fresh -DCMAKE_INSTALL_PREFIX="$DAK_INSTALL" \
+      -DCMAKE_Fortran_COMPILER="gfortran" \
+      -DCMAKE_C_COMPILER="gcc" \
+      -DCMAKE_C_COMPILER_LAUNCHER="ccache" \
+      -DCMAKE_CXX_COMPILER="g++" \
+      -DCMAKE_CXX_COMPILER_LAUNCHER="ccache" \
+      -DMPI_CXX_COMPILER="mpicxx" \
+      -DCMAKE_Fortran_FLAGS="-fallow-argument-mismatch" \
       -DDAKOTA_HAVE_MPI=ON \
       -DDAKOTA_HAVE_HDF5=ON \
       -DHAVE_MUQ=ON \
@@ -56,11 +73,15 @@ configure_dakota() {
       -DDAKOTA_HAVE_GSL=ON \
       -DHAVE_QUESO=ON \
       "${extras[@]}" \
-      "$DAK_SRC"
+      "$DAK_SRC"; then
+        log "$ERROR" "Configuration failed, check $BASE_DIR/configureerr.log for details"
+        exit 1
+    fi
 }
 
 test_dakota() {
     enter_new_func "Testing Dakota"
+    ensure cd "$BASE_DIR"
 
     ensure cd "$DAK_BUILD"
     ctest -j "$(nproc --ignore=2)"
@@ -68,44 +89,67 @@ test_dakota() {
 
 build_dakota() {
     enter_new_func "Building Dakota"
+    ensure cd "$BASE_DIR"
     
     ensure cd "$DAK_BUILD"
-    make -j "$(nproc --ignore=2)"
-    make -j "$(nproc --ignore=2)" install
+    a > >(tee "$BASE_DIR/build.log") 2> >(tee "$BASE_DIR/builderr.log" >&2)
+    b > >(tee "$BASE_DIR/install.log") 2> >(tee "$BASE_DIR/installerr.log" >&2)
+}
+
+b() {
+    if ! make -j "$(nproc --ignore=2)" --no-keep-going install; then
+        log "$ERROR" "Installation failed, check $BASE_DIR/installerr.log for details"
+        exit 1
+    fi
+}
+
+a() {
+    if ! make -j "$(nproc --ignore=2)" --no-keep-going ; then
+        log "$ERROR" "Build failed, check $BASE_DIR/builderr.log for details"
+        exit 1
+    fi
 }
 
 get_release() {
     enter_new_func "Downloading release source files"
+    ensure cd "$BASE_DIR"
 
-    wget https://github.com/snl-dakota/dakota/releases/download/v6.23.0/$DAK_VERSION.tar.gz -O dak.tar.gz
-    tar -xzvf dak.tar.gz
-    rm dak.tar.gz
+    wget https://github.com/snl-dakota/dakota/releases/download/v6.24.0/$DAK_VERSION.tar.gz -O "$BASE_DIR/dak.tar.gz"
+    tar -xzf "$BASE_DIR/dak.tar.gz" -C "$BASE_DIR"
+    rm "$BASE_DIR/dak.tar.gz"
 }
 
 get_dev() {
     enter_new_func "Downloading git source files"
+    ensure cd "$BASE_DIR"
 
     ensure cd "$PROJECT_DIR"
-    git submodule update --init "$DAK_SRC"
+    git submodule update --remote "$DAK_SRC"
     ensure cd "$DAK_SRC"
-    git submodule update --init packages/external/ packages/pecos/ packages/surfpack/
+    # git submodule update packages/external packages/pecos packages/surfpack
+    # a feiura abaixo funciona, enquanto a belezura acima não
+    # sem acesso aos submodules, copiar da release
+    ensure get_release
+    cp -r --update=all $BASE_DIR/$DAK_VERSION/packages/** $DAK_SRC/packages/
+    rm -fr $BASE_DIR/$DAK_VERSION
 }
 
 create_venv() {
     enter_new_func "Creating python venv"
     
     if [ ! -f "$DAK_VENV/bin/activate" ]; then
+        ensure cd "$BASE_DIR"
         python3 -m venv "$DAK_VENV"
     fi
     
     # shellcheck disable=SC1091
     source "$DAK_VENV/bin/activate"
-
     pip install --upgrade pip
-    pip install sphinx myst-parser sphinx-rtd-theme sphinxcontrib-bibtex h5py
+    pip install sphinx myst-parser sphinx-rtd-theme sphinxcontrib-bibtex h5py scipy numpy
 }
 
 install_python() {
+    ensure cd "$BASE_DIR"
     enter_new_func "Installing python"
     if ! command -v pyenv &> /dev/null; then
         if ! command -v python3 &> /dev/null; then
@@ -127,7 +171,7 @@ install_deps() {
     enter_new_func "Installing dependencies"
 
     log "$INFO" "Hoping they are here already"
-    # apt install gcc g++ gfortran cmake libboost-all-dev libblas-dev liblapack-dev libopenmpi-dev openmpi-bin gsl-bin libgsl-dev perl libhdf5-dev doxygen texlive-latex-base openjdk-11-jre-headless libatlas-base-dev
+    # apt install gcc g++ gfortran cmake ccache libboost-all-dev libblas-dev liblapack-dev libopenmpi-dev openmpi-bin gsl-bin libgsl-dev perl libhdf5-dev doxygen texlive-latex-base openjdk-11-jre-headless libatlas-base-dev
 }
 
 _setConfigArgs() {
@@ -138,7 +182,7 @@ _setConfigArgs() {
                 KEEP_AFTER_INSTALL=true
                 ;;
             
-            -p|--release)
+            -r|--release)
                 RELEASE=true
                 ;;
             
@@ -155,9 +199,9 @@ _setConfigArgs() {
 
     BASE_DIR="${1:-"$PROJECT_DIR/dakota"}"
     DEV_DIR="$BASE_DIR/dev"
+    DAK_VERSION=dakota-6.24.0-public-src-cli
 
     if [ "$RELEASE" == "true" ]; then
-        DAK_VERSION=dakota-6.23.0-public-src-cli
         DAK_SRC="$BASE_DIR/$DAK_VERSION"
     else
         DAK_SRC="$BASE_DIR/snl-dakota"
@@ -169,9 +213,6 @@ _setConfigArgs() {
     DAK_VENV="$BASE_DIR/.venv"
 
 
-    # MPICXX=$(find /usr/ -iname mpicxx)
-    # BLAS_LIB=$(find /usr/ -iwholename "*atlas/libblas.so")
-    # LAPACK_LIB=$(find /usr/ -iwholename "*atlas/liblapack.so")
 }
 
 SCRIPT_DIR=$(dirname "$(readlink -e "${BASH_SOURCE[0]}")") && source "$SCRIPT_DIR/util.bash"

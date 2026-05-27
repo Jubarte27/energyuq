@@ -1,0 +1,620 @@
+-- Configuring Dakota with CMake 3.28.3
+-- Found Git: /usr/bin/git (found version "2.43.0") 
+-- Dakota release version is: 6.24+
+-- Dakota git revision is: 91fc67ec5 (2026-05-18)
+-- The C compiler identification is GNU 13.3.0
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/gcc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- The CXX compiler identification is GNU 13.3.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/g++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- The Fortran compiler identification is GNU 13.3.0
+-- Detecting Fortran compiler ABI info
+-- Detecting Fortran compiler ABI info - done
+-- Check for working Fortran compiler: /usr/bin/gfortran - skipped
+-- Found Perl: /usr/bin/perl (found version "5.38.2") 
+-- Dakota enabling Python3 (Interpreter)
+-- Dakota enabling Python3 Development.Module and Development.Embed for Python modules and embedded interpreter support
+-- Dakota enabling Python3 direct interface with NumPy
+-- Found Python3: /home/mmachado/HPC/uq_sbac/dakota/dev/.venv/bin/python3 (found version "3.14.2") found components: Interpreter Development.Module Development.Embed NumPy 
+-- NumPy version  found at 
+-- pybind11 v2.12.1 
+-- Performing Test HAS_FLTO
+-- Performing Test HAS_FLTO - Success
+-- Python3 h5py module found
+-- Python3 numpy module found
+-- Python3 scipy module found
+-- Found Java: /usr/bin/java (found suitable version "11.0.30", minimum required is "1.6") 
+-- DAKOTA MPI: requested.
+-- Found MPI_C: /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so (found version "3.1") 
+-- Found MPI_CXX: /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so (found version "3.1") 
+-- Found MPI_Fortran: /usr/lib/x86_64-linux-gnu/libmpi_usempif08.so (found version "3.1") 
+-- Found MPI: TRUE (found version "3.1")  
+-- Dakota MPI C++ configuration:
+--   MPI_CXX_FOUND: TRUE
+--   MPI_CXX_COMPILER: /usr/bin/mpicxx
+--   MPI_CXX_COMPILE_FLAGS: 
+--   MPI_CXX_INCLUDE_PATH: /usr/lib/x86_64-linux-gnu/openmpi/include;/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi
+--   MPI_CXX_INCLUDE_DIRS: /usr/lib/x86_64-linux-gnu/openmpi/include;/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi
+--   MPI_CXX_LINK_FLAGS: 
+--   MPI_CXX_LIBRARIES: /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so;/usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so
+--   MPIEXEC: /usr/bin/mpiexec
+-- Detecting Fortran/C Interface
+-- Detecting Fortran/C Interface - Found GLOBAL and MODULE mangling
+-- Dakota using Eigen3::Eigen target with include directories
+   /home/mmachado/HPC/uq_sbac/dakota/dev/install/include/eigen3
+-- Found GSL: /usr/include (found version "2.7.1") 
+-- Using GSL libraries: /usr/lib/x86_64-linux-gnu/libgsl.so;/usr/lib/x86_64-linux-gnu/libgslcblas.so
+-- Found HDF5: /usr/lib/x86_64-linux-gnu/hdf5/serial/libhdf5.so;/usr/lib/x86_64-linux-gnu/libcrypto.so;/usr/lib/x86_64-linux-gnu/libcurl.so;/usr/lib/x86_64-linux-gnu/libpthread.a;/usr/lib/x86_64-linux-gnu/libsz.so;/usr/lib/x86_64-linux-gnu/libz.so;/usr/lib/x86_64-linux-gnu/libdl.a;/usr/lib/x86_64-linux-gnu/libm.so;/usr/lib/x86_64-linux-gnu/hdf5/serial/libhdf5_cpp.so;/usr/lib/x86_64-linux-gnu/hdf5/serial/libhdf5.so;/usr/lib/x86_64-linux-gnu/libcrypto.so;/usr/lib/x86_64-linux-gnu/libcurl.so;/usr/lib/x86_64-linux-gnu/libpthread.a;/usr/lib/x86_64-linux-gnu/libsz.so;/usr/lib/x86_64-linux-gnu/libz.so;/usr/lib/x86_64-linux-gnu/libdl.a;/usr/lib/x86_64-linux-gnu/libm.so (found version "1.10.10") found components: C HL CXX 
+-- Found Boost: /usr/lib/x86_64-linux-gnu/cmake/Boost-1.83.0/BoostConfig.cmake (found suitable version "1.83.0", minimum required is "1.70") found components: program_options regex serialization system 
+-- Dakota using previously specified Trilinos in /home/mmachado/HPC/uq_sbac/dakota/dev/install/lib/cmake/Trilinos
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+-- Found Threads: TRUE  
+-- Found Java: /usr/bin/java (found version "11.0.30") found components: Development 
+-- Found JNI: /usr/lib/jvm/java-11-openjdk-amd64/include  found components: AWT JVM 
+-- Finding relocatable package CONMIN with directory external/CONMIN
+-- Setting CONMIN_DIR = /home/mmachado/HPC/uq_sbac/dakota/dev/build/packages/external/CONMIN
+-- Finding relocatable package NCSUOPT with directory external/NCSUOpt
+-- Setting NCSUOPT_DIR = /home/mmachado/HPC/uq_sbac/dakota/dev/build/packages/external/NCSUOpt
+-- Found Python: /home/mmachado/HPC/uq_sbac/dakota/dev/.venv/bin/python3 (found version "3.14.2") found components: Interpreter Development Development.Module Development.Embed 
+-- Python executable: /home/mmachado/HPC/uq_sbac/dakota/dev/.venv/bin/python3
+-- Python include dirs: /home/mmachado/.pyenv/versions/3.14.2/include/python3.14
+-- Found valid nlohmann_json include path: /home/mmachado/HPC/uq_sbac/dakota/snl-dakota/packages/external/json/include
+-- Fetching pybind11 from GitHub...
+-- pybind11 v2.12.1 
+-- Fetching pybind11_json from GitHub...
+-- Fetching PEGTL from GitHub...
+-- Using std::filesystem
+-- Python modules will install to: ${CMAKE_INSTALL_PREFIX}/share/dakota/Python/dakota/spec/validation
+-- 
+-- ========================================
+-- Dakota Parser Configuration:
+--   Schema: /home/mmachado/HPC/uq_sbac/dakota/snl-dakota/src/dakota.json
+--   Generated code: /home/mmachado/HPC/uq_sbac/dakota/dev/build/packages/dakota_parser/dakota_parser/generated
+--   Embedded schema: /home/mmachado/HPC/uq_sbac/dakota/dev/build/packages/dakota_parser/dakota_parser/generated/dakota_embedded_schema_cbor.hpp
+--   Blocks: environment;method;model;variables;interface;responses
+--   Generation: At build time (after schema)
+--   Debug output: OFF
+-- ========================================
+-- 
+-- 
+-- === Dakota JSON Validation Configuration ===
+--   Version:              0.1.0
+--   C++ Standard:         17
+--   Build Python bindings: ON
+--   Build tests:          OFF
+--   Build examples:       OFF
+--   Python install dir:   share/dakota/Python/dakota/spec/validation
+-- 
+-- OPT++ using previously specified Trilinos in /home/mmachado/HPC/uq_sbac/dakota/dev/install/lib/cmake/Trilinos
+-- Looking for times
+-- Looking for times - found
+-- Looking for include file sys/times.h
+-- Looking for include file sys/times.h - found
+-- Looking for include file sys/time.h
+-- Looking for include file sys/time.h - found
+-- Finding relocatable package DFFTPACK with directory external/dfftpack
+-- Setting DFFTPACK_DIR = /home/mmachado/HPC/uq_sbac/dakota/dev/build/packages/external/dfftpack
+-- Finding relocatable package LHS with directory external/LHS
+-- Setting LHS_DIR = /home/mmachado/HPC/uq_sbac/dakota/dev/build/packages/external/LHS
+-- Finding relocatable package SPARSE_GRID with directory external/VPISparseGrid
+-- Setting SPARSE_GRID_DIR = /home/mmachado/HPC/uq_sbac/dakota/dev/build/packages/external/VPISparseGrid
+-- Found Boost: /usr/lib/x86_64-linux-gnu/cmake/Boost-1.83.0/BoostConfig.cmake (found suitable version "1.83.0", minimum required is "1.58")  
+-- Pecos using previously specified Trilinos in /home/mmachado/HPC/uq_sbac/dakota/dev/install/lib/cmake/Trilinos
+-- Finding relocatable package DFFTPACK with directory dfftpack
+-- Finding relocatable package LHS with directory LHS
+-- Finding relocatable package SPARSE_GRID with directory VPISparseGrid
+-- Looking for dlfcn.h
+-- Looking for dlfcn.h - found
+-- Looking for inttypes.h
+-- Looking for inttypes.h - found
+-- Looking for memory.h
+-- Looking for memory.h - found
+-- Looking for stdint.h
+-- Looking for stdint.h - found
+-- Looking for stdlib.h
+-- Looking for stdlib.h - found
+-- Looking for strings.h
+-- Looking for strings.h - found
+-- Looking for string.h
+-- Looking for string.h - found
+-- Looking for sys/stat.h
+-- Looking for sys/stat.h - found
+-- Looking for sys/types.h
+-- Looking for sys/types.h - found
+-- Looking for unistd.h
+-- Looking for unistd.h - found
+-- Surfpack using previously specified Trilinos in /home/mmachado/HPC/uq_sbac/dakota/dev/install/lib/cmake/Trilinos
+-- Found Boost: /usr/lib/x86_64-linux-gnu/cmake/Boost-1.83.0/BoostConfig.cmake (found suitable version "1.83.0", minimum required is "1.58") found components: serialization 
+-- Finding relocatable package CONMIN with directory CONMIN
+-- Finding relocatable package NCSUOPT with directory NCSUOpt
+-- Found DL: /usr/lib/x86_64-linux-gnu/libdl.a  
+-- Looking for include file values.h
+-- Looking for include file values.h - found
+-- Looking for clock
+-- Looking for clock - found
+-- Looking for ftime
+-- Looking for ftime - found
+-- Looking for getrusage
+-- Looking for getrusage - found
+-- Looking for gettimeofday
+-- Looking for gettimeofday - found
+-- Looking for localtime
+-- Looking for localtime - found
+-- Looking for nrand48
+-- Looking for nrand48 - found
+-- Looking for sysconf
+-- Looking for sysconf - found
+-- Looking for times
+-- Looking for times - found
+-- Looking for include file cxxabi.h
+-- Looking for include file cxxabi.h - not found
+-- Looking for include files windows.h, dbghelp.h
+-- Looking for include files windows.h, dbghelp.h - not found
+-- Looking for include file err.h
+-- Looking for include file err.h - found
+-- Looking for include file execinfo.h
+-- Looking for include file execinfo.h - found
+-- Looking for include file float.h
+-- Looking for include file float.h - found
+-- Looking for include file limits.h
+-- Looking for include file limits.h - found
+-- Looking for include file strings.h
+-- Looking for include file strings.h - found
+-- Looking for include file sys/resource.h
+-- Looking for include file sys/resource.h - found
+-- Looking for include file sys/time.h
+-- Looking for include file sys/time.h - found
+-- Looking for include file unistd.h
+-- Looking for include file unistd.h - found
+-- Looking for include file values.h
+-- Looking for include file values.h - found
+-- Looking for include file windows.h
+-- Looking for include file windows.h - not found
+-- Looking for lround
+-- Looking for lround - found
+-- Looking for 3 include files sys/types.h, ..., time.h
+-- Looking for 3 include files sys/types.h, ..., time.h - found
+-- HOPSPACK: Using the standard C++ compiler (no MPI):
+--   /usr/bin/g++
+-- HOPSPACK: LAPACK requested, linear constraints allowed.
+-- HOPSPACK: Using LAPACK libraries:
+--   /usr/lib/x86_64-linux-gnu/liblapack.so
+--   /usr/lib/x86_64-linux-gnu/libblas.so
+-- HOPSPACK: Excluding CDDLIB for degenerate constraints.
+-- HOPSPACK: Using Boost for RNG / shuffle.
+-- Found Boost: /usr/lib/x86_64-linux-gnu/cmake/Boost-1.83.0/BoostConfig.cmake (found version "1.83.0")  
+-- Looking for sys/types.h
+-- Looking for sys/types.h - found
+-- Looking for stdint.h
+-- Looking for stdint.h - found
+-- Looking for stddef.h
+-- Looking for stddef.h - found
+-- Check size of int8_t
+-- Check size of int8_t - done
+-- Check size of int16_t
+-- Check size of int16_t - done
+-- Check size of int32_t
+-- Check size of int32_t - done
+-- Check size of int64_t
+-- Check size of int64_t - done
+-- Check size of uint8_t
+-- Check size of uint8_t - done
+-- Check size of uint16_t
+-- Check size of uint16_t - done
+-- Check size of uint32_t
+-- Check size of uint32_t - done
+-- Check size of uint64_t
+-- Check size of uint64_t - done
+-- 
+
+This is MUQ, the MIT UQ Library!
+
+
+-- PYTHON_INSTALL_PREFIX was set by user to be share/dakota/Python.
+-- Python packages will be installed to share/dakota/Python.
+-- User defined build type = 
+-- Final build type = RELEASE
+-- Performing Test ANYCAST_COMPILES
+-- Performing Test ANYCAST_COMPILES - Failed
+-- Found OpenMP_C: -fopenmp (found version "4.5") 
+-- Found OpenMP_CXX: -fopenmp (found version "4.5") 
+-- Found OpenMP_Fortran: -fopenmp (found version "4.5") 
+-- Found OpenMP: TRUE (found version "4.5")  
+-- Performing Test HAS_PTHREAD
+-- Performing Test HAS_PTHREAD - Success
+-- Performing Test CPP11_AUTO_COMPILES
+-- Performing Test CPP11_AUTO_COMPILES - Success
+-- Performing Test CPP11_SHAREDPTR_COMPILES
+-- Performing Test CPP11_SHAREDPTR_COMPILES - Success
+-- MUQ_ENABLEGROUP_UTILITIES_HDF5 = OFF
+-- MUQ_ENABLEGROUP_UTILITIES_CORE = OFF
+-- MUQ_ENABLEGROUP_UTILITIES_MULTIINDEX = OFF
+-- MUQ_ENABLEGROUP_UTILITIES_CORE_PYTHON = OFF
+-- MUQ_ENABLEGROUP_MODELING_CORE = OFF
+-- MUQ_ENABLEGROUP_MODELING_UMBRIDGE = OFF
+-- MUQ_ENABLEGROUP_MODELING_STAN = OFF
+-- MUQ_ENABLEGROUP_MODELING_FLANN = OFF
+-- MUQ_ENABLEGROUP_MODELING_LINEARALGEBRA = OFF
+-- MUQ_ENABLEGROUP_MODELING_DISTRIBUTIONS = OFF
+-- MUQ_ENABLEGROUP_MODELING_ODE = OFF
+-- MUQ_ENABLEGROUP_MODELING_CORE_PYTHON = OFF
+-- MUQ_ENABLEGROUP_MODELING_SUNDIALS_MODELS_PYTHON = OFF
+-- MUQ_ENABLEGROUP_OPTIMIZATION_CORE = OFF
+-- MUQ_ENABLEGROUP_OPTIMIZATION_NLOPT = OFF
+-- MUQ_ENABLEGROUP_OPTIMIZATION_CORE_PYTHON = OFF
+-- MUQ_ENABLEGROUP_APPROXIMATION_REGRESSION = OFF
+-- MUQ_ENABLEGROUP_APPROXIMATION_POLYNOMIALS = OFF
+-- MUQ_ENABLEGROUP_APPROXIMATION_QUADRATURE = OFF
+-- MUQ_ENABLEGROUP_APPROXIMATION_POLYNOMIALCHAOS = OFF
+-- MUQ_ENABLEGROUP_APPROXIMATION_GP_Kernels = OFF
+-- MUQ_ENABLEGROUP_APPROXIMATION_GP = OFF
+-- MUQ_ENABLEGROUP_APPROXIMATION_CORE_PYTHON = OFF
+-- MUQ_ENABLEGROUP_SAMPLING_PROBLEMS = OFF
+-- MUQ_ENABLEGROUP_FANCY_SAMPLING_PROBLEMS = OFF
+-- MUQ_ENABLEGROUP_SAMPLING_ALGORITHM = ON
+-- MUQ_ENABLEGROUP_SAMPLINGALGORITHMS_CORE_PYTHON = OFF
+-- MUQ_ENABLEGROUP_INFERENCE_FILTERING = OFF
+-- MUQ_ENABLEGROUP_INFERENCE_FILTERING_PYTHON = OFF
+-- Configuring compile group UTILITIES_HDF5
+-- Configuring compile group UTILITIES_CORE
+-- Configuring compile group UTILITIES_MULTIINDEX
+-- Configuring compile group UTILITIES_CORE_PYTHON
+-- Configuring compile group MODELING_CORE
+-- Configuring compile group MODELING_UMBRIDGE
+-- Configuring compile group MODELING_STAN
+-- Configuring compile group MODELING_FLANN
+-- Configuring compile group MODELING_LINEARALGEBRA
+-- Configuring compile group MODELING_DISTRIBUTIONS
+-- Configuring compile group MODELING_ODE
+-- Configuring compile group MODELING_CORE_PYTHON
+-- Configuring compile group MODELING_SUNDIALS_MODELS_PYTHON
+-- Configuring compile group OPTIMIZATION_CORE
+-- Configuring compile group OPTIMIZATION_NLOPT
+-- Configuring compile group OPTIMIZATION_CORE_PYTHON
+-- Configuring compile group APPROXIMATION_REGRESSION
+-- Configuring compile group APPROXIMATION_POLYNOMIALS
+-- Configuring compile group APPROXIMATION_QUADRATURE
+-- Configuring compile group APPROXIMATION_POLYNOMIALCHAOS
+-- Configuring compile group APPROXIMATION_GP_Kernels
+-- Configuring compile group APPROXIMATION_GP
+-- Configuring compile group APPROXIMATION_CORE_PYTHON
+-- Configuring compile group SAMPLING_PROBLEMS
+-- Configuring compile group FANCY_SAMPLING_PROBLEMS
+-- Configuring compile group SAMPLING_ALGORITHM
+--     The SAMPLING_ALGORITHM group depends on the UTILITIES_CORE group, but the UTILITIES_CORE group was not enabled.
+--   Forcibly enabling UTILITIES_CORE
+--     The SAMPLING_ALGORITHM group depends on the UTILITIES_HDF5 group, but the UTILITIES_HDF5 group was not enabled.
+--   Forcibly enabling UTILITIES_HDF5
+--     The SAMPLING_ALGORITHM group depends on the UTILITIES_MULTIINDEX group, but the UTILITIES_MULTIINDEX group was not enabled.
+--   Forcibly enabling UTILITIES_MULTIINDEX
+--     The SAMPLING_ALGORITHM group depends on the MODELING_CORE group, but the MODELING_CORE group was not enabled.
+--   Forcibly enabling MODELING_CORE
+--     The MODELING_CORE group depends on the MODELING_LINEARALGEBRA group, but the MODELING_LINEARALGEBRA group was not enabled.
+--     Turning the MODELING_LINEARALGEBRA group on.
+--   Forcibly enabling MODELING_LINEARALGEBRA
+--     The SAMPLING_ALGORITHM group depends on the MODELING_DISTRIBUTIONS group, but the MODELING_DISTRIBUTIONS group was not enabled.
+--   Forcibly enabling MODELING_DISTRIBUTIONS
+--     The SAMPLING_ALGORITHM group depends on the SAMPLING_PROBLEMS group, but the SAMPLING_PROBLEMS group was not enabled.
+--   Forcibly enabling SAMPLING_PROBLEMS
+-- Configuring compile group SAMPLINGALGORITHMS_CORE_PYTHON
+-- Configuring compile group INFERENCE_FILTERING
+-- Configuring compile group INFERENCE_FILTERING_PYTHON
+-- Adding EIGEN3 to MUQ_REQUIRES because UTILITIES_HDF5 asked for it.
+-- Adding HDF5 to MUQ_REQUIRES because UTILITIES_HDF5 asked for it.
+-- Adding EIGEN3 to MUQ_REQUIRES because UTILITIES_CORE asked for it.
+-- Adding EIGEN3 to MUQ_REQUIRES because UTILITIES_MULTIINDEX asked for it.
+-- Adding EIGEN3 to MUQ_REQUIRES because MODELING_CORE asked for it.
+-- Adding BOOST to MUQ_REQUIRES because MODELING_CORE asked for it.
+-- Adding EIGEN3 to MUQ_REQUIRES because MODELING_LINEARALGEBRA asked for it.
+-- Adding target muqUtilities for compile group UTILITIES_HDF5
+-- Adding target muqUtilities for compile group UTILITIES_CORE
+-- Adding target muqUtilities for compile group UTILITIES_MULTIINDEX
+-- Adding target muqModeling for compile group MODELING_CORE
+-- Adding target muqModeling for compile group MODELING_LINEARALGEBRA
+-- Adding target muqModeling for compile group MODELING_DISTRIBUTIONS
+-- Adding target muqSamplingAlgorithms for compile group SAMPLING_PROBLEMS
+-- Adding target muqSamplingAlgorithms for compile group SAMPLING_ALGORITHM
+-- Found PkgConfig: /usr/bin/pkg-config (found version "1.8.1") 
+-- Found EIGEN3: /home/mmachado/HPC/uq_sbac/dakota/dev/install/include/eigen3  
+-- Could NOT find HDF5 (missing: HDF5_LIBRARY) 
+-- Will download HDF5 from https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.8/hdf5-1.8.19/src/CMake-hdf5-1.8.19.tar.gz during compile.
+-- /home/mmachado/HPC/uq_sbac/dakota/dev/build/packages/external/muq2/external/hdf5/src/HDF5/hdf5-1.8.19/configure  CC=/usr/bin/gcc CXX=/usr/bin/g++ CFLAGS=-Wno-error=implicit-function-declaration  --prefix= --enable-production --disable-examples
+-- Found Boost: /usr/lib/x86_64-linux-gnu/cmake/Boost-1.83.0/BoostConfig.cmake (found suitable version "1.83.0", minimum required is "1.56.0") found components: system graph 
+-- Found BOOST: Boost::system;Boost::graph  
+-- Performing Test BOOST_GRAPH_COMPILES
+-- Performing Test BOOST_GRAPH_COMPILES - Success
+-- “MUQ_USE_GTESTisOFF.Turningofftests.”
+-- Turning off UTILITIES_CORE_PYTHON because of a missing library dependency.
+-- Turning off MODELING_CORE_PYTHON because of a missing library dependency.
+-- Turning off MODELING_SUNDIALS_MODELS_PYTHON because of a missing library dependency.
+-- Turning off OPTIMIZATION_CORE_PYTHON because of a missing library dependency.
+-- Turning off APPROXIMATION_CORE_PYTHON because of a missing library dependency.
+-- Turning off SAMPLINGALGORITHMS_CORE_PYTHON because of a missing library dependency.
+-- Turning off INFERENCE_FILTERING_PYTHON because of a missing library dependency.
+-- Creating muqUtilities target.
+-- Checking for dependency of muqUtilities on internal build of EIGEN3
+-- Checking for dependency of muqUtilities on internal build of HDF5
+-- Adding dependency of muqUtilities on HDF5
+-- Checking for dependency of muqUtilities on internal build of BOOST
+-- Creating muqModeling target.
+-- Checking for dependency of muqModeling on internal build of EIGEN3
+-- Checking for dependency of muqModeling on internal build of HDF5
+-- Adding dependency of muqModeling on HDF5
+-- Checking for dependency of muqModeling on internal build of BOOST
+-- Creating muqSamplingAlgorithms target.
+-- Checking for dependency of muqSamplingAlgorithms on internal build of EIGEN3
+-- Checking for dependency of muqSamplingAlgorithms on internal build of HDF5
+-- Adding dependency of muqSamplingAlgorithms on HDF5
+-- Checking for dependency of muqSamplingAlgorithms on internal build of BOOST
+-- Thinking about connection between muqModeling and muqModeling
+-- Thinking about connection between muqModeling and muqUtilities
+-- Trying to add connection between muqModeling and muqUtilities
+-- Thinking about connection between muqModeling and muqModeling
+-- Thinking about connection between muqModeling and muqModeling
+-- Thinking about connection between muqModeling and muqUtilities
+-- Trying to add connection between muqModeling and muqUtilities
+-- Thinking about connection between muqSamplingAlgorithms and muqModeling
+-- Trying to add connection between muqSamplingAlgorithms and muqModeling
+-- Thinking about connection between muqSamplingAlgorithms and muqUtilities
+-- Trying to add connection between muqSamplingAlgorithms and muqUtilities
+-- Thinking about connection between muqSamplingAlgorithms and muqUtilities
+-- Trying to add connection between muqSamplingAlgorithms and muqUtilities
+-- Thinking about connection between muqSamplingAlgorithms and muqUtilities
+-- Trying to add connection between muqSamplingAlgorithms and muqUtilities
+-- Thinking about connection between muqSamplingAlgorithms and muqModeling
+-- Trying to add connection between muqSamplingAlgorithms and muqModeling
+-- Thinking about connection between muqSamplingAlgorithms and muqModeling
+-- Trying to add connection between muqSamplingAlgorithms and muqModeling
+-- Thinking about connection between muqSamplingAlgorithms and muqSamplingAlgorithms
+-- Storing MUQ_COMPILE_DEFINITIONS = DAKOTA_PYTHON_H5PY_FOUND;DAKOTA_PYTHON_NUMPY_FOUND;DAKOTA_PYTHON_SCIPY_FOUND;HAVE_CONFIG_H;BOOST_NO_CXX98_FUNCTION_BASE;_HAS_AUTO_PTR_ETC=0;HAVE_ROL;HAVE_DAKOTA_SURROGATES
+-- MUQ_LIBRARIES = muqUtilities;muqModeling;muqSamplingAlgorithms
+-- MUQ_EXPORT_LIBRARIES = /home/mmachado/HPC/uq_sbac/dakota/dev/install/lib/libmuqUtilities.so;/home/mmachado/HPC/uq_sbac/dakota/dev/install/lib/libmuqModeling.so;/home/mmachado/HPC/uq_sbac/dakota/dev/install/lib/libmuqSamplingAlgorithms.so
+-- Looking for unistd.h
+-- Looking for unistd.h - found
+-- Looking for system
+-- Looking for system - found
+-- Looking for fork
+-- Looking for fork - found
+-- Looking for vfork
+-- Looking for vfork - found
+-- Looking for wait
+-- Looking for wait - found
+-- Looking for pdb.h
+-- Looking for pdb.h - not found
+-- Dakota Python direct interface using:
+     Include dirs: 
+     Libraries:    
+-- Dakota Python direct interface using NumPy:
+     Include dirs: 
+-- Dakota_LIBRARIES: dakota_util;dakota_ir;dakota_surrogates;dakota_src;dakota_src_fortran;nidr;pecos_util;pecos_src;lhs;lhs_mods;lhs_mod;dfftpack;sparsegrid;surfpack;surfpack;surfpack_fortran;utilib;colin;interfaces;scolib;3po;pebbl;tinyxml;approxnn;queso;conmin;ddace;dream;fsudace;hopspack;jega;jega_fe;moga;soga;eutils;utilities;ncsuopt;cport;nomad;optpp;muqUtilities;muqModeling;muqSamplingAlgorithms;psuade;amplsolver
+-- Dakota_TPL_LIBRARIES: Teuchos::all_libs;/usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so;/usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so;/usr/lib/x86_64-linux-gnu/hdf5/serial/libhdf5_hl.so;/usr/lib/x86_64-linux-gnu/hdf5/serial/libhdf5_hl_cpp.so;/usr/lib/x86_64-linux-gnu/hdf5/serial/libhdf5_hl.so;/usr/lib/x86_64-linux-gnu/hdf5/serial/libhdf5.so;/usr/lib/x86_64-linux-gnu/libcrypto.so;/usr/lib/x86_64-linux-gnu/libcurl.so;/usr/lib/x86_64-linux-gnu/libpthread.a;/usr/lib/x86_64-linux-gnu/libsz.so;/usr/lib/x86_64-linux-gnu/libz.so;/usr/lib/x86_64-linux-gnu/libdl.a;/usr/lib/x86_64-linux-gnu/libm.so;/usr/lib/x86_64-linux-gnu/hdf5/serial/libhdf5_cpp.so;/usr/lib/x86_64-linux-gnu/hdf5/serial/libhdf5.so;/usr/lib/x86_64-linux-gnu/libcrypto.so;/usr/lib/x86_64-linux-gnu/libcurl.so;/usr/lib/x86_64-linux-gnu/libpthread.a;/usr/lib/x86_64-linux-gnu/libsz.so;/usr/lib/x86_64-linux-gnu/libz.so;/usr/lib/x86_64-linux-gnu/libdl.a;/usr/lib/x86_64-linux-gnu/libm.so;/usr/lib/x86_64-linux-gnu/libgsl.so;/usr/lib/x86_64-linux-gnu/libgslcblas.so;/usr/lib/x86_64-linux-gnu/liblapack.so;/usr/lib/x86_64-linux-gnu/libblas.so;Boost::program_options;Boost::regex;Boost::serialization;Boost::system
+-- Installing Dakota exported targets to lib/cmake/Dakota
+-- Omitting test dakota_3pc, serial; requires config: HAVE_DOT
+-- Omitting test dakota_3pc, parallel; requires config: HAVE_DOT
+-- Omitting test dakota_addtnl_users, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_ampl_diet, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_ampl_diet, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_ampl_fma, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_ampl_tb, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_bandb, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_barnes, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_barnes, serial; requires config: HAVE_NLPQL
+-- Omitting test dakota_barnes, serial; requires config: HAVE_DOT
+-- Omitting test dakota_cantilever, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_cantilever, serial; requires config: HAVE_DOT
+-- Omitting test dakota_container, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_container, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_cyl_head, serial; requires config: HAVE_DOT
+-- Omitting test dakota_cyl_head, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_cyl_head, serial; requires config: HAVE_NLPQL
+-- Omitting test dakota_demo_app, serial; requires config: HAVE_DEMO_TPL
+-- Omitting test dakota_demo_app, parallel; requires config: HAVE_DEMO_TPL
+-- Omitting test dakota_drivers, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_drivers, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_ext_python_method, serial; requires config: HAVE_EXT_PYTHON_METHOD
+-- Omitting test dakota_ext_python_method, parallel; requires config: HAVE_EXT_PYTHON_METHOD
+-- Omitting test dakota_ext_python_method_numpy, serial; requires config: HAVE_EXT_PYTHON_METHOD
+-- Omitting test dakota_ext_python_method_numpy, parallel; requires config: HAVE_EXT_PYTHON_METHOD
+-- Omitting test dakota_ext_python_method_scipy, serial; requires config: HAVE_EXT_PYTHON_METHOD
+-- Omitting test dakota_ext_python_method_scipy, parallel; requires config: HAVE_EXT_PYTHON_METHOD
+-- Omitting test dakota_illum, serial; requires config: HAVE_DOT
+-- Omitting test dakota_logratio_taylor2, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_logratio_taylor2, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_mlmf_opt, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_multiobj1, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_multiobj1, serial; requires config: HAVE_NLPQL
+-- Omitting test dakota_multiobj1, serial; requires config: HAVE_DOT
+-- Omitting test dakota_multiobj2, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_multistart, serial; requires config: HAVE_DOT
+-- Omitting test dakota_multistart, parallel; requires config: HAVE_DOT
+-- Omitting test dakota_nested_tunable_acv, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_nowpac, serial; requires config: HAVE_NOWPAC
+-- Omitting test dakota_nowpac, parallel; requires config: HAVE_NOWPAC
+-- Omitting test dakota_ouu1_cantilever, serial; requires config: HAVE_DOT
+-- Omitting test dakota_ouu1_cantilever, parallel; requires config: HAVE_DOT
+-- Omitting test dakota_ouu1_tb, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_ouu1_tb, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_ouu1_tbch, serial; requires config: HAVE_DOT
+-- Omitting test dakota_ouu1_tbch, parallel; requires config: HAVE_DOT
+-- Omitting test dakota_pareto, serial; requires config: HAVE_DOT
+-- Omitting test dakota_pareto, parallel; requires config: HAVE_DOT
+-- Omitting test dakota_pareto_pcbdo_short_column, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_pareto_pcbdo_short_column, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_pcbdo_cantilever, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_pcbdo_cantilever, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_pcbdo_cantilever_mf, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_pcbdo_cantilever_mf, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_pcbdo_cantilever_mixed, serial; requires config: HAVE_DOT
+-- Omitting test dakota_pcbdo_cantilever_mixed, parallel; requires config: HAVE_DOT
+-- Omitting test dakota_pcbdo_cantilever_trsb, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_pcbdo_cantilever_trsb, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_pcbdo_rosenbrock, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_pcbdo_rosenbrock, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_pcbdo_rosenbrock_mf, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_pcbdo_rosenbrock_mf, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_pcbdo_rosenbrock_trsb, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_pcbdo_rosenbrock_trsb, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_pcbdo_short_column, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_pcbdo_short_column, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_pcbdo_short_column_mf, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_pcbdo_short_column_mf, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_pcbdo_short_column_trsb, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_pcbdo_short_column_trsb, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_pcbdo_steel_column, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_pcbdo_steel_column, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_pcbdo_steel_column_mf, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_pcbdo_steel_column_mf, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_pcbdo_steel_column_trsb, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_pcbdo_steel_column_trsb, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_plugin, serial; requires config: DAKOTA_PLUGIN_DEMOS
+-- Omitting test dakota_plugin, parallel; requires config: DAKOTA_PLUGIN_DEMOS
+-- Omitting test dakota_rbdo_cantilever, serial; requires config: HAVE_DOT
+-- Omitting test dakota_rbdo_cantilever, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_rbdo_cantilever, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_rbdo_cantilever_analytic, serial; requires config: HAVE_DOT
+-- Omitting test dakota_rbdo_cantilever_analytic, parallel; requires config: HAVE_DOT
+-- Omitting test dakota_rbdo_cantilever_analytic2, serial; requires config: HAVE_DOT
+-- Omitting test dakota_rbdo_cantilever_analytic2, parallel; requires config: HAVE_DOT
+-- Omitting test dakota_rbdo_cantilever_analytic2_verify, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_rbdo_cantilever_analytic2_verify, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_rbdo_cantilever_mixed, serial; requires config: HAVE_DOT
+-- Omitting test dakota_rbdo_cantilever_mixed, parallel; requires config: HAVE_DOT
+-- Omitting test dakota_rbdo_cantilever_trsb, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_rbdo_cantilever_trsb, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_rbdo_cantilever_trsb2, serial; requires config: HAVE_DOT
+-- Omitting test dakota_rbdo_cantilever_trsb2, parallel; requires config: HAVE_DOT
+-- Omitting test dakota_rbdo_short_column, serial; requires config: HAVE_DOT
+-- Omitting test dakota_rbdo_short_column, parallel; requires config: HAVE_DOT
+-- Omitting test dakota_rbdo_short_column_analytic, serial; requires config: HAVE_DOT
+-- Omitting test dakota_rbdo_short_column_analytic, parallel; requires config: HAVE_DOT
+-- Omitting test dakota_rbdo_short_column_analytic2, serial; requires config: HAVE_DOT
+-- Omitting test dakota_rbdo_short_column_analytic2, parallel; requires config: HAVE_DOT
+-- Omitting test dakota_rbdo_short_column_trsb, serial; requires config: HAVE_DOT
+-- Omitting test dakota_rbdo_short_column_trsb, parallel; requires config: HAVE_DOT
+-- Omitting test dakota_rbdo_short_column_trsb2, serial; requires config: HAVE_DOT
+-- Omitting test dakota_rbdo_short_column_trsb2, parallel; requires config: HAVE_DOT
+-- Omitting test dakota_rbdo_side_impact, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_rbdo_side_impact, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_rbdo_steel_column, serial; requires config: HAVE_DOT
+-- Omitting test dakota_rbdo_steel_column, parallel; requires config: HAVE_DOT
+-- Omitting test dakota_rbdo_steel_column_analytic2, serial; requires config: HAVE_DOT
+-- Omitting test dakota_rbdo_steel_column_analytic2, parallel; requires config: HAVE_DOT
+-- Omitting test dakota_rbdo_steel_column_trsb2, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_rbdo_steel_column_trsb2, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_rosenbrock, serial; requires config: HAVE_DOT
+-- Omitting test dakota_rosenbrock, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_rosenbrock_ext, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_rosenbrock_ext, serial; requires config: HAVE_NLPQL
+-- Omitting test dakota_rosenbrock_fail, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_sbnls_rosen, serial; requires config: HAVE_DOT
+-- Omitting test dakota_sbnls_rosen, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_sbo_barnes, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_sbo_barnes, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_sbo_barnes_mf, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_sbo_barnes_mf, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_sbo_cyl_head, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_sbo_heat_eq_3lev, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_sbo_hier_poly_prod, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_sbo_hier_poly_prod, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_sbo_hierarchical, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_sbo_hierarchical, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_sbouu2_cantilever, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_sbouu2_cantilever, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_sbouu2_tbch, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_sbouu2_tbch, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_sbouu3_cantilever, serial; requires config: HAVE_DOT
+-- Omitting test dakota_sbouu3_cantilever, parallel; requires config: HAVE_DOT
+-- Omitting test dakota_sbouu3_tbch, serial; requires config: HAVE_DOT
+-- Omitting test dakota_sbouu3_tbch, parallel; requires config: HAVE_DOT
+-- Omitting test dakota_sbouu4_cantilever, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_sbouu4_cantilever, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_sbouu4_tbch, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_sbouu4_tbch, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_scaling, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_scaling, serial; requires config: HAVE_DOT
+-- Omitting test dakota_scbdo_cantilever, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_scbdo_cantilever, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_scbdo_cantilever_mf, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_scbdo_cantilever_mf, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_scbdo_cantilever_mixed, serial; requires config: HAVE_DOT
+-- Omitting test dakota_scbdo_cantilever_mixed, parallel; requires config: HAVE_DOT
+-- Omitting test dakota_scbdo_cantilever_trsb, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_scbdo_cantilever_trsb, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_scbdo_rosenbrock, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_scbdo_rosenbrock, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_scbdo_rosenbrock_mf, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_scbdo_rosenbrock_mf, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_scbdo_rosenbrock_trsb, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_scbdo_rosenbrock_trsb, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_scbdo_short_column, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_scbdo_short_column, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_scbdo_short_column_mf, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_scbdo_short_column_mf, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_scbdo_short_column_trsb, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_scbdo_short_column_trsb, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_scbdo_steel_column, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_scbdo_steel_column, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_scbdo_steel_column_mf, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_scbdo_steel_column_mf, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_scbdo_steel_column_trsb, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_scbdo_steel_column_trsb, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_sebdo_short_column_adapt, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_sebdo_short_column_adapt, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_snowpac, serial; requires config: HAVE_NOWPAC
+-- Omitting test dakota_snowpac, parallel; requires config: HAVE_NOWPAC
+-- Omitting test dakota_snowpac_mc, serial; requires config: HAVE_NOWPAC
+-- Omitting test dakota_snowpac_mc, parallel; requires config: HAVE_NOWPAC
+-- Omitting test dakota_snowpac_mlmc, serial; requires config: HAVE_NOWPAC
+-- Omitting test dakota_snowpac_mlmc, parallel; requires config: HAVE_NOWPAC
+-- Omitting test dakota_svanberg, serial; requires config: HAVE_NLPQL
+-- Omitting test dakota_svanberg, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_svanberg, serial; requires config: HAVE_DOT
+-- Omitting test dakota_svanberg_sbo, serial; requires config: HAVE_NLPQL
+-- Omitting test dakota_svanberg_sbo, parallel; requires config: HAVE_NLPQL
+-- Omitting test dakota_svanberg_sbo_vlb5, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_svanberg_sbo_vlb5, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_textbook, serial; requires config: HAVE_DOT
+-- Omitting test dakota_textbook_nips, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_trsbouu2_cantilever, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_trsbouu2_cantilever, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_trsbouu2_tbch, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_trsbouu2_tbch, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_trsbouu4_cantilever, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_trsbouu4_cantilever, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_trsbouu4_tbch, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_trsbouu4_tbch, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_uq_cantilever_interval, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_uq_cantilever_interval, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_uq_cantilever_taylor2, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_uq_cantilever_taylor2, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_uq_diffusion_acv3_cost4, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_uq_diffusion_acv3_cost4, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_uq_diffusion_mfft, serial; requires config: HAVE_C3
+-- Omitting test dakota_uq_diffusion_mfft, parallel; requires config: HAVE_C3
+-- Omitting test dakota_uq_diffusion_mlblue_cost4, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_uq_diffusion_mlft, serial; requires config: HAVE_C3
+-- Omitting test dakota_uq_diffusion_mlft, parallel; requires config: HAVE_C3
+-- Omitting test dakota_uq_function_train, serial; requires config: HAVE_C3
+-- Omitting test dakota_uq_function_train, parallel; requires config: HAVE_C3
+-- Omitting test dakota_uq_heat_eq_mlsurr_cost, serial; requires config: HAVE_C3
+-- Omitting test dakota_uq_textbook_dste, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_uq_tunable_acv, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_var_views_opt, serial; requires config: HAVE_DOT
+-- Omitting test dakota_var_views_opt, serial; requires config: HAVE_NLPQL
+-- Omitting test dakota_var_views_uq, serial; requires config: HAVE_NPSOL
+-- Omitting test dakota_var_views_uq, parallel; requires config: HAVE_NPSOL
+-- Omitting test dakota_win_ext, serial; requires config: WIN32
+-- Omitting test dakota_win_ext, parallel; requires config: WIN32
+-- Omitting test dakota_workdir_windows, serial; requires config: WIN32
+-- Omitting test dakota_workdir_windows, parallel; requires config: WIN32
+-- Configuring done (12.0s)
+-- Generating done (1.3s)
+-- Build files have been written to: /home/mmachado/HPC/uq_sbac/dakota/dev/build
