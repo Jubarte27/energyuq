@@ -11,13 +11,38 @@ main() {
     ensure cleanup
 }
 
+## fail if all of the input strings are empty
+any_empty() {
+    for string in "$@"; do
+        if [[ -z "$string" ]]; then
+            return 0
+        fi
+    done
+    return 42
+}
+
+is_array() {
+    if [[ $(declare -p "$1" 2>/dev/null) =~ "declare -a" ]]; then
+        return 0
+    fi
+    return 42
+}
+
 cleanup() {
     enter_new_func "Cleaning up"
-    if ! [ "$KEEP_AFTER_INSTALL" = "true" ]; then
-        rm -rf "$DAK_BUILD" "$DAK_VENV"
-        if [ "$RELEASE" = "true" ]; then
-            rm -rf "$DAK_SRC"
+    local remove_me=();
+    for directory in "${DIR_TO_REMOVE[@]}"; do
+        local expanded_dir
+        expanded_dir="$(IFS=/ ; echo "${remove_me[*]}")"
+        # array of something. not suppported by bash. think of something else. "declare" might help
+        if is_array directory && any_empty "${directory[@]}"; then
+            log_warn "Skipping removal of invalid dir: $expanded_dir"
+        else
+            remove_me+=("$expanded_dir")
         fi
+    done
+    if [ ${#remove_me[@]} -gt 0 ]; then
+        rm -rf "${remove_me[@]}"
     fi
 }
 
@@ -39,9 +64,8 @@ configure_dakota() {
 
     ensure cd "$BASE_DIR"
 
-    local extras=()
     if ! [ "$RELEASE" == "true" ]; then
-      extras+=("-DENABLE_SPEC_MAINT=ON")
+      EXTRA_CMAKE_ARGS+=("-DENABLE_SPEC_MAINT=ON")
     fi
 
     mkdir -p "$DAK_BUILD"
@@ -53,7 +77,7 @@ configure_dakota() {
 }
 
 make_me() {
-    if ! cmake --fresh -DCMAKE_INSTALL_PREFIX="$DAK_INSTALL" \
+    if ! cmake -DCMAKE_INSTALL_PREFIX="$DAK_INSTALL" \
       -DCMAKE_Fortran_COMPILER="gfortran" \
       -DCMAKE_C_COMPILER="gcc" \
       -DCMAKE_C_COMPILER_LAUNCHER="ccache" \
@@ -64,6 +88,7 @@ make_me() {
       -DDAKOTA_HAVE_MPI=ON \
       -DDAKOTA_HAVE_HDF5=ON \
       -DHAVE_MUQ=ON \
+      -DDAKOTA_ENABLE_TESTS="${TESTS}" \
       -DDAKOTA_JAVA_SURROGATES=ON \
       -DDAKOTA_PYTHON=ON \
       -DDAKOTA_PYTHON_DIRECT_INTERFACE=ON \
@@ -116,22 +141,20 @@ get_release() {
 
     wget https://github.com/snl-dakota/dakota/releases/download/v6.24.0/$DAK_VERSION.tar.gz -O "$BASE_DIR/dak.tar.gz"
     tar -xzf "$BASE_DIR/dak.tar.gz" -C "$BASE_DIR"
-    rm "$BASE_DIR/dak.tar.gz"
+    DIR_TO_REMOVE+=("$BASE_DIR/dak.tar.gz")
 }
 
 get_dev() {
     enter_new_func "Downloading git source files"
-    ensure cd "$BASE_DIR"
-
-    ensure cd "$PROJECT_DIR"
-    git submodule update --remote "$DAK_SRC"
     ensure cd "$DAK_SRC"
     # git submodule update packages/external packages/pecos packages/surfpack
     # a feiura abaixo funciona, enquanto a belezura acima não
     # sem acesso aos submodules, copiar da release
-    ensure get_release
-    cp -r --update=all $BASE_DIR/$DAK_VERSION/packages/** $DAK_SRC/packages/
-    rm -fr $BASE_DIR/$DAK_VERSION
+    if ! [ -d "$BASE_DIR/$DAK_VERSION/" ]; then
+        ensure get_release
+    fi
+    DIR_TO_REMOVE+=("$BASE_DIR/$DAK_VERSION/")
+    cp -r --update=all "$BASE_DIR/$DAK_VERSION/packages/"** "$DAK_SRC/packages/"
 }
 
 create_venv() {
@@ -175,15 +198,28 @@ install_deps() {
 }
 
 _setConfigArgs() {
+    DIR_TO_REMOVE=()
+    KEEP_AFTER_INSTALL=true
+    RELEASE=false
+    TESTS=OFF
+    EXTRA_CMAKE_ARGS=()
     while [ "${1:-}" != '' ]; do
         case "$1" in
             ## Options
-            -k|--keep-after-install)
-                KEEP_AFTER_INSTALL=true
+            -C|--clear-after-install)
+                KEEP_AFTER_INSTALL=false
                 ;;
             
             -r|--release)
                 RELEASE=true
+                ;;
+
+            -t|--tests)
+                TESTS=true
+                ;;
+            
+            -f|--fresh)
+                EXTRA_CMAKE_ARGS+=("--fresh")
                 ;;
             
             ## end of Options
@@ -203,6 +239,7 @@ _setConfigArgs() {
 
     if [ "$RELEASE" == "true" ]; then
         DAK_SRC="$BASE_DIR/$DAK_VERSION"
+        DIR_TO_REMOVE+=("$DAK_SRC")
     else
         DAK_SRC="$BASE_DIR/snl-dakota"
         BASE_DIR="$DEV_DIR"
@@ -211,6 +248,11 @@ _setConfigArgs() {
     DAK_INSTALL="$BASE_DIR/install"
     DAK_BUILD="$BASE_DIR/build"
     DAK_VENV="$BASE_DIR/.venv"
+
+
+    if ! [ "$KEEP_AFTER_INSTALL" = "true" ]; then
+        DIR_TO_REMOVE+=("$DAK_BUILD" "$DAK_VENV")
+    fi
 
 
 }

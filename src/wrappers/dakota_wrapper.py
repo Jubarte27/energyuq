@@ -11,7 +11,7 @@ FREQUECNY_POS = 1
 
 
 def main(program: type[Program], machine: type[Machine], parameters: interfacing.Parameters, results: interfacing.Results):
-    params = ExecutionParams(freq_level=parameters["CLK"], n_threads=parameters["N_THREADS"])
+    params = ExecutionParams(freq_level=int(parameters["CLK"]), n_threads=int(parameters["N_THREADS"]))
     result = base_wrapper.prepare_and_exeute(machine, program, params, [])
 
     results["energy_uj"].function = result["energy_uj"]

@@ -72,3 +72,5 @@ run_results
 /**/.dakota-*/
 /**/dak-*/
 dakota/**/install
+dakota/dev/run
+dak.tar.gz
