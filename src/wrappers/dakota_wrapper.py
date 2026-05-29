@@ -15,6 +15,9 @@ def main(program: type[Program], machine: type[Machine], parameters: interfacing
     result = base_wrapper.prepare_and_exeute(machine, program, params, [])
 
     results["energy_uj"].function = result["energy_uj"]
+    results["energy_scaled"].function = result["energy_scaled"]
+    results["time"].function = result["time"]
+
     results.write()
 
 if __name__ == "__main__":

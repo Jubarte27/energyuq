@@ -11,11 +11,11 @@ import chaospy as cp
 import matplotlib.pyplot as plt
 from easyvvuq.actions import CreateRunDirectory, Encode, Decode, ExecutePython, Actions
 
-from util import persist
-import wrappers.easy_wrapper as easy_wrapper
-from programs import *
-from machines import *
-from util.path import change_dir_permissions, latest_dir, next_file, next_dir
+from .util import persist
+from .wrappers import easy_wrapper
+from .programs import *
+from .machines import *
+from .util.path import change_dir_permissions, latest_dir, next_file, next_dir
 
 
 params_type = dict[str, dict[str, Any]]

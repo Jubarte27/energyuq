@@ -6,9 +6,15 @@ main() {
     ensure install_jupyter
 }
 _setConfigArgs() {
+    EasyDIR="$PROJECT_DIR/easy"
+    EasyVVUQ_DIR="$EasyDIR/EasyVVUQ"
+    VENV_DIR=$EasyDIR/.venv
     while [ "${1:-}" != '' ]; do
         case "$1" in
             ## Options
+            -g|--global)
+                VENV_DIR="$PROJECT_DIR/.venv"
+                ;;
             
             ## end of Options
             [!-]*)
@@ -21,22 +27,20 @@ _setConfigArgs() {
         shift
     done
 
-    EasyDIR="$PROJECT_DIR/easy"
-    EasyVVUQ_DIR="$EasyDIR/EasyVVUQ"
 }
 
 create_venv() {
     enter_new_func "Creating python venv"
     
-    if [ ! -f "$EasyDIR/.venv/bin/activate" ]; then
-        python3 -m venv "$EasyDIR/.venv"
+    if [ ! -f "$VENV_DIR/bin/activate" ]; then
+        python3 -m venv "$VENV_DIR"
     fi
     
     # shellcheck disable=SC1091
-    source "$EasyDIR/.venv/bin/activate"
-
+    source "$VENV_DIR/bin/activate"
+    which pip
     pip install --upgrade pip
-    pip install -r "$EasyDIR/requirements.txt"
+    pip install -r "$VENV_DIR/../requirements.txt"
 }
 
 install_local_easyvvuq() {

@@ -1,0 +1,78 @@
+-- Configuring Dakota with CMake 3.28.3
+-- Dakota release version is: 6.24+
+-- Dakota git revision is: 91fc67ec5 (2026-05-18)
+-- Dakota enabling Python3 (Interpreter)
+-- Python3 h5py module found
+-- Python3 numpy module found
+-- Python3 scipy module found
+-- Found Java: /usr/bin/java (found suitable version "11.0.31", minimum required is "1.6") 
+-- DAKOTA MPI: not requested.
+-- Dakota using Eigen3::Eigen target with include directories
+   /home/mmachado/HPC/uq_sbac/dakota/dev/install/include/eigen3
+-- Found Boost: /usr/lib/x86_64-linux-gnu/cmake/Boost-1.83.0/BoostConfig.cmake (found suitable version "1.83.0", minimum required is "1.70") found components: program_options regex serialization system 
+-- Dakota using previously specified Trilinos in /home/mmachado/HPC/uq_sbac/dakota/dev/install/lib/cmake/Trilinos
+-- Found Java: /usr/bin/java (found version "11.0.31") found components: Development 
+-- Finding relocatable package CONMIN with directory external/CONMIN
+-- Setting CONMIN_DIR = /home/mmachado/HPC/uq_sbac/dakota/dev/build/packages/external/CONMIN
+-- Finding relocatable package NCSUOPT with directory external/NCSUOpt
+-- Setting NCSUOPT_DIR = /home/mmachado/HPC/uq_sbac/dakota/dev/build/packages/external/NCSUOpt
+-- Python executable: /home/mmachado/HPC/uq_sbac/dakota/dev/.venv/bin/python3
+-- Python include dirs: /home/mmachado/.pyenv/versions/3.14.2/include/python3.14
+-- Found valid nlohmann_json include path: /home/mmachado/HPC/uq_sbac/dakota/snl-dakota/packages/external/json/include
+-- Fetching pybind11 from GitHub...
+-- pybind11 v2.12.1 
+-- Fetching pybind11_json from GitHub...
+-- Fetching PEGTL from GitHub...
+-- Using std::filesystem
+-- Python modules will install to: ${CMAKE_INSTALL_PREFIX}/share/dakota/Python/dakota/spec/validation
+-- 
+-- ========================================
+-- Dakota Parser Configuration:
+--   Schema: /home/mmachado/HPC/uq_sbac/dakota/snl-dakota/src/dakota.json
+--   Generated code: /home/mmachado/HPC/uq_sbac/dakota/dev/build/packages/dakota_parser/dakota_parser/generated
+--   Embedded schema: /home/mmachado/HPC/uq_sbac/dakota/dev/build/packages/dakota_parser/dakota_parser/generated/dakota_embedded_schema_cbor.hpp
+--   Blocks: environment;method;model;variables;interface;responses
+--   Generation: At build time (after schema)
+--   Debug output: OFF
+-- ========================================
+-- 
+-- 
+-- === Dakota JSON Validation Configuration ===
+--   Version:              0.1.0
+--   C++ Standard:         17
+--   Build Python bindings: ON
+--   Build tests:          OFF
+--   Build examples:       OFF
+--   Python install dir:   share/dakota/Python/dakota/spec/validation
+-- 
+-- OPT++ using previously specified Trilinos in /home/mmachado/HPC/uq_sbac/dakota/dev/install/lib/cmake/Trilinos
+-- Finding relocatable package DFFTPACK with directory external/dfftpack
+-- Setting DFFTPACK_DIR = /home/mmachado/HPC/uq_sbac/dakota/dev/build/packages/external/dfftpack
+-- Finding relocatable package LHS with directory external/LHS
+-- Setting LHS_DIR = /home/mmachado/HPC/uq_sbac/dakota/dev/build/packages/external/LHS
+-- Finding relocatable package SPARSE_GRID with directory external/VPISparseGrid
+-- Setting SPARSE_GRID_DIR = /home/mmachado/HPC/uq_sbac/dakota/dev/build/packages/external/VPISparseGrid
+-- Found Boost: /usr/lib/x86_64-linux-gnu/cmake/Boost-1.83.0/BoostConfig.cmake (found suitable version "1.83.0", minimum required is "1.58")  
+-- Pecos using previously specified Trilinos in /home/mmachado/HPC/uq_sbac/dakota/dev/install/lib/cmake/Trilinos
+-- Finding relocatable package DFFTPACK with directory dfftpack
+-- Finding relocatable package LHS with directory LHS
+-- Finding relocatable package SPARSE_GRID with directory VPISparseGrid
+-- Surfpack using previously specified Trilinos in /home/mmachado/HPC/uq_sbac/dakota/dev/install/lib/cmake/Trilinos
+-- Found Boost: /usr/lib/x86_64-linux-gnu/cmake/Boost-1.83.0/BoostConfig.cmake (found suitable version "1.83.0", minimum required is "1.58") found components: serialization 
+-- Finding relocatable package CONMIN with directory CONMIN
+-- Finding relocatable package NCSUOPT with directory NCSUOpt
+-- HOPSPACK: Using the standard C++ compiler (no MPI):
+--   /usr/bin/g++
+-- HOPSPACK: LAPACK requested, linear constraints allowed.
+-- HOPSPACK: Using LAPACK libraries:
+--   /usr/lib/x86_64-linux-gnu/liblapack.so
+--   /usr/lib/x86_64-linux-gnu/libblas.so
+-- HOPSPACK: Excluding CDDLIB for degenerate constraints.
+-- HOPSPACK: Using Boost for RNG / shuffle.
+-- Found Boost: /usr/lib/x86_64-linux-gnu/cmake/Boost-1.83.0/BoostConfig.cmake (found version "1.83.0")  
+-- Dakota_LIBRARIES: dakota_util;dakota_ir;dakota_surrogates;dakota_src;dakota_src_fortran;nidr;pecos_util;pecos_src;lhs;lhs_mods;lhs_mod;dfftpack;sparsegrid;surfpack;surfpack;surfpack_fortran;utilib;colin;interfaces;scolib;3po;pebbl;tinyxml;approxnn;conmin;ddace;dream;fsudace;hopspack;jega;jega_fe;moga;soga;eutils;utilities;ncsuopt;cport;nomad;optpp;psuade;amplsolver
+-- Dakota_TPL_LIBRARIES: Teuchos::all_libs;/usr/lib/x86_64-linux-gnu/liblapack.so;/usr/lib/x86_64-linux-gnu/libblas.so;Boost::program_options;Boost::regex;Boost::serialization;Boost::system
+-- Installing Dakota exported targets to lib/cmake/Dakota
+-- Configuring done (2.0s)
+-- Generating done (0.6s)
+-- Build files have been written to: /home/mmachado/HPC/uq_sbac/dakota/dev/build

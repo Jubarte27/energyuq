@@ -8,15 +8,19 @@ fi
 
 main() {
     # shellcheck disable=SC1091
-    source "$PROJECT_DIR/.venv/bin/activate"
+    source "$VENV_DIR/bin/activate"
 
     cd "$PROJECT_DIR" && jupyter notebook --allow-root --NotebookApp.token='' --NotebookApp.password=''
 }
 
 _setConfigArgs() {
+    VENV_DIR="$PROJECT_DIR/easy/.venv"
     while [ "${1:-}" != '' ]; do
         case "$1" in
             ## Options
+            -g|--global-python)
+                VENV_DIR="$PROJECT_DIR/.venv"
+                ;;
             
             ## end of Options
             [!-]*)
@@ -28,6 +32,8 @@ _setConfigArgs() {
         esac
         shift
     done
+
+
 }
 
 SCRIPT_DIR=$(dirname "$(readlink -e "${BASH_SOURCE[0]}")") && source "$SCRIPT_DIR/util.bash"

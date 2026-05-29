@@ -85,19 +85,19 @@ make_me() {
       -DCMAKE_CXX_COMPILER_LAUNCHER="ccache" \
       -DMPI_CXX_COMPILER="mpicxx" \
       -DCMAKE_Fortran_FLAGS="-fallow-argument-mismatch" \
-      -DDAKOTA_HAVE_MPI=ON \
-      -DDAKOTA_HAVE_HDF5=ON \
-      -DHAVE_MUQ=ON \
+      -DDAKOTA_HAVE_MPI=OFF \
+      -DDAKOTA_HAVE_HDF5=OFF \
+      -DHAVE_MUQ=OFF \
       -DDAKOTA_ENABLE_TESTS="${TESTS}" \
       -DDAKOTA_JAVA_SURROGATES=ON \
       -DDAKOTA_PYTHON=ON \
-      -DDAKOTA_PYTHON_DIRECT_INTERFACE=ON \
-      -DDAKOTA_PYTHON_DIRECT_INTERFACE_NUMPY=ON \
-      -DDAKOTA_PYTHON_SURROGATES=ON \
-      -DDAKOTA_PYTHON_WRAPPER=ON \
-      -DDAKOTA_HAVE_GSL=ON \
-      -DHAVE_QUESO=ON \
-      "${extras[@]}" \
+      -DDAKOTA_PYTHON_DIRECT_INTERFACE=OFF \
+      -DDAKOTA_PYTHON_DIRECT_INTERFACE_NUMPY=OFF \
+      -DDAKOTA_PYTHON_SURROGATES=OFF \
+      -DDAKOTA_PYTHON_WRAPPER=OFF \
+      -DDAKOTA_HAVE_GSL=OFF \
+      -DHAVE_QUESO=OFF \
+      "${EXTRA_CMAKE_ARGS[@]}" \
       "$DAK_SRC"; then
         log "$ERROR" "Configuration failed, check $BASE_DIR/configureerr.log for details"
         exit 1

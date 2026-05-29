@@ -1,0 +1,14 @@
+CMake Warning at InstallUnixSOs.cmake:17 (message):
+  Utility chrpath could not be run.  Portability of package/install may be
+  reduced.
+Call Stack (most recent call first):
+  scripts/cmake_install.cmake:63 (include)
+  cmake_install.cmake:95 (include)
+
+
+Resolved build directory: /home/mmachado/HPC/uq_sbac/dakota/dev/build
+-- Installing: /home/mmachado/HPC/uq_sbac/dakota/dev/install/bin/libteuchoscomm.so.16
+-- Installing: /home/mmachado/HPC/uq_sbac/dakota/dev/install/bin/libteuchoscore.so.16
+-- Installing: /home/mmachado/HPC/uq_sbac/dakota/dev/install/bin/libteuchosnumerics.so.16
+-- Installing: /home/mmachado/HPC/uq_sbac/dakota/dev/install/bin/libteuchosparameterlist.so.16
+-- Installing: /home/mmachado/HPC/uq_sbac/dakota/dev/install/bin/libteuchosparser.so.16

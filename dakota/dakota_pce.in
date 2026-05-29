@@ -1,58 +1,73 @@
-environment,
-	method_pointer = 'SBGO'
+environment
+	method_pointer = 'ada'
 	tabular_data
 		tabular_data_file = 'pce_samples.dat'
         custom_annotated header
 
-method
-    id_method = 'BandB'
-    branch_and_bound
-        output verbose
-        method_pointer = 'SBGO'
-
-method
-    id_method = 'SBGO'
-    surrogate_based_global
-        model_pointer = 'SURROGATE'
-        method_pointer = 'newton'
-        max_iterations = 5
-        replace_points
-        output verbose
-
-
-method
-    id_method 'newton'
-    optpp_q_newton
-        output verbose
-
 model
     id_model = 'SURROGATE'
-    surrogate global
-        dace_method_pointer = 'ada'
-        correction additive zeroth_order
-        gaussian_process dakota
+    surrogate
+        responses_pointer = 'energy_response'
+        variables_pointer = 'discrete_design'
+        global_approx
+            reuse_points
+            minimum_points
+            gaussian_process
+                dakota
+            dace_method_pointer = 'gauss'
+            truth_model_pointer = 'TRUTH'
 
+model
+    id_model = 'TRUTH'
+    single
+        responses_pointer = 'energy_response'
+        interface_pointer = 'TRUE_FN'
+        variables_pointer = 'discrete_design'
 
-method,
-	id_method = 'ada'
-	adaptive_sampling
-        seed = 42
-		max_iterations = 20
+ method,
+    id_method = 'pce'
+    polynomial_chaos
+        normalized
+        sparse_grid_level = 3
         model_pointer = 'TRUTH'
-        output verbose
+        variance_based_decomp
+        p_refinement dimension_adaptive sobol
+            max_iterations  = 20
+            convergence_tol = 1.e-4
 
-variables,
-    relaxed
+method
+    id_method = 'ada'
+    adaptive_sampling
+        samples 3
+        refinement_samples 10
+        samples_on_emulator = 100
+        final_solutions 1
+        model_pointer = 'TRUTH'
+        max_iterations 10
+        response_levels = 737239  1037239 5 8
+            num_response_levels 2 1 1
+        distribution
+            complementary
+
+method
+    id_method = 'gauss'
+    gpais
+        build_samples 5
+        model_pointer = 'TRUTH'
+
+variables
+    id_variable = 'discrete_design'
 	active all
+    relaxed
 	discrete_design_range = 2
-		initial_point        2           32
-		lower_bounds         0            1
-		upper_bounds         2           32
-		descriptors      'CLK'  'N_THREADS'
+        initial_point        2           32
+        lower_bounds         0            1
+        upper_bounds         2           32
+        descriptors      'CLK'  'N_THREADS'
 
 interface
     id_interface = 'TRUE_FN'
-    analysis_driver = 'dakota_driver.sh'
+    analysis_drivers = 'dakota_driver.sh'
         fork
             parameters_file 'energyuq.in'
             results_file 'energyuq.out'
@@ -63,13 +78,8 @@ interface
             aprepro
 
 responses
-    objective_functions = 1
-    descriptors = 'energy_uj'
-	numerical_gradients
+    id_response = 'energy_response'
+    response_functions = 3
+    descriptors = 'energy_uj' 'time' 'energy_scaled'
+	no_gradients
 	no_hessians
-
-
-model
-    id_model = 'TRUTH'
-    single
-      interface_pointer = 'TRUE_FN'
