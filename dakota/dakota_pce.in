@@ -10,10 +10,10 @@ model
         responses_pointer = 'energy_response'
         variables_pointer = 'discrete_design'
         global_approx
-            reuse_points
+            reuse_points all
             minimum_points
             gaussian_process
-                dakota
+                surfpack
             dace_method_pointer = 'gauss'
             truth_model_pointer = 'TRUTH'
 
@@ -41,9 +41,9 @@ method
         samples 3
         refinement_samples 4
         samples_on_emulator = 1000
-        final_solutions 1
+        final_solutions 2
         model_pointer = 'TRUTH'
-        max_iterations 10
+        max_iterations 20
 
 method
     id_method = 'gauss'
