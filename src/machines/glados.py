@@ -10,4 +10,4 @@ class Glados(Machine):
         2800000,
         3300000,
     ]
-    physical_core_count: ClassVar[int] = 16
+    physical_core_count: ClassVar[int] = 15 ## mentira

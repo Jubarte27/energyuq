@@ -24,7 +24,7 @@ vary_type = dict[str, cp.Distribution]
 # Quantity of Interest
 QOI = "energy_uj"
 QOIS = ["energy_uj", "energy_scaled", "time"]
-RESULTS_DIR = "run_results"
+RESULTS_DIR = "easy/run_results"
 
 
 class ExecuteWrapper:
@@ -68,8 +68,11 @@ def default_params(machine: type[Machine]) -> tuple[params_type, vary_type]:
     vary: vary_type = {}
 
     # Current machine maximum number of cores
-    params["N_THREADS"] = {"type": "integer", "default": machine.physical_core_count}
-    vary["N_THREADS"] = cp.DiscreteUniform(1, machine.physical_core_count)
+    # params["N_THREADS"] = {"type": "integer", "default": machine.physical_core_count}
+    # vary["N_THREADS"] = cp.DiscreteUniform(1, machine.physical_core_count)
+    # Glados limited number of cores
+    params["N_THREADS"] = {"type": "integer", "default": 28}
+    vary["N_THREADS"] = cp.DiscreteUniform(1, 28)
 
     # Clock frequencies available for our current machine:
     params["CLK"] = {"type": "integer", "default": len(machine.freq) - 1}
@@ -85,7 +88,7 @@ def energy_wraper_actions(
 ) -> uq.actions.Actions:
     # input file encoder
     encoder = uq.encoders.GenericEncoder(
-        template_fname="energy.template", delimiter="$", target_filename="input.csv"
+        template_fname="easy/energy.template", delimiter="$", target_filename="input.csv"
     )
 
     # CSV output file decoder
@@ -245,6 +248,7 @@ def run_dir(*, name: str = "energy", dir: Union[str, None] = None, campaign: Uni
         if app:
             name = app["name"]
     
+    create_dir(Path(RESULTS_DIR))
     return next_dir(RESULTS_DIR, name)
 
 def create(

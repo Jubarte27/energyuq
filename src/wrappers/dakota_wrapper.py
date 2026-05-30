@@ -21,7 +21,7 @@ def main(program: type[Program], machine: type[Machine], parameters: interfacing
     results.write()
 
 if __name__ == "__main__":
-    program = NONE
+    program = FFT
     machine = Glados
     print(f"Running on {machine.name}")
     parameters, results = interfacing.read_parameters_file()
