@@ -3,7 +3,7 @@ main() {
     set_log_depth 0
     ensure create_venv
     ensure install_local_easyvvuq
-    ensure install_jupyter
+    # ensure install_jupyter
 }
 _setConfigArgs() {
     EasyDIR="$PROJECT_DIR/easy"

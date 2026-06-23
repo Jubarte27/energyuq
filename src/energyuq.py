@@ -80,6 +80,12 @@ def default_params(machine: type[Machine]) -> tuple[params_type, vary_type]:
 
     # params['POWER_CAP'] = {'type': 'integer', 'default': 220.0}  # power cap in watts
 
+    params["PLACE_WIDE"] = {"type": "integer", "default": len(machine.places) - 1}
+    vary["PLACE_WIDE"] = cp.DiscreteUniform(0, len(machine.places) - 1)
+    
+    params["AFF_DISTANCE"] = {"type": "integer", "default": len(machine.proc_bind) - 1}
+    vary["AFF_DISTANCE"] = cp.DiscreteUniform(0, len(machine.proc_bind) - 1)
+
     return params, vary
 
 

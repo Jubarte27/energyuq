@@ -29,25 +29,26 @@ def mostly_square_grid(blocks: int, total_width: float, min_block_width: float):
     total_height = rows * total_width
     return (cols, rows), (total_width, total_height)
 
-limits={
-    "N_THREADS": limit(1, 28),
-    "CLK": limit(0, len(machine.freq) - 1)
-}
-labels = np.array(list(limits.keys()), dtype=str)
-values = np.array(list(limits.values()), dtype=limit)
+def init(limits={
+        "N_THREADS": limit(1, 28),
+        "CLK": limit(0, len(machine.freq) - 1)
+    }):
+    global labels, values, grid_fig_size, L, C, R, full_rows, nd_labels, nd_values, legend_handles
+    labels = np.array(list(limits.keys()), dtype=str)
+    values = np.array(list(limits.values()), dtype=limit)
 
-L = (labels.size+1)//2
-(C, R), grid_fig_size = mostly_square_grid(L, 6, 2)
-full_rows = L // C
+    L = (labels.size+1)//2
+    (C, R), grid_fig_size = mostly_square_grid(L, 6, 2)
+    full_rows = L // C
 
-nd_values = pad_to_even_and_split(values)
-nd_labels = pad_to_even_and_split(labels)
+    nd_values = pad_to_even_and_split(values)
+    nd_labels = pad_to_even_and_split(labels)
 
 
-more_red = Line2D([0], [0], color='red', lw=2, marker="o", linestyle='')
-more_blue = Line2D([0], [0], color='blue', lw=2, marker="o", linestyle='')
+    more_red = Line2D([0], [0], color='red', lw=2, marker="o", linestyle='')
+    more_blue = Line2D([0], [0], color='blue', lw=2, marker="o", linestyle='')
 
-legend_handles = [more_red, more_blue]
+    legend_handles = [more_red, more_blue]
 
 def colors_for(qoi) -> dict[str, tuple[str,str,str,str]]:
     return {
@@ -299,10 +300,12 @@ def plot_2D_single_dimension(result: Result, qoi=None, subfig=None):
         fig = plt.figure(figsize=(12,12/C*R), layout="constrained")
         fig.supylabel(f"For {qoi}")
 
-    ax: list[Axes]=[]
+    ax = []
     i=0
     
     ax = fig.subplots(R, C, sharey=False)
+    if isinstance(ax, np.ndarray):
+        ax = ax.flatten()
 
     for i in range(L):
         xd = values[i].upper - values[i].lower

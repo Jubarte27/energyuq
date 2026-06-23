@@ -2,3 +2,4 @@ numpy
 chaospy
 matplotlib
 scipy
+setuptools==81.0.0

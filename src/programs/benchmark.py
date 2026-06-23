@@ -9,8 +9,11 @@ class ExecuteSH(Program):
     def run(cls, params: ExecutionParams, args: Iterable[str]) -> CompletedProcess[str]:
         execute = f"{os.path.dirname(__file__)}/../../scripts/execute-hpc-benchmarks.sh"
         print(f"Running {cls.name} with {params.n_threads} threads")
+        proc_bind = params.machine.proc_bind[params.affinity_distance]
+        places = params.machine.places[params.place_wideness]
         return run(
             [execute, cls.name, str(params.n_threads)],
+            env={"OMP_PLACES": places, "OMP_PROC_BIND": proc_bind},
             capture_output=True,
             text=True,
         )

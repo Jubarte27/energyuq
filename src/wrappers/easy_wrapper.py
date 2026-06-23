@@ -9,7 +9,7 @@ from ..machines import *
 def main(program: type[Program], machine: type[Machine], input_file: str = "input.csv", output_file: str = "output.csv"):
     with open(input_file, "r") as f:
         args = f.readline().split(",")
-    params = ExecutionParams(n_threads=int(args[0]), freq_level=int(args[1]))
+    params = ExecutionParams(machine=machine, n_threads=int(args[0]), freq_level=int(args[1]), place_wideness=int(args[2]), affinity_distance=int(args[3]))
 
     result = base_wrapper.prepare_and_exeute(machine, program, params, args[2:])
 

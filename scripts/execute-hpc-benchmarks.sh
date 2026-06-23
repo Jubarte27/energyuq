@@ -14,9 +14,14 @@ main() {
     fi
 	echo "Running $NAME with $NT threads"
 	{
+        if [ -z "$OMP_PROC_BIND" ]; then
+	        export OMP_PROC_BIND=CLOSE
+        fi
+        if [ -z "$OMP_PLACES" ]; then
+	        export OMP_PLACES=CORES
+        fi
+	    
 	    export OMP_NUM_THREADS=$NT
-	    export OMP_PROC_BIND=CLOSE
-	    export OMP_PLACES=CORES
 
 		echo "OMP_NUM_THREADS=$OMP_NUM_THREADS"
 		echo "OMP_PROC_BIND=$OMP_PROC_BIND"
