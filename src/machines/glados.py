@@ -10,4 +10,6 @@ class Glados(Machine):
         2800000,
         3300000,
     ]
-    max_threads: ClassVar[int] = 15 ## mentira
+    max_threads: ClassVar[int] = 16 ## mentira
+    places = ["threads", "core", "sockets"]
+    proc_bind = ["true", "close", "spread", "false"]

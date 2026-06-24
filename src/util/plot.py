@@ -30,7 +30,7 @@ def mostly_square_grid(blocks: int, total_width: float, min_block_width: float):
     return (cols, rows), (total_width, total_height)
 
 def init(limits={
-        "N_THREADS": limit(1, 28),
+        "N_THREADS": limit(1, machine.max_threads),
         "CLK": limit(0, len(machine.freq) - 1)
     }):
     global labels, values, grid_fig_size, L, C, R, full_rows, nd_labels, nd_values, legend_handles

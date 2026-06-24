@@ -24,7 +24,7 @@ vary_type = dict[str, cp.Distribution]
 # Quantity of Interest
 QOI = "energy_uj"
 QOIS = ["energy_uj", "energy_scaled", "time"]
-RESULTS_DIR = "easy/run_results"
+RESULTS_DIR = "run_results"
 
 
 class ExecuteWrapper:
@@ -71,8 +71,8 @@ def default_params(machine: type[Machine]) -> tuple[params_type, vary_type]:
     # params["N_THREADS"] = {"type": "integer", "default": machine.physical_core_count}
     # vary["N_THREADS"] = cp.DiscreteUniform(1, machine.physical_core_count)
     # Glados limited number of cores
-    params["N_THREADS"] = {"type": "integer", "default": 28}
-    vary["N_THREADS"] = cp.DiscreteUniform(1, 28)
+    params["N_THREADS"] = {"type": "integer", "default": machine.max_threads}
+    vary["N_THREADS"] = cp.DiscreteUniform(1, machine.max_threads)
 
     # Clock frequencies available for our current machine:
     params["CLK"] = {"type": "integer", "default": len(machine.freq) - 1}
@@ -93,6 +93,12 @@ def energy_wraper_actions(
     program: type[Program], machine: type[Machine], root: Path
 ) -> uq.actions.Actions:
     # input file encoder
+    
+    template = ",".join([f"${param}" for param in default_params(machine)[0]])
+    
+    with open("easy/energy.template", "w") as f:
+        f.write(f"{template}\n")
+    
     encoder = uq.encoders.GenericEncoder(
         template_fname="easy/energy.template", delimiter="$", target_filename="input.csv"
     )

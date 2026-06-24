@@ -9,7 +9,14 @@ from ..machines import *
 def main(program: type[Program], machine: type[Machine], input_file: str = "input.csv", output_file: str = "output.csv"):
     with open(input_file, "r") as f:
         args = f.readline().split(",")
-    params = ExecutionParams(machine=machine, n_threads=int(args[0]), freq_level=int(args[1]), place_wideness=int(args[2]), affinity_distance=int(args[3]))
+    def arg(i, default=0):
+        return int(args[i]) if len(args) > i else default
+    params = ExecutionParams(
+        machine=machine,
+        n_threads=int(args[0]),
+        freq_level=int(args[1]),
+        place_wideness=arg(2),
+        affinity_distance=arg(3))
 
     result = base_wrapper.prepare_and_exeute(machine, program, params, args[2:])
 

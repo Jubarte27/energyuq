@@ -7,8 +7,8 @@ class Machine(Protocol):
     max_threads: ClassVar[int]
     package: ClassVar[list[int]] = [0]
     sub_package: ClassVar[list[int]] = [-1] # nome ruim, valores ruins
-    places: ClassVar[list[str]] = ["close"]
-    proc_bind: ClassVar[list[str]] = ["cores"]
+    places: ClassVar[list[str]] = ["threads", "cores"]
+    proc_bind: ClassVar[list[str]] = ["true", "false"]
 
 class NONE(Machine):
     name = "NONE"

@@ -6,10 +6,17 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=40
 #SBATCH --time=3:00:00
-#SBATCH --output=energyuq_%x_%j.out
-#SBATCH --error=energyuq_%x_%j.err
+#SBATCH --output=execlog/%x_%j.out
+#SBATCH --error=execlog/%x_%j.err
 
 set -e
+
+report_end() {
+    local exit_code=$? 
+    echo "Something made me finnish. Last exit code was: $exit_code"
+}
+trap report_end EXIT
+
 cd "$SCRATCH"
 
 if [ -d "energyuq" ]; then
@@ -27,5 +34,16 @@ git submodule update --init easy/EasyVVUQ hpc-benchmarks
 source easy/.venv/bin/activate
 python3 run.py
 
-# todo copy back
-cp -r "$SCRATCH/energyuq/easy/run_results" "$HOME/run_results"
+echo "Done executing. Copying back."
+
+# copy back
+
+PARENT_DIR="$HOME"
+COUNTER=1
+
+while [ -d "$PARENT_DIR/run_results_$COUNTER" ]; do ((COUNTER++)); done
+UNIQUE="$PARENT_DIR/run_results_$COUNTER"
+mkdir -p "$UNIQUE"
+cp -r "$SCRATCH/energyuq/easy/run_results" "$UNIQUE"
+
+echo All finished
