@@ -17,7 +17,6 @@ def prepare_and_exeute(machine: type[Machine], program: type[Program], params: E
     return report(reading, t)
 
 def set_userspace():
-    print("tried this")
     return subprocess.run(
         # which to use should be defined on the machine
     #     ["cpupower", "frequency-set", "--governor", "userspace"],
@@ -35,7 +34,6 @@ def cpu_set(machine: type[Machine], freq_level: int):
     if result.returncode != 0:
         raise Exception(f"Unable to set governor using cpupower, am i root? code: {result.returncode}")
 
-    print("also this")
     result = subprocess.run(
         # which to use should be defined on the machine
         # ["cpupower", "frequency-set", "--freq", str(frequency)],
@@ -47,14 +45,12 @@ def cpu_set(machine: type[Machine], freq_level: int):
     if result.returncode != 0:
         raise Exception(f"Unable to set frequency using cpupower, am i root? code: {result.returncode}")
     
-    print("and it worked")
     # power_cap = x[POWER_CAP_POS]
     # power_cap *= 10**6
     # set_sysfs("/sys/class/powercap/intel-rapl:0/?????", power_cap, "Power cap")
 
 
 def run(machine: type[Machine],program: type[Program], params: ExecutionParams, parameter_list: Iterable[str]):
-    print("started")
     reading = all_energy_uj(machine)
     t = perf_counter()
 
@@ -67,7 +63,7 @@ def run(machine: type[Machine],program: type[Program], params: ExecutionParams, 
 
     output_CompletedProcess(program.name, result)
 
-    return reading, t
+    return end, t
 
 
 def report(readings: list[EnergyReading], elapsed: float):
@@ -100,7 +96,6 @@ def max_energy_range_uj(socket) -> int:
     output_CompletedProcess(f"max_energy_range_uj:{socket}", result)
     if result.returncode != 0:
         exit(result.returncode)
-    print("read once")
     return int(result.stdout)
 
 def energy_uj(socket) -> int:

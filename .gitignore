@@ -67,6 +67,7 @@ venv.bak/
 .results
 .benchmark-results
 run_results
+hype_results
 
 /**/dakota-*/
 /**/.dakota-*/

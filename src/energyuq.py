@@ -1,12 +1,12 @@
 from contextlib import redirect_stdout
 import os
 from pathlib import Path
-from typing import Any, Union
+from typing import Any, Union, cast
 import typing
-from easyvvuq.db.sql import CampaignDB
 import dill
 import numpy as np
 import easyvvuq as uq
+from easyvvuq.sampling.stochastic_collocation import SCSampler
 import chaospy as cp
 import matplotlib.pyplot as plt
 from easyvvuq.actions import CreateRunDirectory, Encode, Decode, ExecutePython, Actions
@@ -180,9 +180,12 @@ def prepare_campaign(
 
 
 def prepare_analysis(campaign: uq.campaign.Campaign) -> uq.analysis.SCAnalysis:
+    sampler: SCSampler = cast(SCSampler, campaign.get_active_sampler())
     analysis = uq.analysis.SCAnalysis(
-        sampler=campaign.get_active_sampler(), qoi_cols=[QOI]
+        sampler=sampler, qoi_cols=[QOI]
     )
+    if not hasattr(analysis, "l_norm"):
+        analysis.l_norm = sampler.l_norm
 
     return analysis
 
@@ -204,18 +207,9 @@ def get_sampler(campaign: uq.campaign.Campaign):
 def refine_sampling_plan(
     campaign: uq.campaign.Campaign,
     analysis: uq.analysis.SCAnalysis,
-    number_of_refinements,
+    min_number_of_refinements = -1,
 ):
     """
-    Refine the sampling plan.
-
-    Parameters
-    ----------
-    number_of_refinements (int)
-    The number of refinement iterations that must be performed.
-
-    Returns
-    -------
     None. The new accepted indices are stored in analysis.l_norm and the admissible indices
     in sampler.admissible_idx.
     """
@@ -242,13 +236,26 @@ def refine_sampling_plan(
         analysis.adapt_dimension(QOI, data_frame, method="var")
         return True
     i = 0
-    for i in range(number_of_refinements):
+    over = False
+    for i in range(min_number_of_refinements):
         if not single_iteration(i):
+            over = True
             break
+
     while np.min(np.max(analysis.l_norm, 0)) == 1:
         i+=1
         if not single_iteration(i):
+            over = True
             break
+    
+    while np.min(np.max(analysis.l_norm, 0)) == 1:
+        i+=1
+        if not single_iteration(i):
+            over = True
+            break
+        
+    if over:
+        return
 
 
 
