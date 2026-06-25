@@ -221,7 +221,7 @@ def refine_sampling_plan(
     """
     sampler = get_sampler(campaign)
 
-    for i in range(number_of_refinements):
+    def single_iteration(i):
         # compute the admissible indices
         sampler.look_ahead(analysis.l_norm)
 
@@ -231,7 +231,7 @@ def refine_sampling_plan(
 
         if len(sampler.admissible_idx) == 0:
             # we searched everything
-            break
+            return False
 
         print(f"-------{i + 1} iteration: {sampler.n_new_points[-1]} new points------")
         # run the ensemble
@@ -240,6 +240,16 @@ def refine_sampling_plan(
         # accept one of the multi indices of the new admissible set
         data_frame = campaign.get_collation_result()
         analysis.adapt_dimension(QOI, data_frame, method="var")
+        return True
+    i = 0
+    for i in range(number_of_refinements):
+        if not single_iteration(i):
+            break
+    while np.min(np.max(analysis.l_norm, 0)) == 1:
+        i+=1
+        if not single_iteration(i):
+            break
+
 
 
 def refine_and_analyse(

@@ -23,5 +23,3 @@ class Hype(Machine):
     max_threads: ClassVar[int] = 40
     package = [0, 1]
     sub_package = [-1,0] # nome ruim, valores ruins
-    places = ["threads", "core", "sockets"]
-    proc_bind = ["true", "close", "spread", "false"]
