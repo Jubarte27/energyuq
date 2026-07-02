@@ -220,7 +220,7 @@ def refine_sampling_plan(
             # we searched everything
             return False
 
-        print(f"-------{i + 1}{ {0: "st", 1: "nd"}.get(i, "th") } iteration: {sampler.n_new_points[-1]} new points------")
+        print(f"-------{i + 1}{({0: 'st', 1: 'nd'}.get(i, 'th'))} iteration: {sampler.n_new_points[-1]} new points------")
         campaign.execute(sequential=True).collate(progress_bar=True)
 
         analysis.adapt_dimension(QOI, campaign.get_collation_result(), method="var")
