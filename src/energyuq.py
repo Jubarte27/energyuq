@@ -233,7 +233,7 @@ def refine_sampling_plan(
         max_orders = np.max(analysis.l_norm, 0)
         return (all(
             order > 1 or
-            not all(sobol <= thresh for permut, sobol in sobols if dim + 1 in permut)
+            not all(sobol <= thresh for permut, sobol in sobols.items() if dim + 1 in permut)
             for dim, order in enumerate(max_orders)
         ))
 
