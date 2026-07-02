@@ -29,7 +29,7 @@ git submodule update --init easy/EasyVVUQ hpc-benchmarks
 
 ./scripts/install-easy.sh
 
-./scripts/compile-hpc-benchmarks.sh
+./scripts/compile-hpc-benchmarks.sh HPCG
 
 source easy/.venv/bin/activate
 python3 run.py

@@ -1,4 +1,5 @@
 {
     "cmake.sourceDirectory": "/home/mmachado/HPC/uq_sbac/dakota/snl-dakota",
     "C_Cpp.default.compilerPath": "/usr/bin/g++",
+    "python.terminal.useEnvFile": true,
 }

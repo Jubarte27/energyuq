@@ -208,63 +208,63 @@ def refine_sampling_plan(
     campaign: uq.campaign.Campaign,
     analysis: uq.analysis.SCAnalysis,
     min_number_of_refinements = -1,
+    max_number_of_refinements = 100
 ):
-    """
-    None. The new accepted indices are stored in analysis.l_norm and the admissible indices
-    in sampler.admissible_idx.
-    """
     sampler = get_sampler(campaign)
 
     def single_iteration(i):
         # compute the admissible indices
         sampler.look_ahead(analysis.l_norm)
 
-        if sampler.n_new_points[-1] == 0:
-            # maybe we should stop??
-            pass
-
         if len(sampler.admissible_idx) == 0:
             # we searched everything
             return False
 
-        print(f"-------{i + 1} iteration: {sampler.n_new_points[-1]} new points------")
-        # run the ensemble
+        print(f"-------{i + 1}{ {0: "st", 1: "nd"}.get(i, "th") } iteration: {sampler.n_new_points[-1]} new points------")
         campaign.execute(sequential=True).collate(progress_bar=True)
 
-        # accept one of the multi indices of the new admissible set
-        data_frame = campaign.get_collation_result()
-        analysis.adapt_dimension(QOI, data_frame, method="var")
+        analysis.adapt_dimension(QOI, campaign.get_collation_result(), method="var")
         return True
     i = 0
-    over = False
-    for i in range(min_number_of_refinements):
-        if not single_iteration(i):
-            over = True
-            break
 
-    while np.min(np.max(analysis.l_norm, 0)) == 1:
-        i+=1
-        if not single_iteration(i):
-            over = True
-            break
+    def explored_enough(thresh=1e-3):
+        return all(order > 1 or sobol <= thresh for sobol, order in zip(analysis.get_sobol_indices(QOI).values(), np.max(analysis.l_norm, 0)))
+
+    def advance():
+        nonlocal i
+        i += 1
+        return i < max_number_of_refinements and single_iteration(i)
+
+    def converged(rtol=1e-3, atol=1e-6) -> bool:
+        if len(analysis.adaptation_errors) < 3: raise RuntimeError("Less thatn 3 values in adaptation_erros, should not happen")
+        last3 = analysis.adaptation_errors[-3:]
+        return np.all(np.isclose(last3[:-1], last3[1:], rtol=rtol, atol=atol), 0)
     
-    while np.min(np.max(analysis.l_norm, 0)) == 1:
-        i+=1
-        if not single_iteration(i):
-            over = True
-            break
-        
-    if over:
-        return
+    while i <= 2:
+        print("Adapt because <= 2")
+        if not advance(): return
+    
+    while i < min_number_of_refinements:
+        print("Adapt because min_number_of_refinements")
+        if not advance(): return
+
+    while not explored_enough():
+        print("Adapt because something was not properly explored")
+        if not advance(): return
+    
+    while not converged():
+        print("Adapt because it has not converged yet")
+        if not advance(): return
 
 
 
 def refine_and_analyse(
     campaign: uq.campaign.Campaign,
     analysis: uq.analysis.SCAnalysis,
-    number_of_refinements,
+    min_number_of_refinements=-1,
+    max_number_of_refinements=100
 ):
-    refine_sampling_plan(campaign, analysis, number_of_refinements)
+    refine_sampling_plan(campaign, analysis, min_number_of_refinements, max_number_of_refinements)
     campaign.apply_analysis(analysis)
 
 def run_dir(*, name: str = "energy", dir: Union[str, None] = None, campaign: Union[uq.campaign.Campaign, None] = None):

@@ -1,10 +1,12 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import subprocess
+from sys import stderr
 from typing import Iterable, Union
 from ..programs import *
 from ..machines import *
 from ..util.data import ExecutionParams, EnergyReading
 from time import perf_counter
+from shutil import which
 
 from textwrap import indent
 
@@ -16,34 +18,35 @@ def prepare_and_exeute(machine: type[Machine], program: type[Program], params: E
     reading, t = run(machine, program, params, args)
     return report(reading, t)
 
-def set_userspace():
-    return subprocess.run(
-        # which to use should be defined on the machine
-    #     ["cpupower", "frequency-set", "--governor", "userspace"],
-        ["cpufreq-set", "--governor", "userspace"],
-        capture_output=True,
-        text=True,
-    )
+def try_exec(cmds: list[list[str]], err_msg: str = "") -> bool:
+    for cmd in cmds:
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            if err_msg:
+                print(err_msg, file=stderr)
+            output_CompletedProcess(" ".join(cmd), result)
+            return False
+    return True
+
+# which to use should be defined on the machine
+def set_freq(machine: type[Machine], frequency):
+    if which("cpufreq-set"):
+        if try_exec([
+            *(["sudo", "-n", "cpufreq-set", f"--cpu {cpu}", "--governor", "userspace"] for cpu in range(machine.max_threads)),
+            *(["sudo", "-n", "cpufreq-set", f"--cpu {cpu}", "--freq", f"{frequency}"] for cpu in range(machine.max_threads))
+        ]): return
+    
+    if which("cpupower"):
+        if try_exec([
+            ["sudo", "-n", "cpupower", "frequency-set", "--governor", "userspace"],
+            ["sudo", "-n", "cpupower", "frequency-set", "--freq", f"{frequency}"]
+        ]): return
+    
+    raise Exception("Unable to use cpufreq-set or cpupower, do i have permission?")
 
 def cpu_set(machine: type[Machine], freq_level: int):
-    frequency = machine.freq[freq_level]
 
-    result = set_userspace()
-
-    output_CompletedProcess("Governor set", result, True)
-    if result.returncode != 0:
-        raise Exception(f"Unable to set governor using cpupower, am i root? code: {result.returncode}")
-
-    result = subprocess.run(
-        # which to use should be defined on the machine
-        # ["cpupower", "frequency-set", "--freq", str(frequency)],
-        ["cpufreq-set", "--freq", str(frequency)],
-        capture_output=True,
-        text=True,
-    )
-    output_CompletedProcess("Frequency set", result, True)
-    if result.returncode != 0:
-        raise Exception(f"Unable to set frequency using cpupower, am i root? code: {result.returncode}")
+    set_freq(machine, machine.freq[freq_level])
     
     # power_cap = x[POWER_CAP_POS]
     # power_cap *= 10**6
@@ -58,28 +61,30 @@ def run(machine: type[Machine],program: type[Program], params: ExecutionParams, 
     result = program.run(params, parameter_list)
     print()
 
-    t = perf_counter() - t
+    delta = perf_counter() - t
     end = all_energy_uj(machine, reading)
 
     output_CompletedProcess(program.name, result)
 
-    return end, t
+    return end, delta
 
 
 def report(readings: list[EnergyReading], elapsed: float):
     used_energy = 0
     energy_scaled = 0
     for reading in readings:
-        used_energy = reading.end - reading.start
+        max_energy = max_energy_range_uj(f"{reading.package}{sub_package_sufix(reading.sub_package)}")
+
+        # it can technically wrap around twice or more, so we shouldn't run it for longer than a whole day or something
+        if reading.start > reading.end:
+            used_energy += (reading.end + max_energy) - reading.start
+        else:  
+            used_energy += reading.end - reading.start
         
-        # it can technically wrap around twice or more, so we shouldn't run it for longer that a whole day or something
-        
-        suf = f":{reading.sub_package}" if reading.sub_package >= 0 else ""
-        max_energy = max_energy_range_uj(f"{reading.package}{suf}")
-        if reading.end > reading.start:
-            used_energy = (reading.end + max_energy) - reading.start
-        
-        energy_scaled = used_energy / max_energy
+        energy_scaled += used_energy / max_energy
+    
+    print(f"Energy (μJ): {used_energy}")
+    print(f"Time elapsed (s): {elapsed}")
 
     return {
         "energy_uj": used_energy,
@@ -110,26 +115,23 @@ def energy_uj(socket) -> int:
     return int(result.stdout)
 
 
+def sub_package_sufix(sub_package: int):
+    return f":{sub_package}" if sub_package >= 0 else ""
+
+def get_energy(package: int = -1, sub_package: int= -1, reading: EnergyReading | None = None):
+    if reading:
+        package = reading.package
+        sub_package = reading.sub_package
+    return energy_uj(f"{package}{sub_package_sufix(sub_package)}")
+
+
 def all_energy_uj(machine: type[Machine], start: None | list[EnergyReading] = None) -> list[EnergyReading]:
     if start is not None:
-        reading_requests = start
-    else:
-        reading_requests = [
-            EnergyReading(-1, -1, package, sub_package)
-            for package in machine.package
-            for sub_package in machine.sub_package
-        ]
-    # feio
+        return [replace(reading, end=get_energy(reading=reading)) for reading in start]
     return [
-        EnergyReading(
-            reading.start if reading.start < 0 else value_read,
-            reading.end if reading.start >= 0 else value_read,
-            reading.package,
-            reading.sub_package
-        )
-        for reading in reading_requests
-        if (suf := f":{reading.sub_package}" if reading.sub_package >= 0 else "") is not None
-        if (value_read := energy_uj(f"{reading.package}{suf}")) >= 0
+        EnergyReading(get_energy(package=package, sub_package=sub_package), -1, package, sub_package)
+        for package in machine.package
+        for sub_package in machine.sub_package
     ]
         
 
