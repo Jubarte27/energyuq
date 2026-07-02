@@ -32,14 +32,14 @@ def try_exec(cmds: list[list[str]], err_msg: str = "") -> bool:
 def set_freq(machine: type[Machine], frequency):
     if which("cpufreq-set"):
         if try_exec([
-            *(["cpufreq-set", f"--cpu {cpu}", "--governor", "userspace"] for cpu in range(machine.max_threads)),
-            *(["cpufreq-set", f"--cpu {cpu}", "--freq", f"{frequency}"] for cpu in range(machine.max_threads))
+            *(["cpufreq-set", "--cpu", f"{cpu}", "--governor", "userspace"] for cpu in range(machine.max_threads)),
+            *(["cpufreq-set", "--cpu", f"{cpu}", "--freq", f"{frequency}"] for cpu in range(machine.max_threads))
         ]): return
         if try_exec([
-            *(["sudo", "-n", "cpufreq-set", f"--cpu {cpu}", "--governor", "userspace"] for cpu in range(machine.max_threads)),
-            *(["sudo", "-n", "cpufreq-set", f"--cpu {cpu}", "--freq", f"{frequency}"] for cpu in range(machine.max_threads))
+            *(["sudo", "-n", "cpufreq-set", f"--cpu", f"{cpu}", "--governor", "userspace"] for cpu in range(machine.max_threads)),
+            *(["sudo", "-n", "cpufreq-set", f"--cpu", f"{cpu}", "--freq", f"{frequency}"] for cpu in range(machine.max_threads))
         ]): return
-    
+
     if which("cpupower"):
         if try_exec([
             ["cpupower", "frequency-set", "--governor", "userspace"],
