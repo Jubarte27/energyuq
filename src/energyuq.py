@@ -207,6 +207,7 @@ def get_sampler(campaign: uq.campaign.Campaign):
 def refine_sampling_plan(
     campaign: uq.campaign.Campaign,
     analysis: uq.analysis.SCAnalysis,
+    start_index=1, # for display only
     min_number_of_refinements = -1,
     max_number_of_refinements = 100
 ):
@@ -220,7 +221,7 @@ def refine_sampling_plan(
             # we searched everything
             return False
 
-        print(f"-------{i + 1}{({0: 'st', 1: 'nd'}.get(i, 'th'))} iteration: {sampler.n_new_points[-1]} new points------")
+        print(f"-------{i + start_index + 1}{({0: 'st', 1: 'nd', 2: 'rd'}.get(i + start_index, 'th'))} iteration: {sampler.n_new_points[-1]} new points------")
         campaign.execute(sequential=True).collate(progress_bar=True)
 
         analysis.adapt_dimension(QOI, campaign.get_collation_result(), method="var")
@@ -228,20 +229,28 @@ def refine_sampling_plan(
     i = 0
 
     def explored_enough(thresh=1e-3):
-        return all(order > 1 or sobol <= thresh for sobol, order in zip(analysis.get_sobol_indices(QOI).values(), np.max(analysis.l_norm, 0)))
+        sobols = analysis.get_sobol_indices(QOI)
+        max_orders = np.max(analysis.l_norm, 0)
+        return (all(
+            order > 1 or
+            not all(sobol <= thresh for permut, sobol in sobols if dim + 1 in permut)
+            for dim, order in enumerate(max_orders)
+        ))
 
     def advance():
         nonlocal i
+        if not single_iteration(i): return False
         i += 1
-        return i < max_number_of_refinements and single_iteration(i)
+        return i < max_number_of_refinements
 
-    def converged(rtol=1e-3, atol=1e-6) -> bool:
+    # pick better rtol and atol
+    def converged(rtol=1e-2, atol=1e-3) -> bool:
         assert len(analysis.adaptation_errors) >= 3
         last3 = analysis.adaptation_errors[-3:]
         return np.all(np.isclose(last3[:-1], last3[1:], rtol=rtol, atol=atol), 0)
     
-    while i <= 2:
-        print("Adapt because <= 2")
+    while len(analysis.adaptation_errors) < 3:
+        print("Adapt because too few runs")
         if not advance(): return
     
     while i < min_number_of_refinements:
