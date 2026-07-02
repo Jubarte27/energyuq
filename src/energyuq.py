@@ -239,9 +239,7 @@ def refine_sampling_plan(
 
     def advance():
         nonlocal i
-        if not single_iteration(i): return False
-        i += 1
-        return i < max_number_of_refinements
+        return single_iteration(i) and (i := i + 1) < max_number_of_refinements
 
     # pick better rtol and atol
     def converged(rtol=1e-2, atol=1e-3) -> bool:
@@ -273,7 +271,7 @@ def refine_and_analyse(
     min_number_of_refinements=-1,
     max_number_of_refinements=100
 ):
-    refine_sampling_plan(campaign, analysis, min_number_of_refinements, max_number_of_refinements)
+    refine_sampling_plan(campaign, analysis, min_number_of_refinements=min_number_of_refinements, max_number_of_refinements=max_number_of_refinements)
     campaign.apply_analysis(analysis)
 
 def run_dir(*, name: str = "energy", dir: Union[str, None] = None, campaign: Union[uq.campaign.Campaign, None] = None):
