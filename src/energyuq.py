@@ -80,11 +80,11 @@ def default_params(machine: type[Machine]) -> tuple[params_type, vary_type]:
 
     # params['POWER_CAP'] = {'type': 'integer', 'default': 220.0}  # power cap in watts
 
-    params["PLACE_WIDE"] = {"type": "integer", "default": len(machine.places) - 1}
-    vary["PLACE_WIDE"] = cp.DiscreteUniform(0, len(machine.places) - 1)
+    # params["PLACE_WIDE"] = {"type": "integer", "default": len(machine.places) - 1}
+    # vary["PLACE_WIDE"] = cp.DiscreteUniform(0, len(machine.places) - 1)
     
-    params["AFF_DISTANCE"] = {"type": "integer", "default": len(machine.proc_bind) - 1}
-    vary["AFF_DISTANCE"] = cp.DiscreteUniform(0, len(machine.proc_bind) - 1)
+    # params["AFF_DISTANCE"] = {"type": "integer", "default": len(machine.proc_bind) - 1}
+    # vary["AFF_DISTANCE"] = cp.DiscreteUniform(0, len(machine.proc_bind) - 1)
 
     return params, vary
 
@@ -236,7 +236,7 @@ def refine_sampling_plan(
         return i < max_number_of_refinements and single_iteration(i)
 
     def converged(rtol=1e-3, atol=1e-6) -> bool:
-        if len(analysis.adaptation_errors) < 3: raise RuntimeError("Less thatn 3 values in adaptation_erros, should not happen")
+        assert len(analysis.adaptation_errors) >= 3
         last3 = analysis.adaptation_errors[-3:]
         return np.all(np.isclose(last3[:-1], last3[1:], rtol=rtol, atol=atol), 0)
     
@@ -253,7 +253,7 @@ def refine_sampling_plan(
         if not advance(): return
     
     while not converged():
-        print("Adapt because it has not converged yet")
+        print(f"Adapt because it has not converged yet {analysis.adaptation_errors[-3:]}")
         if not advance(): return
 
 

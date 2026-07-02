@@ -12,6 +12,8 @@ import matplotlib.colors as mcolors
 
 from pandas import DataFrame
 
+from .. import energyuq
+
 from .. import machines
 from .data import *
 machine = machines.Glados
@@ -29,11 +31,11 @@ def mostly_square_grid(blocks: int, total_width: float, min_block_width: float):
     total_height = rows * total_width
     return (cols, rows), (total_width, total_height)
 
-def init(limits={
-        "N_THREADS": limit(1, machine.max_threads),
-        "CLK": limit(0, len(machine.freq) - 1)
-    }):
+def init(mach: type[machine]):
+    _, vary = energyuq.default_params(mach)
     global labels, values, grid_fig_size, L, C, R, full_rows, nd_labels, nd_values, legend_handles
+
+    limits = { k: limit(lower=int(v.lower), upper=int(v.upper)) for k, v in vary.items()}
     labels = np.array(list(limits.keys()), dtype=str)
     values = np.array(list(limits.values()), dtype=limit)
 
@@ -43,7 +45,6 @@ def init(limits={
 
     nd_values = pad_to_even_and_split(values)
     nd_labels = pad_to_even_and_split(labels)
-
 
     more_red = Line2D([0], [0], color='red', lw=2, marker="o", linestyle='')
     more_blue = Line2D([0], [0], color='blue', lw=2, marker="o", linestyle='')
