@@ -75,3 +75,4 @@ hype_results
 dakota/**/install
 dakota/dev/run
 dak.tar.gz
+easy/energy.template
