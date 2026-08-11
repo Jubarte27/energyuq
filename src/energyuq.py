@@ -221,7 +221,9 @@ def refine_sampling_plan(
             # we searched everything
             return False
 
-        print(f"-------{i + start_index + 1}{({0: 'st', 1: 'nd', 2: 'rd'}.get(i + start_index, 'th'))} iteration: {sampler.n_new_points[-1]} new points------")
+        print(f"-------{i + start_index + 1}{({0: 'st', 1: 'nd', 2: 'rd'}.get(i + start_index, 'th'))} iteration-------")
+        print(f"-------{sampler.n_new_points[-1]} new points------")
+        print(f"-------Executed {np.sum(sampler.n_new_points)} in total-------")
         campaign.execute(sequential=True).collate(progress_bar=True)
 
         analysis.adapt_dimension(QOI, campaign.get_collation_result(), method="var")
@@ -233,7 +235,7 @@ def refine_sampling_plan(
         max_orders = np.max(analysis.l_norm, 0)
         return (all(
             order > 1 or
-            not all(sobol <= thresh for permut, sobol in sobols.items() if dim + 1 in permut)
+            not all(sobol <= thresh for permutation, sobol in sobols.items() if dim + 1 in permutation)
             for dim, order in enumerate(max_orders)
         ))
 
@@ -262,7 +264,6 @@ def refine_sampling_plan(
     while not converged():
         print(f"Adapt because it has not converged yet {analysis.adaptation_errors[-3:]}")
         if not advance(): return
-
 
 
 def refine_and_analyse(
