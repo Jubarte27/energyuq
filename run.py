@@ -12,6 +12,7 @@ import sys
 
 
 # todo: extract details programatically. Remove this horror
+#/sys/devices/system/cpu/cpu*/cpufreq/scaling_available_frequencies
 POSSIBILITIES: list[tuple[re.Pattern, type[machines.Machine]]] = [
     (re.compile(r"glados", re.IGNORECASE), machines.Glados),
     (re.compile(r"hype\d", re.IGNORECASE), machines.Hype),

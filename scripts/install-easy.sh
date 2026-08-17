@@ -49,7 +49,7 @@ install_local_easyvvuq() {
 
     cd "$EasyDIR" || exit 1
     if [ ! -f "$EasyVVUQ_DIR/requirements.txt" ]; then
-        git submodule init && git submodule update
+        git submodule update --init "$EasyVVUQ_DIR" "$PROJECT_DIR/hpc-benchmarks"
     fi
     pip install setuptools wheel build
     pip install -e "$EasyVVUQ_DIR"

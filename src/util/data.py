@@ -19,7 +19,7 @@ class  ExecutionParams():
 class EnergyReading():
     start: int
     end: int
-    package: int
+    package: int | str
     sub_package: int
 
 

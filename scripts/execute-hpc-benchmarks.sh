@@ -13,31 +13,37 @@ main() {
         mkdir "$OUT_DIR"
     fi
 	echo "Running $NAME with $NT threads"
-	{
-        if [ -z "$OMP_PROC_BIND" ]; then
-	        export OMP_PROC_BIND=CLOSE
-        fi
-        if [ -z "$OMP_PLACES" ]; then
-	        export OMP_PLACES=CORES
-        fi
-	    
-	    export OMP_NUM_THREADS=$NT
-
-		echo "OMP_NUM_THREADS=$OMP_NUM_THREADS"
-		echo "OMP_PROC_BIND=$OMP_PROC_BIND"
-		echo "OMP_PLACES=$OMP_PLACES"
-
-		"${EXEC[@]}"
-	} 2>&1 | tee "$OUT_DIR/$NAME.$NT.txt"
+	OMP_RUN 2>&1 | tee "$OUT_DIR/$NAME.$NT.txt"
 }
 
-maybe_buffered() {
-    if [ "$BUFF" == "true" ]; then
-        "$@"
+OMP_RUN() {
+    if [ -z "$OMP_PROC_BIND" ]; then
+        export OMP_PROC_BIND=CLOSE
+    fi
+    if [ -z "$OMP_PLACES" ]; then
+        export OMP_PLACES=CORES
+    fi
+    
+    export OMP_NUM_THREADS=$NT
+
+    echo "OMP_NUM_THREADS=$OMP_NUM_THREADS"
+    echo "OMP_PROC_BIND=$OMP_PROC_BIND"
+    echo "OMP_PLACES=$OMP_PLACES"
+
+    "${EXEC[@]}"
+}
+
+execute() {
+    if [ "$SRUN" == "true" ]; then
+        srun --cpu-freq="$FREQHZ" --cpus-per-task="$NT" --ntasks=1 "$@"
+    elif ! [ "$BUFF" == "true" ]; then
+        not_buffered "$@"
     else
-        stdbuf -oL "$@"
+        "$@"
     fi
 }
+
+not_buffered() { stdbuf -oL "$@"; }
 
 find_exec() {
     case "$1" in
@@ -108,19 +114,19 @@ find_exec() {
     NAME="$1"
 }
 
-fft()    { cd "$BENCHMARK_DIR/FFT"    && maybe_buffered ./fft_omp; }
-hpcg()   { cd "$BENCHMARK_DIR/HPCG"   && maybe_buffered ./HPCCG_BIN 256 256 128; }
-ja()     { cd "$BENCHMARK_DIR/JA"     && maybe_buffered ./omp_ja; }
-lulesh() { cd "$BENCHMARK_DIR/LULESH" && maybe_buffered ./lulesh2.0 -i 5000 -s 50; }
-po()     { cd "$BENCHMARK_DIR/po"     && maybe_buffered ./omp_po; }
-st()     { cd "$BENCHMARK_DIR/ST"     && maybe_buffered ./stream ;}
-nas()    { cd "$BENCHMARK_DIR/NAS"    && maybe_buffered "./$1.B.x"; }
-teste_erro_omp() { cd "$PROJECT_DIR/teste" && maybe_buffered ./execute.sh; }
+fft()    { cd "$BENCHMARK_DIR/FFT"    && execute ./fft_omp; }
+hpcg()   { cd "$BENCHMARK_DIR/HPCG"   && execute ./HPCCG_BIN 256 256 128; }
+ja()     { cd "$BENCHMARK_DIR/JA"     && execute ./omp_ja; }
+lulesh() { cd "$BENCHMARK_DIR/LULESH" && execute ./lulesh2.0 -i 5000 -s 50; }
+po()     { cd "$BENCHMARK_DIR/po"     && execute ./omp_po; }
+st()     { cd "$BENCHMARK_DIR/ST"     && execute ./stream ;}
+nas()    { cd "$BENCHMARK_DIR/NAS"    && execute "./$1.B.x"; }
+teste_erro_omp() { cd "$PROJECT_DIR/teste" && execute ./execute.sh; }
 
-parboil_bfs() { cd "$BENCHMARK_DIR/parboil" && maybe_buffered ./parboil run bfs omp_base SF ;}
-parboil_lbm() { cd "$BENCHMARK_DIR/parboil" && maybe_buffered ./parboil run lbm omp_cpu long ; }
+parboil_bfs() { cd "$BENCHMARK_DIR/parboil" && execute ./parboil run bfs omp_base SF ;}
+parboil_lbm() { cd "$BENCHMARK_DIR/parboil" && execute ./parboil run lbm omp_cpu long ; }
 
-rodinia_hotspot() { cd "$BENCHMARK_DIR/RODINIA/hotspot" && maybe_buffered ./hotspot 1024 1024 100000 "$N_THREADS" ../data/hotspot/temp_1024 ../data/hotspot/power_1024 output.out ;}
+rodinia_hotspot() { cd "$BENCHMARK_DIR/RODINIA/hotspot" && execute ./hotspot 1024 1024 100000 "$N_THREADS" ../data/hotspot/temp_1024 ../data/hotspot/power_1024 output.out ;}
 
 _setConfigArgs() {
     while [ "${1:-}" != '' ]; do
@@ -128,6 +134,9 @@ _setConfigArgs() {
             ## Options
             -b)
                 BUFF=false
+                ;;
+            -s|--srun)
+                SRUN=true
                 ;;
             
             ## end of Options
@@ -151,6 +160,9 @@ _setConfigArgs() {
 
 	find_exec "$1"
 	NT=$2
+
+    # should check us
+    FREQHZ=$3
 }
 
 
@@ -160,6 +172,11 @@ set_env() {
 	EXEC=()
 	NAME=""
     BUFF=true
+    if ! [ -z "$SLURM_JOB_ID" ]; then
+        SRUN=true
+    else
+        SRUN=false
+    fi
 }
 
 SCRIPT_DIR=$(dirname "$(readlink -e "${BASH_SOURCE[0]}")") && source "$SCRIPT_DIR/util.bash"
