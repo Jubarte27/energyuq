@@ -15,6 +15,7 @@ import sys
 POSSIBILITIES: list[tuple[re.Pattern, type[machines.Machine]]] = [
     (re.compile(r"glados", re.IGNORECASE), machines.Glados),
     (re.compile(r"hype\d", re.IGNORECASE), machines.Hype),
+    (re.compile(r"machado", re.IGNORECASE), machines.Machado),
 ]
 
 host = sys.argv[1] if len(sys.argv) > 1 else gethostname()
@@ -29,7 +30,7 @@ for pat, m in POSSIBILITIES:
 if mach is None:
     raise RuntimeError("I don't know where I am at")
 
-campaign, analysis = energyuq.create(programs.HPCG, mach)
+campaign, analysis = energyuq.create(programs.NONE, mach)
 
 energyuq.refine_and_analyse(campaign, analysis, max_number_of_refinements=100)
 

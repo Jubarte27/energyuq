@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 main() {
     set_log_depth 0
     ensure create_venv
