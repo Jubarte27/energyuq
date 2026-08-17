@@ -6,7 +6,7 @@ from . import base_wrapper
 from ..programs import *
 from ..machines import *
 
-def main(program: type[Program], machine: type[Machine], input_file: str = "input.csv", output_file: str = "output.csv"):
+def main(program: type[Program], machine: Machine, input_file: str = "input.csv", output_file: str = "output.csv"):
     with open(input_file, "r") as f:
         args = f.readline().split(",")
     def arg(i, default=0):
@@ -29,6 +29,6 @@ def main(program: type[Program], machine: type[Machine], input_file: str = "inpu
 
 if __name__ == "__main__":
     program = NONE
-    machine = Glados
+    machine = guess_machine()
     print(f"Running on {machine.name}")
     main(program, machine)

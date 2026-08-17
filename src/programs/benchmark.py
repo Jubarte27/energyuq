@@ -11,9 +11,10 @@ class ExecuteSH(Program):
         print(f"Running {cls.name} with {params.n_threads} threads")
         proc_bind = params.machine.proc_bind[params.affinity_distance]
         places = params.machine.places[params.place_wideness]
+        freq = params.machine.freq[params.freq_level]
         return run(
-            [execute, cls.name, str(params.n_threads)],
-            env={"OMP_PLACES": places, "OMP_PROC_BIND": proc_bind},
+            [execute, cls.name, str(params.n_threads), str(freq)],
+            env=os.environ | {"OMP_PLACES": places, "OMP_PROC_BIND": proc_bind},
             capture_output=True,
             text=True,
         )

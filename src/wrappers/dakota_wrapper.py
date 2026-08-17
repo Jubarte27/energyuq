@@ -10,7 +10,7 @@ FREQUECNY_POS = 1
 # POWER_CAP_POS = 2
 
 
-def main(program: type[Program], machine: type[Machine], parameters: interfacing.Parameters, results: interfacing.Results):
+def main(program: type[Program], machine: Machine, parameters: interfacing.Parameters, results: interfacing.Results):
     params = ExecutionParams(machine=machine, freq_level=int(parameters["CLK"]), n_threads=int(parameters["N_THREADS"]))
     result = base_wrapper.prepare_and_exeute(machine, program, params, [])
 
@@ -22,7 +22,7 @@ def main(program: type[Program], machine: type[Machine], parameters: interfacing
 
 if __name__ == "__main__":
     program = FFT
-    machine = Glados
+    machine = guess_machine()
     print(f"Running on {machine.name}")
     parameters, results = interfacing.read_parameters_file()
     if isinstance(parameters, interfacing.BatchParameters) or isinstance(results, interfacing.BatchResults):

@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 # need to have pyenv installed if you want parboil
 main() {
     set_log_depth 0
@@ -104,7 +105,7 @@ _setConfigArgs() {
     done
 
     if ! [ -z "$1" ]; then
-        IFS=, read -r BENCHMARKS_TO_CONSIDER <<< "$1"
+        IFS=, read -r -a BENCHMARKS_TO_CONSIDER <<< "$1"
     fi
 }
 

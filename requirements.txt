@@ -4,3 +4,4 @@ matplotlib
 scipy
 dill
 setuptools==81.0.0
+python-dotenv

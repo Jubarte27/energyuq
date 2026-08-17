@@ -15,8 +15,9 @@ from pandas import DataFrame
 from .. import energyuq
 
 from .. import machines
+from ..machines.machine import Machine
 from .data import *
-machine = machines.Glados
+machine = machines.guess_machine()
 
 def pad_to_even_and_split(arr: np.ndarray, value=None) -> np.ndarray:
     pad_by = arr.shape[-1] % 2
@@ -31,7 +32,7 @@ def mostly_square_grid(blocks: int, total_width: float, min_block_width: float):
     total_height = rows * total_width
     return (cols, rows), (total_width, total_height)
 
-def init(mach: type[machine]):
+def init(mach: Machine):
     _, vary = energyuq.default_params(mach)
     global labels, values, grid_fig_size, L, C, R, full_rows, nd_labels, nd_values, legend_handles
 

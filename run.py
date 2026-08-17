@@ -1,7 +1,11 @@
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from src import energyuq
 
 from src import programs
-from src import machines
+from src.machines import *
 
 from socket import gethostname
 
@@ -12,15 +16,17 @@ import sys
 
 
 # todo: extract details programatically. Remove this horror
-POSSIBILITIES: list[tuple[re.Pattern, type[machines.Machine]]] = [
-    (re.compile(r"glados", re.IGNORECASE), machines.Glados),
-    (re.compile(r"hype\d", re.IGNORECASE), machines.Hype),
-    (re.compile(r"machado", re.IGNORECASE), machines.Machado),
+#/sys/devices/system/cpu/cpu*/cpufreq/scaling_available_frequencies
+POSSIBILITIES: list[tuple[re.Pattern, Machine]] = [
+    (re.compile(r"glados", re.IGNORECASE), Glados),
+    (re.compile(r"hype\d", re.IGNORECASE), Hype),
+    (re.compile(r"machado", re.IGNORECASE), Machado),
 ]
 
 host = sys.argv[1] if len(sys.argv) > 1 else gethostname()
 
-mach = None
+
+mach = guess_machine()
 
 for pat, m in POSSIBILITIES:
     if pat.match(host):

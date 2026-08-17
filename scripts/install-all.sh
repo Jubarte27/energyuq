@@ -25,7 +25,7 @@ _setConfigArgs() {
 create_venv() {
     enter_new_func "Creating python venv"
     
-    if [ ! -f "$$PROJECT_DIR/.venv/bin/activate" ]; then
+    if [ ! -f "$PROJECT_DIR/.venv/bin/activate" ]; then
         python3 -m venv "$PROJECT_DIR/.venv"
     fi
     
