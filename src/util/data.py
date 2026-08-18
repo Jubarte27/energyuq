@@ -8,7 +8,7 @@ from ..machines.machine import Machine
 
 @dataclass
 class  ExecutionParams():
-    machine: type[Machine]
+    machine: Machine
     n_threads: int
     freq_level: int
     place_wideness: int = 0

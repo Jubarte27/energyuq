@@ -1,11 +1,10 @@
-from typing import ClassVar
 from .machine import Machine
 
 
 # Todo: Consultar essas informações programaticamente, sem necessidade de fazer estes arquivos
-class Hype(Machine):
-    name: ClassVar[str] = "Hype"
-    freq: ClassVar[list[int]] = [
+Hype = Machine(
+    name="Hype",
+    freq=[
         1200000,
         1300000,
         1400000,
@@ -19,7 +18,8 @@ class Hype(Machine):
         2200000,
         2300000,
         2301000,
-    ]
-    max_threads: ClassVar[int] = 40
-    package = [0, 1]
-    sub_package = [-1,0] # nome ruim, valores ruins
+    ],
+    max_threads=40,
+    package=[0, 1],
+    sub_package=[-1,0], # nome ruim, valores ruins
+)

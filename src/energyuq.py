@@ -63,7 +63,7 @@ class ExecuteWrapper:
             return True
 
 
-def default_params(machine: type[Machine]) -> tuple[params_type, vary_type]:
+def default_params(machine: Machine) -> tuple[params_type, vary_type]:
     params: params_type = {}
     vary: vary_type = {}
 
@@ -90,7 +90,7 @@ def default_params(machine: type[Machine]) -> tuple[params_type, vary_type]:
 
 
 def energy_wraper_actions(
-    program: type[Program], machine: type[Machine], root: Path
+    program: type[Program], machine: Machine, root: Path
 ) -> uq.actions.Actions:
     # input file encoder
     
@@ -137,7 +137,7 @@ def campaign_path(root: Path):
     return root.joinpath("campaign")
 
 
-def create_campaign(program: type[Program], machine: type[Machine], root: Path):
+def create_campaign(program: type[Program], machine: Machine, root: Path):
     path = campaign_path(root)
     create_dir(path)
     change_dir_permissions(path, 0o777)
@@ -167,7 +167,7 @@ def create_campaign(program: type[Program], machine: type[Machine], root: Path):
 
 
 def prepare_campaign(
-    program: type[Program], machine: type[Machine], root: Path
+    program: type[Program], machine: Machine, root: Path
 ) -> uq.campaign.Campaign:
     """
     Creates a campaign and runs the first execution
@@ -289,7 +289,7 @@ def run_dir(*, name: str = "energy", dir: Union[str, None] = None, campaign: Uni
     return next_dir(RESULTS_DIR, name)
 
 def create(
-    program: type[Program], machine: type[Machine], /, dir: Union[str, None] = None
+    program: type[Program], machine: Machine, /, dir: Union[str, None] = None
 ):
     root = run_dir(dir=dir)
     create_dir(root)
@@ -318,7 +318,7 @@ def save(
 
 def load(
     program: type[Program],
-    machine: type[Machine],
+    machine: Machine,
     campaign_name: str,
     /,
     dir: Union[str, None] = None,

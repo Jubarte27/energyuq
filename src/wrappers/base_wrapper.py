@@ -19,7 +19,7 @@ class MachineConfig:
     energy_accum: str
     
 
-def prepare_and_exeute(machine: type[Machine], program: type[Program], params: ExecutionParams, args: Union[None, Iterable[str]]):
+def prepare_and_exeute(machine: Machine, program: type[Program], params: ExecutionParams, args: Union[None, Iterable[str]]):
     if not args:
         args = []
     
@@ -40,7 +40,7 @@ def try_exec(cmds: list[list[str]], err_msg: str = "") -> bool:
     return True
 
 # which to use should be defined on the machine
-def set_freq(machine: type[Machine], frequency):
+def set_freq(machine: Machine, frequency):
     if which("cpufreq-set"):
         if try_exec([
             *(["cpufreq-set", "--cpu", f"{cpu}", "--governor", "userspace"] for cpu in range(machine.max_threads)),
@@ -63,7 +63,7 @@ def set_freq(machine: type[Machine], frequency):
     
     raise Exception("Unable to use cpufreq-set or cpupower, do i have permission?")
 
-def cpu_set(machine: type[Machine], freq_level: int):
+def cpu_set(machine: Machine, freq_level: int):
 
     set_freq(machine, machine.freq[freq_level])
     
@@ -72,7 +72,7 @@ def cpu_set(machine: type[Machine], freq_level: int):
     # set_sysfs("/sys/class/powercap/intel-rapl:0/?????", power_cap, "Power cap")
 
 
-def pick_reader(machine: type[Machine]):
+def pick_reader(machine: Machine):
     def check_rapl():
         return try_exec([
             ["cat", f"/sys/class/powercap/intel-rapl:{package}{suf}/energy_uj"]
@@ -96,7 +96,7 @@ def pick_reader(machine: type[Machine]):
         exit(42)
     return reader
 
-def run(machine: type[Machine],program: type[Program], params: ExecutionParams, parameter_list: Iterable[str]):
+def run(machine: Machine,program: type[Program], params: ExecutionParams, parameter_list: Iterable[str]):
     reading = (reader := pick_reader(machine)).all_energy()
     t = perf_counter()
 
@@ -143,7 +143,7 @@ def set_sysfs(full_path: str, value: object, name=None):
         exit(result.returncode)
 
 class intel_rapl(EnergyReader):
-    def __init__(self, machine: type[Machine]) -> None:
+    def __init__(self, machine: Machine) -> None:
         super().__init__()
         self.packages = machine.package
         self.sub_packages = machine.sub_package
