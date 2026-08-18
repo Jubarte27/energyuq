@@ -14,7 +14,7 @@ class ExecuteSH(Program):
         freq = params.machine.freq[params.freq_level]
         return run(
             [execute, cls.name, str(params.n_threads), str(freq)],
-            env={"OMP_PLACES": places, "OMP_PROC_BIND": proc_bind},
+            env=os.environ | {"OMP_PLACES": places, "OMP_PROC_BIND": proc_bind},
             capture_output=True,
             text=True,
         )

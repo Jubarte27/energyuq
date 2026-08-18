@@ -39,13 +39,13 @@ class ExecuteWrapper:
 
         function = dill.loads(self.function)
 
-        if "rundir" in previous:
-            self.old_dir = os.getcwd()
-            os.chdir(previous["rundir"])
-
-        function(previous["run_info"]["params"])
-
-        self.finalise()
+        try:
+            if "rundir" in previous:
+                self.old_dir = os.getcwd()
+                os.chdir(previous["rundir"])
+            function(previous["run_info"]["params"])
+        finally:
+            self.finalise()
         return previous
 
     def finished(self):

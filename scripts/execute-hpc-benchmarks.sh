@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 main() {
 	
@@ -13,7 +14,9 @@ main() {
         mkdir "$OUT_DIR"
     fi
 	echo "Running $NAME with $NT threads"
+    set -o pipefail
 	OMP_RUN 2>&1 | tee "$OUT_DIR/$NAME.$NT.txt"
+    set +o pipefail
 }
 
 OMP_RUN() {
@@ -35,6 +38,7 @@ OMP_RUN() {
 
 execute() {
     if [ "$SRUN" == "true" ]; then
+        if [ -z "$FREQHZ" ]; then echo ; exit 42; fi
         srun --cpu-freq="$FREQHZ:UserSpace" --cpus-per-task="$NT" --ntasks=1 "$@"
     elif ! [ "$BUFF" == "true" ]; then
         not_buffered "$@"
@@ -126,7 +130,7 @@ teste_erro_omp() { cd "$PROJECT_DIR/teste" && execute ./execute.sh; }
 parboil_bfs() { cd "$BENCHMARK_DIR/parboil" && execute ./parboil run bfs omp_base SF ;}
 parboil_lbm() { cd "$BENCHMARK_DIR/parboil" && execute ./parboil run lbm omp_cpu long ; }
 
-rodinia_hotspot() { cd "$BENCHMARK_DIR/RODINIA/hotspot" && execute ./hotspot 1024 1024 100000 "$N_THREADS" ../data/hotspot/temp_1024 ../data/hotspot/power_1024 output.out ;}
+rodinia_hotspot() { cd "$BENCHMARK_DIR/RODINIA/hotspot" && execute ./hotspot 1024 1024 100000 "$NT" ../data/hotspot/temp_1024 ../data/hotspot/power_1024 output.out ;}
 
 _setConfigArgs() {
     while [ "${1:-}" != '' ]; do

@@ -74,12 +74,16 @@ def cpu_set(machine: Machine, freq_level: int):
 
 def pick_reader(machine: Machine):
     def check_rapl():
-        return try_exec([
-            ["cat", f"/sys/class/powercap/intel-rapl:{package}{suf}/energy_uj"]
+        commands = [
+            [
+                "cat",
+                f"/sys/class/powercap/intel-rapl:{package}"
+                f"{intel_rapl.sub_package_sufix(sub_package)}/energy_uj",
+            ]
             for package in machine.package
             for sub_package in machine.sub_package
-            if (suf := intel_rapl.sub_package_sufix(sub_package))
-        ])
+        ]
+        return len(commands) > 0 and try_exec(commands)
 
     def check_cray():
         return try_exec([
@@ -108,6 +112,7 @@ def run(machine: Machine,program: type[Program], params: ExecutionParams, parame
     end = reader.all_energy(reading)
 
     output_CompletedProcess(program.name, result)
+    result.check_returncode()
 
     return reader.accumulate(end), delta
 
