@@ -26,6 +26,8 @@ QOI = "energy_uj"
 QOIS = ["energy_uj", "energy_scaled", "time"]
 RESULTS_DIR = "run_results"
 
+RTOL=1e-1
+ATOL=1e-3
 
 class ExecuteWrapper:
     def __init__(self, function):
@@ -209,7 +211,8 @@ def refine_sampling_plan(
     analysis: uq.analysis.SCAnalysis,
     start_index=1, # for display only
     min_number_of_refinements = -1,
-    max_number_of_refinements = 100
+    max_number_of_refinements = 100,
+    variance_stop_epsilon: float = 1e-3,
 ):
     sampler = get_sampler(campaign)
 
@@ -230,6 +233,11 @@ def refine_sampling_plan(
         return True
     i = 0
 
+    def epsilon_stop() -> bool:
+        if len(analysis.adaptation_errors) == 0:
+            return False
+        return analysis.adaptation_errors[-1] < variance_stop_epsilon
+
     def explored_enough(thresh=1e-3):
         sobols = analysis.get_sobol_indices(QOI)
         max_orders = np.max(analysis.l_norm, 0)
@@ -244,7 +252,9 @@ def refine_sampling_plan(
         return single_iteration(i) and (i := i + 1) < max_number_of_refinements
 
     # pick better rtol and atol
-    def converged(rtol=1e-2, atol=1e-3) -> bool:
+    def converged(rtol=RTOL, atol=ATOL) -> bool:
+        if epsilon_stop():
+            return True
         assert len(analysis.adaptation_errors) >= 3
         last3 = analysis.adaptation_errors[-3:]
         return np.all(np.isclose(last3[:-1], last3[1:], rtol=rtol, atol=atol), 0)
@@ -270,9 +280,16 @@ def refine_and_analyse(
     campaign: uq.campaign.Campaign,
     analysis: uq.analysis.SCAnalysis,
     min_number_of_refinements=-1,
-    max_number_of_refinements=100
+    max_number_of_refinements=100,
+    variance_stop_epsilon: float = 1e-3,
 ):
-    refine_sampling_plan(campaign, analysis, min_number_of_refinements=min_number_of_refinements, max_number_of_refinements=max_number_of_refinements)
+    refine_sampling_plan(
+        campaign,
+        analysis,
+        min_number_of_refinements=min_number_of_refinements,
+        max_number_of_refinements=max_number_of_refinements,
+        variance_stop_epsilon=variance_stop_epsilon,
+    )
     campaign.apply_analysis(analysis)
 
 def run_dir(*, name: str = "energy", dir: Union[str, None] = None, campaign: Union[uq.campaign.Campaign, None] = None):
