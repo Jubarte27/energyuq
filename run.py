@@ -36,7 +36,7 @@ for pat, m in POSSIBILITIES:
 if mach is None:
     raise RuntimeError("I don't know where I am at")
 
-campaign, analysis = energyuq.create(programs.NONE, mach)
+campaign, analysis = energyuq.create(programs.FAKEWORK, mach)
 
 energyuq.refine_and_analyse(campaign, analysis, max_number_of_refinements=100)
 

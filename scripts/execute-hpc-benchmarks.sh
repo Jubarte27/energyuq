@@ -51,6 +51,9 @@ not_buffered() { stdbuf -oL "$@"; }
 
 find_exec() {
     case "$1" in
+        FAKE_WORK | fake_work)
+            EXEC=(fake_work)
+            ;;
         FFT | fft)
             EXEC=(fft)
             ;;
@@ -132,6 +135,24 @@ parboil_lbm() { cd "$BENCHMARK_DIR/parboil" && execute ./parboil run lbm omp_cpu
 
 rodinia_hotspot() { cd "$BENCHMARK_DIR/RODINIA/hotspot" && execute ./hotspot 1024 1024 100000 "$NT" ../data/hotspot/temp_1024 ../data/hotspot/power_1024 output.out ;}
 
+fake_work() {
+    local iters=${1:-30}
+
+    echo "Fake work: $iters per thread"
+
+    for ((thread_i = 0; thread_i < NT; thread_i++)); do
+        (
+            local acc=0
+            local i
+            for ((i = 0; i < iters; i++)); do
+                acc=$(( (acc + i + thread_i) % 420 ))
+            done
+            printf '%d' "$acc"
+        ) &
+    done
+    wait
+}
+
 _setConfigArgs() {
     while [ "${1:-}" != '' ]; do
         case "$1" in
@@ -165,7 +186,6 @@ _setConfigArgs() {
 	find_exec "$1"
 	NT=$2
 
-    # should check us
     FREQHZ=$3
 }
 

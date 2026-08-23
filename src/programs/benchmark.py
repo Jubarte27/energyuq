@@ -36,3 +36,6 @@ class LULESH(ExecuteSH):
 
 class NONE(ExecuteSH):
      name: ClassVar[str] = "NONE"
+
+class FAKEWORK(ExecuteSH):
+     name: ClassVar[str] = "FAKE_WORK"
