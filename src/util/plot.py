@@ -17,7 +17,6 @@ from .. import energyuq
 from .. import machines
 from ..machines.machine import Machine
 from .data import *
-machine = machines.guess_machine()
 
 def pad_to_even_and_split(arr: np.ndarray, value=None) -> np.ndarray:
     pad_by = arr.shape[-1] % 2

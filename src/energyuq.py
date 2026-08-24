@@ -1,5 +1,6 @@
 from contextlib import redirect_stdout
 import os
+import pickle
 from pathlib import Path
 from typing import Any, Union, cast
 import typing
@@ -151,6 +152,7 @@ def create_campaign(program: type[Program], machine: Machine, root: Path):
         work_dir=path.as_posix(),
     )
     setattr(campaign, "root_path", root)
+    setattr(campaign, "machine", machine)
     
     # the database was empty, create a new app
     if campaign.get_active_app() is None:
@@ -257,7 +259,7 @@ def refine_sampling_plan(
             return True
         assert len(analysis.adaptation_errors) >= 3
         last3 = analysis.adaptation_errors[-3:]
-        return np.all(np.isclose(last3[:-1], last3[1:], rtol=rtol, atol=atol), 0)
+        return np.all(np.isclose(last3, np.roll(last3, i), rtol=rtol, atol=atol), 0)
     
     while len(analysis.adaptation_errors) < 3:
         print("Adapt because too few runs")
@@ -325,10 +327,17 @@ def save(
     analysis: uq.analysis.SCAnalysis,
     /,
     dir: Union[str, None] = None,
+    machine: Union[Machine, None] = None,
 ):
     path = run_dir(dir=dir, campaign=campaign)
-
     create_dir(path)
+
+    machine_to_save = machine if machine is not None else getattr(campaign, "machine", None)
+    if machine_to_save is None:
+        raise ValueError("No machine information available to save for this campaign")
+
+    with path.joinpath("machine.pkl").open("wb") as f:
+        pickle.dump(machine_to_save, f)
 
     analysis.save_state(path.joinpath("analysis").as_posix())
 
@@ -339,7 +348,7 @@ def load(
     campaign_name: str,
     /,
     dir: Union[str, None] = None,
-) -> tuple[uq.campaign.Campaign, uq.analysis.SCAnalysis]:
+) -> tuple[uq.campaign.Campaign, uq.analysis.SCAnalysis, Machine]:
 
     if not dir:
         path = latest_dir(RESULTS_DIR, campaign_name)
@@ -350,11 +359,17 @@ def load(
     else:
         path = Path(dir)
 
+    machine_path = path.joinpath("machine.pkl")
+    if machine_path.exists():
+        with machine_path.open("rb") as f:
+            machine = pickle.load(f)
+
     campaign = create_campaign(program, machine, path)
+    setattr(campaign, "machine", machine)
     analysis = prepare_analysis(campaign)
     analysis.load_state(path.absolute().joinpath("analysis"))
-    
+
     # perform analysis (basically estimates moments, Sobol analysis, and updates internal state of analysis)
     campaign.apply_analysis(analysis)
 
-    return campaign, analysis
+    return campaign, analysis, machine
