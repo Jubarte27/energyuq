@@ -18,7 +18,7 @@ def main(program: type[Program], machine: Machine, input_file: str = "input.csv"
         place_wideness=arg(2),
         affinity_distance=arg(3))
 
-    result = base_wrapper.prepare_and_exeute(machine, program, params, args[2:])
+    result = base_wrapper.prepare_and_execute(machine, program, params, args[2:])
 
     ks, vs = zip(*result.items())
     header = ",".join(ks)

@@ -1,4 +1,4 @@
-from dataclasses import dataclass, replace
+from dataclasses import replace
 import subprocess
 from sys import stderr
 from typing import Iterable, Union
@@ -6,25 +6,16 @@ from ..programs import *
 from ..machines import *
 from ..util.data import ExecutionParams, EnergyReading
 from time import perf_counter
-from shutil import which
 from abc import ABC, abstractmethod
 
 from textwrap import indent
 
-@dataclass
-class MachineConfig:
-    freq_getter: str
-    freq_setter: str
-    energy_reader: str
-    energy_accum: str
-    
 
-def prepare_and_exeute(machine: Machine, program: type[Program], params: ExecutionParams, args: Union[None, Iterable[str]]):
+def prepare_and_execute(machine: Machine, program: type[Program], params: ExecutionParams, args: Union[None, Iterable[str]]):
     if not args:
         args = []
-    
+
     cpu_set(machine, params.freq_level)
-    
     accum, t = run(machine, program, params, args)
     return report(accum, t)
 
@@ -39,29 +30,32 @@ def try_exec(cmds: list[list[str]], err_msg: str = "") -> bool:
             return False
     return True
 
-# which to use should be defined on the machine
 def set_freq(machine: Machine, frequency):
-    if which("cpufreq-set"):
+    if machine.freq_setter == "cpufreq-set":
         if try_exec([
             *(["cpufreq-set", "--cpu", f"{cpu}", "--governor", "userspace"] for cpu in range(machine.max_threads)),
             *(["cpufreq-set", "--cpu", f"{cpu}", "--freq", f"{frequency}"] for cpu in range(machine.max_threads))
-        ]): return "cpufreq-set"
+        ]):
+            return machine.freq_setter
         if try_exec([
             *(["sudo", "-n", "cpufreq-set", f"--cpu", f"{cpu}", "--governor", "userspace"] for cpu in range(machine.max_threads)),
             *(["sudo", "-n", "cpufreq-set", f"--cpu", f"{cpu}", "--freq", f"{frequency}"] for cpu in range(machine.max_threads))
-        ]): return "cpufreq-set"
+        ]):
+            return machine.freq_setter
 
-    if which("cpupower"):
+    if machine.freq_setter == "cpupower":
         if try_exec([
             ["cpupower", "frequency-set", "--governor", "userspace"],
             ["cpupower", "frequency-set", "--freq", f"{frequency}"]
-        ]): return "cpupower"
+        ]):
+            return machine.freq_setter
         if try_exec([
             ["sudo", "-n", "cpupower", "frequency-set", "--governor", "userspace"],
             ["sudo", "-n", "cpupower", "frequency-set", "--freq", f"{frequency}"]
-        ]): return "cpupower"
-    
-    raise Exception("Unable to use cpufreq-set or cpupower, do i have permission?")
+        ]):
+            return machine.freq_setter
+
+    raise Exception(f"Unable to use {machine.freq_setter}, do i have permission?")
 
 def cpu_set(machine: Machine, freq_level: int):
 
@@ -73,27 +67,9 @@ def cpu_set(machine: Machine, freq_level: int):
 
 
 def pick_reader(machine: Machine):
-    def check_rapl():
-        commands = [
-            [
-                "cat",
-                f"/sys/class/powercap/intel-rapl:{package}"
-                f"{intel_rapl.sub_package_sufix(sub_package)}/energy_uj",
-            ]
-            for package in machine.package
-            for sub_package in machine.sub_package
-        ]
-        return len(commands) > 0 and try_exec(commands)
-
-    def check_cray():
-        return try_exec([
-            ["cat", f"/sys/cray/pm_counters/{package}"]
-            for package in ("cpu_energy", "memory_energy")
-        ])
-
-    if check_rapl():
+    if machine.energy_reader == "intel-rapl":
         reader: EnergyReader = intel_rapl(machine)
-    elif check_cray():
+    elif machine.energy_reader == "cray":
         reader: EnergyReader = cray()
     else:
         print("Couldn't find a way to read energy counters, do i have permission?")
