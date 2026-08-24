@@ -14,7 +14,6 @@ from pandas import DataFrame
 
 from .. import energyuq
 
-from .. import machines
 from ..machines.machine import Machine
 from .data import *
 

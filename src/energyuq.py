@@ -344,7 +344,7 @@ def save(
 
 def load(
     program: type[Program],
-    machine: Machine,
+    default_machine: Machine,
     campaign_name: str,
     /,
     dir: Union[str, None] = None,
@@ -363,7 +363,8 @@ def load(
     if machine_path.exists():
         with machine_path.open("rb") as f:
             machine = pickle.load(f)
-
+    else:
+        machine = default_machine
     campaign = create_campaign(program, machine, path)
     setattr(campaign, "machine", machine)
     analysis = prepare_analysis(campaign)
