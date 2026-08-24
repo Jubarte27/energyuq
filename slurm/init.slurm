@@ -24,4 +24,4 @@ cd "$SCRATCH"
 rm -fr energyuq
 git clone https://github.com/Jubarte27/energyuq
 cd energyuq
-./scripts/install-easy.sh -g
+./scripts/install/install-easy.sh -g

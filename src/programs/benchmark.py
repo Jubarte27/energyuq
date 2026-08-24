@@ -7,7 +7,7 @@ from .program import Program
 class ExecuteSH(Program):
     @classmethod
     def run(cls, params: ExecutionParams, args: Iterable[str]) -> CompletedProcess[str]:
-        execute = f"{os.path.dirname(__file__)}/../../scripts/execute-hpc-benchmarks.sh"
+        execute = f"{os.path.dirname(__file__)}/../../scripts/run/execute-hpc-benchmarks.sh"
         print(f"Running {cls.name} with {params.n_threads} threads")
         proc_bind = params.machine.proc_bind[params.affinity_distance]
         places = params.machine.places[params.place_wideness]

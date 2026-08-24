@@ -3,7 +3,7 @@ set -o pipefail
 main() {
     set_log_depth 0
     
-    source "$SCRIPT_DIR/dakota-to-path.sh"
+    source "$SCRIPT_DIR/install/dakota-to-path.sh"
     mkdir -p "$RUN_DIR"
     ensure cd "$RUN_DIR"
     cat << EOF > dakota_driver.sh
