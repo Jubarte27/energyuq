@@ -143,7 +143,7 @@ def campaign_path(root: Path):
 def create_campaign(program: type[Program], machine: Machine, root: Path):
     path = campaign_path(root)
     create_dir(path)
-    change_dir_permissions(path, 0o777)
+    change_dir_permissions(path, 0o755)
 
     params, vary = default_params(machine)
     campaign = uq.Campaign(
@@ -258,8 +258,8 @@ def refine_sampling_plan(
         if epsilon_stop():
             return True
         assert len(analysis.adaptation_errors) >= 3
-        last3 = analysis.adaptation_errors[-3:]
-        return np.all(np.isclose(last3, np.roll(last3, i), rtol=rtol, atol=atol), 0)
+        last3 = np.array(analysis.adaptation_errors[-3:])
+        return bool(np.all(np.isclose(last3, np.roll(last3, 1), rtol=rtol, atol=atol)))
     
     while len(analysis.adaptation_errors) < 3:
         print("Adapt because too few runs")

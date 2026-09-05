@@ -21,5 +21,5 @@ Hype = Machine(
     ],
     max_threads=40,
     package=[0, 1],
-    sub_package=[-1,0], # nome ruim, valores ruins
+    sub_package=[-1],
 )

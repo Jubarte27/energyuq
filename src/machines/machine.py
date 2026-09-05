@@ -65,7 +65,6 @@ def _system_frequencies() -> list[int] | None:
 def _system_rapl_domains() -> tuple[list[int], list[int]] | None:
     powercap = Path("/sys/class/powercap")
     packages: set[int] = set()
-    sub_packages_by_package: dict[int, set[int]] = {}
 
     try:
         paths = list(powercap.iterdir())
@@ -76,27 +75,31 @@ def _system_rapl_domains() -> tuple[list[int], list[int]] | None:
         if not path.name.startswith("intel-rapl:"):
             continue
         parts = path.name.removeprefix("intel-rapl:").split(":")
+        if len(parts) != 1:
+            continue
         try:
             package = int(parts[0])
         except ValueError:
             continue
-        packages.add(package)
-        if len(parts) == 2:
-            try:
-                sub_packages_by_package.setdefault(package, set()).add(int(parts[1]))
-            except ValueError:
+
+        # Check domain name: only consider CPU sockets (e.g. "package-0", "package-1"),
+        # and ignore platform domains like "psys" to avoid double-counting.
+        name_path = path / "name"
+        try:
+            if name_path.exists() and not name_path.read_text().strip().startswith("package-"):
                 continue
+        except OSError:
+            pass
+
+        packages.add(package)
 
     if not packages:
         return None
 
-    # We apply every sub-package to every package, so
-    # only retain sub-packages that exist on all detected packages.
-    # Not ideal, will cause problems in the future
-    common_sub_packages = set.intersection(
-        *(sub_packages_by_package.get(package, set()) for package in packages)
-    )
-    return sorted(packages), [-1, *sorted(common_sub_packages)]
+    # Sub-packages [-1] means the entire package/socket domain.
+    # Individual sub-domains (e.g. core, uncore, dram) are subsets of the package
+    # and should not be combined with -1 to avoid double-counting.
+    return sorted(packages), [-1]
 
 
 def _available_programs(machine: Machine, slurm: bool=True) -> Machine:

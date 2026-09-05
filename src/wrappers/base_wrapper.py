@@ -130,8 +130,13 @@ class intel_rapl(EnergyReader):
         self.sub_packages = machine.sub_package
         
     def accumulate(self, readings: list[EnergyReading]):
+        # If package-level readings (sub_package < 0) are present, accumulate only those
+        # to avoid double-counting sub-domains (e.g. core, dram) which are already included in package energy.
+        has_package_level = any(reading.sub_package < 0 for reading in readings)
+        target_readings = [r for r in readings if r.sub_package < 0] if has_package_level else readings
+
         used_energy = 0
-        for reading in readings:
+        for reading in target_readings:
             max_energy = self.max_energy_range_uj(f"{reading.package}{self.sub_package_sufix(reading.sub_package)}")
             # it can technically wrap around twice or more, so we shouldn't run it for longer than a whole day or something
             if reading.start > reading.end:
@@ -182,21 +187,21 @@ class intel_rapl(EnergyReader):
         return f":{sub_package}" if sub_package >= 0 else ""
 
 
+#https://cray-hpe.github.io/docs-csm/en-17/operations/power_management/user_access_to_compute_node_power_data/
 class cray(EnergyReader):
     def accumulate(self, readings: list[EnergyReading]):
-        # apparently it does not wrap around like rapl
-        return sum(reading.end - reading.start for reading in readings)
+        return int(sum(reading.end - reading.start for reading in readings))
 
-    def energy(self, socket) -> int:
+    def energy(self, counter) -> int:
         result = subprocess.run(
-            ["cat", f"/sys/cray/pm_counters/{socket}"],
+            ["cat", f"/sys/cray/pm_counters/{counter}"],
             capture_output=True,
             text=True,
         )
-        output_CompletedProcess(f"energy_j:{socket}", result)
+        output_CompletedProcess(f"energy_j:{counter}", result)
         if result.returncode != 0: exit(result.returncode)
         
-        return int(result.stdout.split(" ")[0])
+        return int(result.stdout.split()[0])  * 1_000_000
     
     def all_energy(self, start: None | list[EnergyReading] = None) -> list[EnergyReading]:
         if start is not None:
