@@ -45,8 +45,8 @@ def compile_results(base_dir: str = "run_results"):
                 try:
                     input_text = input_file.read_text().strip()
                     input_reader = csv.reader(input_text.splitlines())
-                    input_headers = next(input_reader, None)
-                    input_values = next(input_reader, None)
+                    input_headers = next(input_reader, [])
+                    input_values = next(input_reader, [])
                     if not input_values and input_headers:
                         # Handle case where input.csv has no header row (e.g. "20,6")
                         input_values = input_headers
@@ -70,7 +70,7 @@ def compile_results(base_dir: str = "run_results"):
                     continue
 
                 # Combine headers and values with fixed input names
-                row_data = {"id": run_id}
+                row_data: dict[str, str|int] = {"id": run_id}
                 if len(input_values) >= 2:
                     row_data["THREADS"] = input_values[0]
                     row_data["CLK_LEVEL"] = input_values[1]

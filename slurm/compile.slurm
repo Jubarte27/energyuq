@@ -3,7 +3,7 @@
 #SBATCH --cpus-per-task=40
 #SBATCH --partition=hype
 
-#SBATCH --job-name=energyuq-init
+#SBATCH --job-name=energyuq-compile
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --time=3:00:00
@@ -20,8 +20,6 @@ report_end() {
 }
 trap report_end EXIT
 
-cd "$SCRATCH"
-rm -fr energyuq
-git clone https://github.com/Jubarte27/energyuq
-cd energyuq
-./scripts/install/install-easy.sh -g
+cd "$SCRATCH/energyuq"
+
+./scripts/install/compile-hpc-benchmarks.sh HPCG

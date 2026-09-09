@@ -214,7 +214,11 @@ def refine_sampling_plan(
     start_index=1, # for display only
     min_number_of_refinements = -1,
     max_number_of_refinements = 100,
-    variance_stop_epsilon: float = 1e-3,
+    surplus_tol = 0.1,
+    mean_tol = 0.1,
+    var_tol = 0.1,
+    patience = 2,
+    epsilon = 1e-12,
 ):
     sampler = get_sampler(campaign)
 
@@ -235,11 +239,48 @@ def refine_sampling_plan(
         return True
     i = 0
 
-    def epsilon_stop() -> bool:
-        if len(analysis.adaptation_errors) == 0:
-            return False
-        return analysis.adaptation_errors[-1] < variance_stop_epsilon
+    stable_steps = 0
 
+    def convergence_check() -> dict:
+        """
+        Returns sdictionary containing booleans and current metric values.
+        """
+        
+        nonlocal stable_steps
+        latest_surplus = analysis.adaptation_errors[-1]
+        surplus_ok = latest_surplus < (surplus_tol * analysis.std_history[-1])
+
+        # 2. Check Relative Change in Statistical Moments
+        K = len(analysis.mean_history)
+
+        delta_mean = np.linalg.norm(analysis.mean_history[-1] - analysis.mean_history[-2], np.inf)
+        norm_mean_prev = np.linalg.norm(analysis.mean_history[-2], np.inf)
+        rel_diff_mean = delta_mean / (norm_mean_prev + epsilon)
+
+        delta_var = np.linalg.norm(analysis.std_history[-1] - analysis.std_history[-2], np.inf)
+        norm_var_prev = np.linalg.norm(analysis.std_history[-2], np.inf)
+        rel_diff_var = delta_var / (norm_var_prev + epsilon)
+
+        mean_ok = rel_diff_mean < mean_tol
+        var_ok = rel_diff_var < var_tol
+
+        if mean_ok and var_ok:
+            stable_steps += 1
+        else:
+            stable_steps = 0
+
+        converged = stable_steps >= patience
+
+        return {
+            "converged": converged,
+            "consecutive_passed": stable_steps,
+            "latest_surplus": latest_surplus,
+            "surplus_ok": surplus_ok,
+            "rel_diff_mean": rel_diff_mean,
+            "mean_ok": mean_ok,
+            "rel_diff_var": rel_diff_var,
+            "var_ok": var_ok
+        }
     def explored_enough(thresh=1e-3):
         sobols = analysis.get_sobol_indices(QOI)
         max_orders = np.max(analysis.l_norm, 0)
@@ -254,12 +295,17 @@ def refine_sampling_plan(
         return single_iteration(i) and (i := i + 1) < max_number_of_refinements
 
     # pick better rtol and atol
-    def converged(rtol=RTOL, atol=ATOL) -> bool:
-        if epsilon_stop():
+    def converged() -> bool:
+        check = convergence_check()
+        if check["converged"]:
             return True
-        assert len(analysis.adaptation_errors) >= 3
-        last3 = np.array(analysis.adaptation_errors[-3:])
-        return bool(np.all(np.isclose(last3, np.roll(last3, 1), rtol=rtol, atol=atol)))
+        print(f"Iteration {i:02d} | "
+            f"Surplus: {check.get('latest_surplus', np.nan):.3e} (Pass[{(surplus_tol * analysis.std_history[-1])}]: {check.get('surplus_ok', False)}) | "
+            f"Rel Mean Δ: {check.get('rel_diff_mean', np.nan):.3e} | "
+            f"Rel Var Δ: {check.get('rel_diff_var', np.nan):.3e} | "
+            f"Consecutive Stable: {check.get('consecutive_passed', 0)}/{patience}")
+        return False
+
     
     while len(analysis.adaptation_errors) < 3:
         print("Adapt because too few runs")
@@ -277,20 +323,20 @@ def refine_sampling_plan(
         print(f"Adapt because it has not converged yet {analysis.adaptation_errors[-3:]}")
         if not advance(): return
 
+    print(f"Conveged [{analysis.std_history[-1]}]: {analysis.adaptation_errors[-3:]}")
+
 
 def refine_and_analyse(
     campaign: uq.campaign.Campaign,
     analysis: uq.analysis.SCAnalysis,
     min_number_of_refinements=-1,
     max_number_of_refinements=100,
-    variance_stop_epsilon: float = 1e-3,
 ):
     refine_sampling_plan(
         campaign,
         analysis,
         min_number_of_refinements=min_number_of_refinements,
         max_number_of_refinements=max_number_of_refinements,
-        variance_stop_epsilon=variance_stop_epsilon,
     )
     campaign.apply_analysis(analysis)
 

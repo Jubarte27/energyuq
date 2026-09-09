@@ -3,7 +3,7 @@
 #SBATCH --cpus-per-task=40
 #SBATCH --partition=hype
 
-#SBATCH --job-name=energyuq
+#SBATCH --job-name=energyuq-gitpull
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --time=3:00:00

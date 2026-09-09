@@ -39,7 +39,7 @@ OMP_RUN() {
 execute() {
     if [ "$SRUN" == "true" ]; then
         if [ -z "$FREQHZ" ]; then echo ; exit 42; fi
-        srun --cpu-freq="$FREQHZ:UserSpace" --cpus-per-task="$NT" --ntasks=1 "$@"
+        srun --cpu-freq="$FREQHZ-$FREQHZ:UserSpace" --cpus-per-task="$NT" --ntasks=1 --cpu-bind="threads,verbose" --exclusive "$@"
     elif ! [ "$BUFF" == "true" ]; then
         not_buffered "$@"
     else
