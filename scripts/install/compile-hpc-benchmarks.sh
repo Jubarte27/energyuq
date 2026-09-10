@@ -42,7 +42,7 @@ main() {
         silent_make NAS BT CLASS=B
         silent_make NAS CG CLASS=B
         silent_make NAS FT CLASS=B
-        silent_make NAS LU CLASS=B
+        # silent_make NAS LU CLASS=B
         silent_make NAS MG CLASS=B
         silent_make NAS SP CLASS=B
         silent_make NAS UA CLASS=B
