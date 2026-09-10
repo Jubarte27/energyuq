@@ -33,7 +33,7 @@ main() {
     silent_make HPCG
 
     silent_make RODINIA/hotspot
-    silent_make RODINIA/lud
+    # silent_make RODINIA/lud
     silent_make RODINIA/streamcluster
     silent_make RODINIA/data/hotspot/inputGen
 
