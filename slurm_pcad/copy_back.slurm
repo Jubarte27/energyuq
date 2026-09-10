@@ -6,7 +6,7 @@
 #SBATCH --job-name=energyuq-copyback
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --time=3:00:00
+#SBATCH --time=0:30:00
 #SBATCH --output=execlog/%x_%j.out
 #SBATCH --error=execlog/%x_%j.err
 

@@ -3,10 +3,10 @@
 #SBATCH --cpus-per-task=40
 #SBATCH --partition=hype
 
-#SBATCH --job-name=energyuq
+#SBATCH --job-name=energyuq-gitpull
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --time=3:00:00
+#SBATCH --time=0:30:00
 #SBATCH --output=execlog/%x_%j.out
 #SBATCH --error=execlog/%x_%j.err
 
@@ -16,12 +16,9 @@ set -e
 
 report_end() {
     local exit_code=$? 
-    echo "Something made me finnish. Last exit code was: $exit_code"
+    echo "Something made me finish. Last exit code was: $exit_code"
 }
 trap report_end EXIT
 
-if ! [ -z "$SLURM_CPUS_PER_TASK" ]; then
-    echo "$SLURM_CPUS_PER_TASK"
-else
-    nproc
-fi
+cd "$SCRATCH/energyuq"
+git pull --rebase

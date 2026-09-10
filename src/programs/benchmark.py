@@ -31,6 +31,12 @@ class HPCG(ExecuteSH):
 class JA(ExecuteSH):
      name: ClassVar[str] = "JA"
 
+class PO(ExecuteSH):
+     name: ClassVar[str] = "PO"
+
+class ST(ExecuteSH):
+     name: ClassVar[str] = "ST"
+
 class LULESH(ExecuteSH):
      name: ClassVar[str] = "LULESH"
 
