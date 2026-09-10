@@ -22,4 +22,6 @@ trap report_end EXIT
 
 cd "$SCRATCH/energyuq"
 
+git pull --rebase
+
 ./scripts/install/compile-hpc-benchmarks.sh

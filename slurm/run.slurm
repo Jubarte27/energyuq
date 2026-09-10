@@ -32,8 +32,6 @@ if [ -f "$ROOTV" ]; then source "$ROOTV"
 elif [ -f "$EASYV" ]; then source "$EASYV"
 else echo I have not been properly initialized; exit 2; fi
 
-./scripts/install/compile-hpc-benchmarks.sh HPCG
-
 export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}$SCRIPT_DIR"
 
 python3 "$SCRIPT_DIR/run.py"
