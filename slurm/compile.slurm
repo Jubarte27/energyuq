@@ -22,4 +22,4 @@ trap report_end EXIT
 
 cd "$SCRATCH/energyuq"
 
-./scripts/install/compile-hpc-benchmarks.sh HPCG
+./scripts/install/compile-hpc-benchmarks.sh

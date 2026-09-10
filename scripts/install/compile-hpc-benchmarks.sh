@@ -23,7 +23,7 @@ main() {
         return
     fi
 
-    pyenv_setup
+    # pyenv_setup
 
     silent_make FFT
     silent_make JA
@@ -48,9 +48,9 @@ main() {
         silent_make NAS UA CLASS=B
     } > /dev/null
 
-    cd "$BENCHMARKS_DIR/parboil" && ./parboil list
-    cd "$BENCHMARKS_DIR/parboil" && ./parboil compile stencil omp_base
-    cd "$BENCHMARKS_DIR/parboil" && ./parboil run     stencil omp_base default
+    # cd "$BENCHMARKS_DIR/parboil" && ./parboil list
+    # cd "$BENCHMARKS_DIR/parboil" && ./parboil compile stencil omp_base
+    # cd "$BENCHMARKS_DIR/parboil" && ./parboil run     stencil omp_base default
 }
 
 clean() {
