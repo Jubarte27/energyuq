@@ -125,7 +125,7 @@ fft()    { cd "$BENCHMARK_DIR/FFT"    && execute ./fft_omp; }
 hpcg()   { cd "$BENCHMARK_DIR/HPCG"   && execute ./HPCCG_BIN 256 256 128; }
 ja()     { cd "$BENCHMARK_DIR/JA"     && execute ./omp_ja; }
 lulesh() { cd "$BENCHMARK_DIR/LULESH" && execute ./lulesh2.0 -i 5000 -s 50; }
-po()     { cd "$BENCHMARK_DIR/po"     && execute ./omp_po; }
+po()     { cd "$BENCHMARK_DIR/PO"     && execute ./omp_po; }
 st()     { cd "$BENCHMARK_DIR/ST"     && execute ./stream ;}
 nas()    { cd "$BENCHMARK_DIR/NAS"    && execute "./$1.B.x"; }
 teste_erro_omp() { cd "$PROJECT_DIR/teste" && execute ./execute.sh; }
