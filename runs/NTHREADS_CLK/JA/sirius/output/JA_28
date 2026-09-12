@@ -1,0 +1,79 @@
+['cpufreq-set', '--cpu', '0', '--governor', 'userspace']
+['cpufreq-set', '--cpu', '1', '--governor', 'userspace']
+['cpufreq-set', '--cpu', '2', '--governor', 'userspace']
+['cpufreq-set', '--cpu', '3', '--governor', 'userspace']
+['cpufreq-set', '--cpu', '4', '--governor', 'userspace']
+['cpufreq-set', '--cpu', '5', '--governor', 'userspace']
+['cpufreq-set', '--cpu', '6', '--governor', 'userspace']
+['cpufreq-set', '--cpu', '7', '--governor', 'userspace']
+['cpufreq-set', '--cpu', '8', '--governor', 'userspace']
+['cpufreq-set', '--cpu', '9', '--governor', 'userspace']
+['cpufreq-set', '--cpu', '10', '--governor', 'userspace']
+['cpufreq-set', '--cpu', '11', '--governor', 'userspace']
+['cpufreq-set', '--cpu', '12', '--governor', 'userspace']
+['cpufreq-set', '--cpu', '13', '--governor', 'userspace']
+['cpufreq-set', '--cpu', '14', '--governor', 'userspace']
+['cpufreq-set', '--cpu', '15', '--governor', 'userspace']
+['cpufreq-set', '--cpu', '16', '--governor', 'userspace']
+['cpufreq-set', '--cpu', '17', '--governor', 'userspace']
+['cpufreq-set', '--cpu', '18', '--governor', 'userspace']
+['cpufreq-set', '--cpu', '19', '--governor', 'userspace']
+['cpufreq-set', '--cpu', '20', '--governor', 'userspace']
+['cpufreq-set', '--cpu', '21', '--governor', 'userspace']
+['cpufreq-set', '--cpu', '22', '--governor', 'userspace']
+['cpufreq-set', '--cpu', '23', '--governor', 'userspace']
+['cpufreq-set', '--cpu', '24', '--governor', 'userspace']
+['cpufreq-set', '--cpu', '25', '--governor', 'userspace']
+['cpufreq-set', '--cpu', '26', '--governor', 'userspace']
+['cpufreq-set', '--cpu', '27', '--governor', 'userspace']
+['cpufreq-set', '--cpu', '28', '--governor', 'userspace']
+['cpufreq-set', '--cpu', '29', '--governor', 'userspace']
+['cpufreq-set', '--cpu', '30', '--governor', 'userspace']
+['cpufreq-set', '--cpu', '31', '--governor', 'userspace']
+['cpufreq-set', '--cpu', '0', '--freq', '3500000']
+['cpufreq-set', '--cpu', '1', '--freq', '3500000']
+['cpufreq-set', '--cpu', '2', '--freq', '3500000']
+['cpufreq-set', '--cpu', '3', '--freq', '3500000']
+['cpufreq-set', '--cpu', '4', '--freq', '3500000']
+['cpufreq-set', '--cpu', '5', '--freq', '3500000']
+['cpufreq-set', '--cpu', '6', '--freq', '3500000']
+['cpufreq-set', '--cpu', '7', '--freq', '3500000']
+['cpufreq-set', '--cpu', '8', '--freq', '3500000']
+['cpufreq-set', '--cpu', '9', '--freq', '3500000']
+['cpufreq-set', '--cpu', '10', '--freq', '3500000']
+['cpufreq-set', '--cpu', '11', '--freq', '3500000']
+['cpufreq-set', '--cpu', '12', '--freq', '3500000']
+['cpufreq-set', '--cpu', '13', '--freq', '3500000']
+['cpufreq-set', '--cpu', '14', '--freq', '3500000']
+['cpufreq-set', '--cpu', '15', '--freq', '3500000']
+['cpufreq-set', '--cpu', '16', '--freq', '3500000']
+['cpufreq-set', '--cpu', '17', '--freq', '3500000']
+['cpufreq-set', '--cpu', '18', '--freq', '3500000']
+['cpufreq-set', '--cpu', '19', '--freq', '3500000']
+['cpufreq-set', '--cpu', '20', '--freq', '3500000']
+['cpufreq-set', '--cpu', '21', '--freq', '3500000']
+['cpufreq-set', '--cpu', '22', '--freq', '3500000']
+['cpufreq-set', '--cpu', '23', '--freq', '3500000']
+['cpufreq-set', '--cpu', '24', '--freq', '3500000']
+['cpufreq-set', '--cpu', '25', '--freq', '3500000']
+['cpufreq-set', '--cpu', '26', '--freq', '3500000']
+['cpufreq-set', '--cpu', '27', '--freq', '3500000']
+['cpufreq-set', '--cpu', '28', '--freq', '3500000']
+['cpufreq-set', '--cpu', '29', '--freq', '3500000']
+['cpufreq-set', '--cpu', '30', '--freq', '3500000']
+['cpufreq-set', '--cpu', '31', '--freq', '3500000']
+energy_uj:0: Stdout: 14515865512
+
+Running JA with 13 threads
+
+energy_uj:0: Stdout: 17855533027
+JA
+    Stdout
+        Running JA with 13 threads
+        OMP_NUM_THREADS=13
+        OMP_PROC_BIND=true
+        OMP_PLACES=threads
+        Execution Time: 43.11373
+max_energy_range_uj:0: Stdout: 65532610987
+Energy (μJ): 3339667515
+Time elapsed (s): 43.238826267421246
