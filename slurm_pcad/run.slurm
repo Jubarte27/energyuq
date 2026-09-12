@@ -3,7 +3,7 @@
 #SBATCH --job-name=energyuq-run
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --time=3:00:00
+#SBATCH --time=5:00:00
 #SBATCH --output=execlog/%x_%j.out
 #SBATCH --error=execlog/%x_%j.err
 
@@ -34,6 +34,6 @@ else echo I have not been properly initialized; exit 2; fi
 
 export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}$SCRIPT_DIR"
 
-python3 "$SCRIPT_DIR/run.py"
+python3 "$SCRIPT_DIR/run.py" "$@"
 
-cd "$DESTINATION" && "$SCRIPT_DIR/slurm/copy_back.slurm"
+cd "$DESTINATION" && "$SCRIPT_DIR/slurm_pcad/copy_back.slurm"

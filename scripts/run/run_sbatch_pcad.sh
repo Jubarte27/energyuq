@@ -15,7 +15,7 @@ main() {
         EXTRA_ARGS+=(--cpus-per-task="$SLURM_CPUS_PER_TASK")
     fi
 
-    sbatch "${EXTRA_ARGS[@]}" "$PROJECT_DIR/slurm/$SCRIPT.slurm"
+    sbatch "${EXTRA_ARGS[@]}" "$PROJECT_DIR/slurm_pcad/$SCRIPT.slurm" "${EXTRA_SCRIPT_ARGS[@]}"
 }
 
 _setConfigArgs() {
@@ -39,6 +39,8 @@ _setConfigArgs() {
 		log_error "First argument must be the name of a slurm script"
 	fi
     SCRIPT="$1"
+    shift
+    EXTRA_SCRIPT_ARGS=("$@")
 }
 
 SCRIPT_DIR=$(dirname "$(readlink -e "${BASH_SOURCE[0]}")") && source "$SCRIPT_DIR/util.bash"

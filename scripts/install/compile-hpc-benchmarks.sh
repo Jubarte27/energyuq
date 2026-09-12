@@ -37,16 +37,16 @@ main() {
     silent_make RODINIA/streamcluster
     silent_make RODINIA/data/hotspot/inputGen
 
-    {
-        silent_make NAS
-        silent_make NAS BT CLASS=B
-        silent_make NAS CG CLASS=B
-        silent_make NAS FT CLASS=B
-        # silent_make NAS LU CLASS=B
-        silent_make NAS MG CLASS=B
-        silent_make NAS SP CLASS=B
-        silent_make NAS UA CLASS=B
-    } > /dev/null
+    # {
+    #     silent_make NAS
+    #     silent_make NAS BT CLASS=B
+    #     silent_make NAS CG CLASS=B
+    #     silent_make NAS FT CLASS=B
+    #     # silent_make NAS LU CLASS=B
+    #     silent_make NAS MG CLASS=B
+    #     silent_make NAS SP CLASS=B
+    #     silent_make NAS UA CLASS=B
+    # } > /dev/null
 
     # cd "$BENCHMARKS_DIR/parboil" && ./parboil list
     # cd "$BENCHMARKS_DIR/parboil" && ./parboil compile stencil omp_base

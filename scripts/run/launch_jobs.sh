@@ -37,10 +37,10 @@ main() {
     for env_file in "${files[@]}"; do
         # Run each submission in a subshell so variables do not leak between jobs
         if [[ "$DRY_RUN" == "true" ]]; then
-            log_info "[$(basename "$env_file")] \"$PROJECT_DIR/scripts/run/run_sbatch.sh\" --env \"$env_file\" \"$SCRIPT\""
+            log_info "[$(basename "$env_file")] \"$PROJECT_DIR/scripts/run/run_sbatch_pcad.sh\" --env \"$env_file\" \"$SCRIPT\""
         else
             log_info "Submitting: $(basename "$env_file") -> $SCRIPT"
-            "$PROJECT_DIR/scripts/run/run_sbatch.sh" --env "$env_file" "$SCRIPT"
+            "$PROJECT_DIR/scripts/run/run_sbatch_pcad.sh" --env "$env_file" "$SCRIPT"
         fi
     done
 }
