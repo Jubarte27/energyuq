@@ -37,10 +37,10 @@ main() {
     for env_file in "${files[@]}"; do
         # Run each submission in a subshell so variables do not leak between jobs
         if [[ "$DRY_RUN" == "true" ]]; then
-            log_info "[$(basename "$env_file")] \"$PROJECT_DIR/scripts/run/run_sbatch_pcad.sh\" --env \"$env_file\" \"$SCRIPT\""
+            log_info "[$(basename "$env_file")] \"$PROJECT_DIR/scripts/run/run_sbatch_pcad.sh\" --env \"$env_file\" \"$SCRIPT\" \"${EXTRA_SCRIPT_ARGS[*]}\""
         else
             log_info "Submitting: $(basename "$env_file") -> $SCRIPT"
-            "$PROJECT_DIR/scripts/run/run_sbatch_pcad.sh" --env "$env_file" "$SCRIPT"
+            "$PROJECT_DIR/scripts/run/run_sbatch_pcad.sh" --env "$env_file" "$SCRIPT" "${EXTRA_SCRIPT_ARGS[@]}"
         fi
     done
 }
@@ -75,6 +75,10 @@ _setConfigArgs() {
     export SCRIPT="$1"
     export CONFIG_DIR="${CONFIG_DIR:-"$PROJECT_DIR/slurm_nodes"}"
     export DRY_RUN="${DRY_RUN:-false}"
+
+    
+    shift
+    EXTRA_SCRIPT_ARGS=("$@")
 }
 
 SCRIPT_DIR=$(dirname "$(readlink -e "${BASH_SOURCE[0]}")") && source "$SCRIPT_DIR/util.bash"
