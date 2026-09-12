@@ -3,7 +3,7 @@
 #SBATCH --job-name=energyuq-run
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --time=5:00:00
+#SBATCH --time=2:00:00
 #SBATCH --output=execlog/%x_%j.out
 #SBATCH --error=execlog/%x_%j.err
 
