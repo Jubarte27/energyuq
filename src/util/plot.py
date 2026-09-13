@@ -366,3 +366,15 @@ def plot_boxplot(result: Result, qoi=None):
 
     # plt.tight_layout()
     return fig
+
+
+# Re-export multi-run plotting functions
+from .multi_plot import (
+    plot_multi_sobols,
+    plot_multi_convergence,
+    plot_multi_energy_time_pareto,
+    plot_multi_qoi_distribution,
+    plot_multi_best_configurations,
+    plot_multi_parameter_effects,
+    plot_multi_dashboard,
+)
