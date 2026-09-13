@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EnergyUQ Interactive Run Report</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- App Body -->
+  <div class="app-body">
+    <!-- Sidebar / Hierarchical Index -->
+    <aside class="sidebar">
+      <div class="sidebar-search">
+        <input type="text" id="search-filter" class="search-input" placeholder="Search benchmark or machine..." />
+      </div>
+      <div class="sidebar-tree" id="sidebar-tree">
+        <div class="loading-stage">
+          <div class="spinner"></div>
+          <div>Loading metadata index...</div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="content" id="main-content">
+      <!-- Breadcrumb & Control Bar -->
+      <div class="view-control-bar">
+        <div class="breadcrumbs" id="breadcrumbs">
+          <span class="breadcrumb-item">Benchmarks</span>
+          <span class="breadcrumb-sep">/</span>
+          <span class="breadcrumb-active" id="crumb-active">Loading...</span>
+        </div>
+        <div class="run-machine-pills" id="machine-pills-bar">
+          <!-- Machine pills populated by JS -->
+        </div>
+      </div>
+
+      <!-- Focused Information Container (shows only a little info at a time) -->
+      <div class="view-container" id="view-container">
+        <div class="loading-stage">
+          <div class="spinner"></div>
+          <div>Loading analytical data...</div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Lightbox Modal -->
+  <div class="lightbox-overlay" id="lightbox-modal">
+    <div class="lightbox-content">
+      <button class="lightbox-close" id="lightbox-close-btn">&times;</button>
+      <img id="lightbox-img" src="" alt="Enlarged Plot" />
+      <div class="lightbox-caption" id="lightbox-caption"></div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
+
