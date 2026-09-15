@@ -15,6 +15,14 @@ class Machine:
     sub_package: list[int] = field(default_factory=lambda: [-1]) # nome ruim, valores ruins
     places: list[str] = field(default_factory=lambda: ["threads", "cores", "sockets"])
     proc_bind: list[str] = field(default_factory=lambda: ["true", "close", "spread", "false"])
+    
+    turbo_boost: list[str] = field(default_factory=lambda: ["false", "true"])
+    numactl: list[str] = field(default_factory=lambda: ["false", "true"])
+    # uncore: list[int] = field(default_factory=lambda: [])
+
+
+    boost_setter: str | None = "cpufreq"
+    
     freq_getter: str | None = None
     freq_setter: str | None = None
     energy_reader: str | None = None
@@ -187,8 +195,8 @@ def guess_machine() -> Machine:
         or (system_domains[1] if system_domains else None)
         or [-1]
     )
-    places = _environment_list("ENERGYUQ_MACHINE_PLACES", str) or ["threads"]
-    proc_bind = _environment_list("ENERGYUQ_MACHINE_PROC_BIND", str) or ["true"]
+    places = _environment_list("ENERGYUQ_MACHINE_PLACES", str) or ["threads", "cores", "sockets"]
+    proc_bind = _environment_list("ENERGYUQ_MACHINE_PROC_BIND", str) or ["true", "close", "spread", "false"]
 
     return _available_programs(Machine(
         name=name,

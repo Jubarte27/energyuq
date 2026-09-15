@@ -71,9 +71,6 @@ def default_params(machine: Machine) -> tuple[params_type, vary_type]:
     vary: vary_type = {}
 
     # Current machine maximum number of cores
-    # params["N_THREADS"] = {"type": "integer", "default": machine.physical_core_count}
-    # vary["N_THREADS"] = cp.DiscreteUniform(1, machine.physical_core_count)
-    # Glados limited number of cores
     params["N_THREADS"] = {"type": "integer", "default": machine.max_threads}
     vary["N_THREADS"] = cp.DiscreteUniform(1, machine.max_threads)
 
@@ -83,11 +80,14 @@ def default_params(machine: Machine) -> tuple[params_type, vary_type]:
 
     # params['POWER_CAP'] = {'type': 'integer', 'default': 220.0}  # power cap in watts
 
-    # params["PLACE_WIDE"] = {"type": "integer", "default": len(machine.places) - 1}
-    # vary["PLACE_WIDE"] = cp.DiscreteUniform(0, len(machine.places) - 1)
+    params["PLACE_WIDE"] = {"type": "integer", "default": len(machine.places) - 1}
+    vary["PLACE_WIDE"] = cp.DiscreteUniform(0, len(machine.places) - 1)
     
-    # params["AFF_DISTANCE"] = {"type": "integer", "default": len(machine.proc_bind) - 1}
-    # vary["AFF_DISTANCE"] = cp.DiscreteUniform(0, len(machine.proc_bind) - 1)
+    params["AFF_DISTANCE"] = {"type": "integer", "default": len(machine.proc_bind) - 1}
+    vary["AFF_DISTANCE"] = cp.DiscreteUniform(0, len(machine.proc_bind) - 1)
+    
+    params["BOOST"] = {"type": "integer", "default": len(machine.turbo_boost) - 1}
+    vary["BOOST"] = cp.DiscreteUniform(0, len(machine.turbo_boost) - 1)
 
     return params, vary
 

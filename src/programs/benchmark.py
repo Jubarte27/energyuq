@@ -12,8 +12,9 @@ class ExecuteSH(Program):
         proc_bind = params.machine.proc_bind[params.affinity_distance]
         places = params.machine.places[params.place_wideness]
         freq = params.machine.freq[params.freq_level]
+        boost = params.machine.turbo_boost[params.boost]
         return run(
-            [execute, cls.name, str(params.n_threads), str(freq)],
+            [execute, cls.name, str(params.n_threads), str(freq), str(boost)],
             env=os.environ | {"OMP_PLACES": places, "OMP_PROC_BIND": proc_bind},
             capture_output=True,
             text=True,

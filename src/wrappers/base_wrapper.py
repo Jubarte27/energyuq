@@ -16,19 +16,28 @@ def prepare_and_execute(machine: Machine, program: type[Program], params: Execut
         args = []
 
     cpu_set(machine, params.freq_level)
+    set_boost(machine, params.boost)
+    
     accum, t = run(machine, program, params, args)
     return report(accum, t)
 
-def try_exec(cmds: list[list[str]], err_msg: str = "") -> bool:
+def try_exec(cmds: list[list[str]], err_msg: str = "", input: str | None = None) -> bool:
     for cmd in cmds:
-        print(f"{cmd}")
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        result = subprocess.run(cmd, capture_output=True, text=True, input=input)
         if result.returncode != 0:
             if err_msg:
                 print(err_msg, file=stderr)
             output_CompletedProcess(" ".join(cmd), result)
             return False
     return True
+
+def set_boost(machine: Machine, value: int):
+    if machine.boost_setter == "cpufreq":
+        boost = "0" if machine.turbo_boost[value] == "false" else "1"
+        if try_exec([["tee", "/sys/devices/system/cpu/cpufreq/boost"]], input=boost):
+            return machine.boost_setter
+
+    raise Exception(f"Unable to use {machine.boost_setter} for setting turbo boost, do i have permission?")
 
 def set_freq(machine: Machine, frequency):
     if machine.freq_setter == "cpufreq-set":
@@ -55,7 +64,7 @@ def set_freq(machine: Machine, frequency):
         ]):
             return machine.freq_setter
 
-    raise Exception(f"Unable to use {machine.freq_setter}, do i have permission?")
+    raise Exception(f"Unable to use {machine.freq_setter} for setting cpu frequency, do i have permission?")
 
 def cpu_set(machine: Machine, freq_level: int):
 
@@ -106,7 +115,7 @@ class EnergyReader(ABC):
     @abstractmethod
     def accumulate(self, readings: list[EnergyReading]) -> int: pass
     @abstractmethod
-    def energy(self, socket) -> int: pass
+    def energy(self, counter) -> int: pass
     @abstractmethod
     def all_energy(self, start: None | list[EnergyReading] = None) -> list[EnergyReading]: pass
 
@@ -156,13 +165,13 @@ class intel_rapl(EnergyReader):
             exit(result.returncode)
         return int(result.stdout)
 
-    def energy(self, socket) -> int:
+    def energy(self, counter) -> int:
         result = subprocess.run(
-            ["cat", f"/sys/class/powercap/intel-rapl:{socket}/energy_uj"],
+            ["cat", f"/sys/class/powercap/intel-rapl:{counter}/energy_uj"],
             capture_output=True,
             text=True,
         )
-        output_CompletedProcess(f"energy_uj:{socket}", result)
+        output_CompletedProcess(f"energy_uj:{counter}", result)
         if result.returncode != 0:
             exit(result.returncode)
         return int(result.stdout)

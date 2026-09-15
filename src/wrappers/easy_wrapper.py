@@ -13,12 +13,13 @@ def main(program: type[Program], machine: Machine, input_file: str = "input.csv"
         return int(args[i]) if len(args) > i else default
     params = ExecutionParams(
         machine=machine,
-        n_threads=int(args[0]),
-        freq_level=int(args[1]),
+        n_threads=arg(0),
+        freq_level=arg(1),
         place_wideness=arg(2),
-        affinity_distance=arg(3))
+        affinity_distance=arg(3),
+        boost=arg(4))
 
-    result = base_wrapper.prepare_and_execute(machine, program, params, args[2:])
+    result = base_wrapper.prepare_and_execute(machine, program, params, args[5:])
 
     ks, vs = zip(*result.items())
     header = ",".join(ks)

@@ -11,8 +11,9 @@ class  ExecutionParams():
     machine: Machine
     n_threads: int
     freq_level: int
-    place_wideness: int = 0
-    affinity_distance: int = 0
+    boost: int
+    place_wideness: int
+    affinity_distance: int
 
 
 @dataclass
