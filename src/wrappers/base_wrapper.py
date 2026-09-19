@@ -46,21 +46,11 @@ def set_freq(machine: Machine, frequency):
             *(["cpufreq-set", "--cpu", f"{cpu}", "--freq", f"{frequency}"] for cpu in range(machine.max_threads))
         ]):
             return machine.freq_setter
-        if try_exec([
-            *(["sudo", "-n", "cpufreq-set", f"--cpu", f"{cpu}", "--governor", "userspace"] for cpu in range(machine.max_threads)),
-            *(["sudo", "-n", "cpufreq-set", f"--cpu", f"{cpu}", "--freq", f"{frequency}"] for cpu in range(machine.max_threads))
-        ]):
-            return machine.freq_setter
 
     if machine.freq_setter == "cpupower":
         if try_exec([
             ["cpupower", "frequency-set", "--governor", "userspace"],
             ["cpupower", "frequency-set", "--freq", f"{frequency}"]
-        ]):
-            return machine.freq_setter
-        if try_exec([
-            ["sudo", "-n", "cpupower", "frequency-set", "--governor", "userspace"],
-            ["sudo", "-n", "cpupower", "frequency-set", "--freq", f"{frequency}"]
         ]):
             return machine.freq_setter
 
@@ -81,8 +71,7 @@ def pick_reader(machine: Machine):
     elif machine.energy_reader == "cray":
         reader: EnergyReader = cray()
     else:
-        print("Couldn't find a way to read energy counters, do i have permission?")
-        exit(42)
+        raise RuntimeError("Couldn't find a way to read energy counters, do i have permission?")
     return reader
 
 def run(machine: Machine,program: type[Program], params: ExecutionParams, parameter_list: Iterable[str]):
@@ -130,7 +119,7 @@ def set_sysfs(full_path: str, value: object, name=None):
     output_CompletedProcess(full_path if name is None else name, result)
 
     if result.returncode != 0:
-        exit(result.returncode)
+        raise RuntimeError(f"\"tee {full_path}\" failed with exit code:{result.returncode}")
 
 class intel_rapl(EnergyReader):
     def __init__(self, machine: Machine) -> None:
@@ -162,7 +151,7 @@ class intel_rapl(EnergyReader):
         )
         output_CompletedProcess(f"max_energy_range_uj:{socket}", result)
         if result.returncode != 0:
-            exit(result.returncode)
+            raise RuntimeError(f"\"cat /sys/class/powercap/intel-rapl:{socket}/max_energy_range_uj\" failed with exit code:{result.returncode}")
         return int(result.stdout)
 
     def energy(self, counter) -> int:
@@ -173,7 +162,7 @@ class intel_rapl(EnergyReader):
         )
         output_CompletedProcess(f"energy_uj:{counter}", result)
         if result.returncode != 0:
-            exit(result.returncode)
+            raise RuntimeError(f"\"cat /sys/class/powercap/intel-rapl:{counter}/energy_uj\" failed with exit code:{result.returncode}")
         return int(result.stdout)
     
     def all_energy(self, start: None | list[EnergyReading] = None) -> list[EnergyReading]:
@@ -208,7 +197,8 @@ class cray(EnergyReader):
             text=True,
         )
         output_CompletedProcess(f"energy_j:{counter}", result)
-        if result.returncode != 0: exit(result.returncode)
+        if result.returncode != 0:
+            raise RuntimeError(f"\"cat /sys/cray/pm_counters/{counter}\" failed with exit code:{result.returncode}")
         
         return int(result.stdout.split()[0])  * 1_000_000
     

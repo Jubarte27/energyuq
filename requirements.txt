@@ -3,6 +3,8 @@ numpy
 chaospy
 matplotlib
 scipy
+SALib
 dill
 setuptools==81.0.0
 python-dotenv
+msgpack

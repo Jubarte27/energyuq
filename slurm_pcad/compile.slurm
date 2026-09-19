@@ -24,4 +24,4 @@ cd "$SCRATCH/energyuq"
 
 git pull --rebase
 
-./scripts/install/compile-hpc-benchmarks.sh
+./hpc-benchmarks/compile-hpc-benchmarks.sh "$@"
