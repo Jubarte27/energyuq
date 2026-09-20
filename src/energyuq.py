@@ -1,6 +1,8 @@
 from collections.abc import Callable
 from contextlib import redirect_stdout
 from dataclasses import fields
+import datetime
+import json
 import os
 from pathlib import Path
 from typing import Any, cast
@@ -112,7 +114,10 @@ def energy_wraper_actions(
 
 
 def campaign_path(root: Path | str) -> Path:
-    return Path(root) / "campaign"
+    p = Path(root)
+    if (p / "campaign.db").exists():
+        return p
+    return p / "campaign"
 
 
 def create_campaign(
@@ -133,8 +138,7 @@ def create_campaign(
     )
     setattr(campaign, "root_path", root)
     setattr(campaign, "machine", machine)
-    if active_params is not None:
-        setattr(campaign, "active_params", active_params)
+    setattr(campaign, "active_params", active_params if active_params is not None else list(vary.keys()))
 
     if campaign.get_active_app() is None:
         campaign.add_app(
@@ -204,7 +208,7 @@ def _ordinal(n: int) -> str:
 def refine_sampling_plan(
     campaign: uq.Campaign,
     analysis: uq.analysis.SCAnalysis,
-    start_index: int = 1,
+    start_index: int | None = None,
     min_number_of_refinements: int = -1,
     max_number_of_refinements: int = 100,
     surplus_tol: float = 0.1,
@@ -214,6 +218,8 @@ def refine_sampling_plan(
     epsilon: float = 1e-12,
     sobol_thresh: float = 1e-3,
     ignored_dims: set[int] | list[int] | None = None,
+    save_every: int = 2,
+    save_dir: Path | str | None = None,
 ) -> None:
     sampler = get_sampler(campaign)
     ignored = set(ignored_dims) if ignored_dims is not None else set()
@@ -222,12 +228,14 @@ def refine_sampling_plan(
         if d < sampler.N:
             sampler.max_level[d] = 1
 
+    effective_start = len(analysis.adaptation_errors) if start_index is None else (start_index - 1)
+
     def single_iteration(idx: int) -> bool:
         sampler.look_ahead(analysis.l_norm)
         if len(sampler.admissible_idx) == 0:
             return False
 
-        iter_num = idx + start_index + 1
+        iter_num = idx + effective_start + 2
         print(f"-------{_ordinal(iter_num)} iteration-------")
         print(f"-------{sampler.n_new_points[-1]} new points------")
         print(f"-------Executed {np.sum(sampler.n_new_points)} in total-------")
@@ -289,6 +297,17 @@ def refine_sampling_plan(
         i += 1
         return i < max_number_of_refinements
 
+    def advance_and_save() -> bool:
+        continue_advancing = advance()
+        if not continue_advancing:
+            save(campaign, analysis, dir=save_dir, status="completed", converged=False)
+            return False
+        total_adaptations = len(analysis.adaptation_errors)
+        if save_every > 0 and (total_adaptations % save_every == 0):
+            print(f"[Checkpoint] Periodic save at iteration {total_adaptations} (every {save_every} iterations)...")
+            save(campaign, analysis, dir=save_dir, status="in_progress")
+        return True
+
     def is_converged() -> bool:
         check = convergence_check()
         if check["converged"]:
@@ -305,25 +324,26 @@ def refine_sampling_plan(
 
     while len(analysis.adaptation_errors) < 3:
         print("Adapt because too few runs")
-        if not advance():
+        if not advance_and_save():
             return
 
     while i < min_number_of_refinements:
         print("Adapt because min_number_of_refinements")
-        if not advance():
+        if not advance_and_save():
             return
 
     while not explored_enough():
         print("Adapt because something was not properly explored")
-        if not advance():
+        if not advance_and_save():
             return
 
     while not is_converged():
         print(f"Adapt because it has not converged yet {analysis.adaptation_errors[-3:]}")
-        if not advance():
+        if not advance_and_save():
             return
 
     print(f"Converged [{analysis.std_history[-1]}]: {analysis.adaptation_errors[-3:]}")
+    save(campaign, analysis, dir=save_dir, status="converged", converged=True)
 
 
 def refine_and_analyse(
@@ -331,6 +351,8 @@ def refine_and_analyse(
     analysis: uq.analysis.SCAnalysis,
     min_number_of_refinements: int = -1,
     max_number_of_refinements: int = 100,
+    save_every: int = 2,
+    save_dir: Path | str | None = None,
     **kwargs,
 ) -> None:
     refine_sampling_plan(
@@ -338,9 +360,12 @@ def refine_and_analyse(
         analysis,
         min_number_of_refinements=min_number_of_refinements,
         max_number_of_refinements=max_number_of_refinements,
+        save_every=save_every,
+        save_dir=save_dir,
         **kwargs,
     )
     campaign.apply_analysis(analysis)
+    save(campaign, analysis, dir=save_dir, status="completed")
 
 
 def run_dir(
@@ -375,7 +400,23 @@ def create(
     evaluate_fn: Callable[[dict[str, int]], dict[str, Any]] | None = None,
     morris_include_dummy: bool = True,
     morris_seed: int | None = None,
+    resume: bool = False,
 ) -> tuple[uq.Campaign, uq.analysis.SCAnalysis]:
+    if resume:
+        target_dir = Path(dir) if dir else latest_dir(RESULTS_DIR, "energy")
+        if target_dir is not None and (
+            (target_dir / "campaign" / "campaign.db").exists()
+            or (target_dir / "campaign.db").exists()
+            or (target_dir / "analysis").exists()
+        ):
+            print(f"Resuming campaign from {target_dir.as_posix()}...")
+            c, a, _ = load(program, machine, "energy", dir=target_dir)
+            return c, a
+        elif dir is not None:
+            raise FileNotFoundError(f"Cannot resume: checkpoint directory '{dir}' not found or invalid")
+        else:
+            print("No existing campaign found to resume. Starting fresh campaign...")
+
     root = run_dir(dir=dir)
     create_dir(root)
 
@@ -409,6 +450,7 @@ def create(
 
     analysis = prepare_analysis(campaign)
     campaign.apply_analysis(analysis)
+    save(campaign, analysis, dir=root.as_posix(), machine=machine, status="in_progress")
     return campaign, analysis
 
 
@@ -416,17 +458,19 @@ def save(
     campaign: uq.Campaign,
     analysis: uq.analysis.SCAnalysis,
     /,
-    dir: str | None = None,
+    dir: str | Path | None = None,
     machine: Machine | None = None,
-) -> None:
-    path = run_dir(dir=dir, campaign=campaign)
+    status: str = "in_progress",
+    converged: bool = False,
+) -> Path:
+    path = run_dir(dir=str(dir) if dir is not None else None, campaign=campaign)
     create_dir(path)
 
     machine_to_save = machine if machine is not None else getattr(campaign, "machine", None)
-    if machine_to_save is None:
+    if machine_to_save is not None:
+        _pack(machine_to_save, path / "machine.msgpack")
+    elif not (path / "machine.msgpack").exists():
         raise ValueError("No machine information available to save for this campaign")
-
-    _pack(machine_to_save, path / "machine.msgpack")
 
     active_params = getattr(campaign, "active_params", None)
     if active_params is not None:
@@ -434,13 +478,42 @@ def save(
 
     analysis.save_state((path / "analysis").as_posix())
 
+    sampler = get_sampler(campaign)
+    if sampler is not None:
+        sampler.save_state((path / "sampler").as_posix())
+
+    total_samples = 0
+    try:
+        collation = campaign.get_collation_result()
+        if collation is not None and not collation.empty:
+            total_samples = int(len(collation))
+    except Exception:
+        pass
+
+    latest_surplus = None
+    if hasattr(analysis, "adaptation_errors") and len(analysis.adaptation_errors) > 0:
+        latest_surplus = float(analysis.adaptation_errors[-1])
+
+    checkpoint_data = {
+        "iteration": len(getattr(analysis, "adaptation_errors", [])),
+        "total_samples": total_samples,
+        "status": status,
+        "converged": converged,
+        "latest_surplus": latest_surplus,
+        "timestamp": datetime.datetime.now().isoformat(),
+    }
+    with open(path / "checkpoint.json", "w", encoding="utf-8") as f:
+        json.dump(checkpoint_data, f, indent=2)
+
+    return path
+
 
 def load(
     program: type[Program],
     default_machine: Machine,
-    campaign_name: str,
+    campaign_name: str = "energy",
     /,
-    dir: str | None = None,
+    dir: str | Path | None = None,
 ) -> tuple[uq.Campaign, uq.analysis.SCAnalysis, Machine]:
     if not dir:
         path = latest_dir(RESULTS_DIR, campaign_name)
@@ -478,11 +551,33 @@ def load(
         except Exception:
             pass
 
+    sampler_path = path / "sampler"
+    if sampler_path.exists():
+        try:
+            sampler = get_sampler(campaign)
+            if sampler is not None:
+                sampler.load_state(sampler_path.as_posix())
+        except Exception as e:
+            print(f"Warning: Could not load sampler state: {e}")
+
     analysis = prepare_analysis(campaign)
-    analysis.load_state((path / "analysis").as_posix())
+    analysis_path = path / "analysis"
+    if analysis_path.exists():
+        analysis.load_state(analysis_path.as_posix())
 
     collation = campaign.get_collation_result()
     if collation is not None and not collation.empty:
         campaign.apply_analysis(analysis)
 
     return campaign, analysis, machine
+
+
+def resume(
+    program: type[Program],
+    default_machine: Machine,
+    campaign_name: str = "energy",
+    /,
+    dir: str | Path | None = None,
+) -> tuple[uq.Campaign, uq.analysis.SCAnalysis]:
+    campaign, analysis, _ = load(program, default_machine, campaign_name, dir=dir)
+    return campaign, analysis
