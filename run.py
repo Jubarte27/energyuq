@@ -40,6 +40,11 @@ def parse_args():
         default=100,
         help="Maximum number of refinement iterations (default: 100)",
     )
+    parser.add_argument(
+        "--numa",
+        action="store_true",
+        help="Include kernel numa balancing, if available",
+    )
     return parser.parse_args()
 
 
@@ -63,6 +68,7 @@ if __name__ == "__main__":
         mach,
         dir=args.dir,
         resume=args.resume,
+        numa=args.numa
     )
 
     energyuq.refine_and_analyse(

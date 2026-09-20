@@ -407,5 +407,178 @@ class TestPlotNewPoints(unittest.TestCase):
         mock_show.assert_called_once()
 
 
+class TestNumaBalancing(unittest.TestCase):
+    def setUp(self):
+        self.numa_machine = Machine(
+            name="NumaMachine",
+            freq=[1000, 2000],
+            max_threads=4,
+            places=["threads", "cores"],
+            proc_bind=["close", "spread"],
+            turbo_boost=["false", "true"],
+            has_numa=True,
+            numactl=["false", "true"],
+        )
+        self.non_numa_machine = Machine(
+            name="NonNumaMachine",
+            freq=[1000, 2000],
+            max_threads=4,
+            places=["threads", "cores"],
+            proc_bind=["close", "spread"],
+            turbo_boost=["false", "true"],
+            has_numa=False,
+            numactl=["false", "true"],
+        )
+
+    def test_default_params_numa_enabled(self):
+        params, vary = energyuq.default_params(self.numa_machine, numa=True)
+        self.assertIn("NUMA", params)
+        self.assertIn("NUMA", vary)
+        self.assertEqual(params["NUMA"]["default"], 1)
+        self.assertEqual(set(params.keys()), {"N_THREADS", "CLK", "PLACES", "BINDING", "BOOST", "NUMA"})
+
+    def test_default_params_numa_not_added_when_flag_false(self):
+        params, vary = energyuq.default_params(self.numa_machine, numa=False)
+        self.assertNotIn("NUMA", params)
+        self.assertNotIn("NUMA", vary)
+
+    def test_default_params_numa_not_added_on_non_numa_machine(self):
+        params, vary = energyuq.default_params(self.non_numa_machine, numa=True)
+        self.assertNotIn("NUMA", params)
+        self.assertNotIn("NUMA", vary)
+
+    def test_default_params_numa_via_active_params(self):
+        params, vary = energyuq.default_params(self.numa_machine, active_params=["N_THREADS", "NUMA"])
+        self.assertIn("NUMA", params)
+        self.assertEqual(set(vary.keys()), {"N_THREADS", "NUMA"})
+
+    @patch("src.wrappers.base_wrapper.try_exec", return_value=True)
+    def test_set_numa_executes_sysctl(self, mock_try_exec):
+        from src.wrappers import base_wrapper
+        base_wrapper.set_numa(self.numa_machine, 0)
+        mock_try_exec.assert_called_with([["sudo", "/sbin/sysctl", "kernel.numa_balancing=0"]])
+
+        base_wrapper.set_numa(self.numa_machine, 1)
+        mock_try_exec.assert_called_with([["sudo", "/sbin/sysctl", "kernel.numa_balancing=1"]])
+
+    @patch("src.wrappers.base_wrapper.set_numa")
+    @patch("src.wrappers.base_wrapper.set_boost")
+    @patch("src.wrappers.base_wrapper.cpu_set")
+    @patch("src.wrappers.base_wrapper.run", return_value=(100, 1.0))
+    def test_prepare_and_execute_calls_set_numa_only_when_appropriate(
+        self, mock_run, mock_cpu_set, mock_set_boost, mock_set_numa
+    ):
+        from src.wrappers import base_wrapper
+        from src.util.data import ExecutionParams
+
+        # When machine has NUMA and params.numa is an int
+        params = ExecutionParams(
+            machine=self.numa_machine,
+            n_threads=2,
+            freq_level=0,
+            boost=1,
+            place_wideness=0,
+            binding=0,
+            numa=0,
+        )
+        base_wrapper.prepare_and_execute(self.numa_machine, NONE, params, [])
+        mock_set_numa.assert_called_once_with(self.numa_machine, 0)
+        mock_set_numa.reset_mock()
+
+        # When machine has NUMA but params.numa is None
+        params_none = ExecutionParams(
+            machine=self.numa_machine,
+            n_threads=2,
+            freq_level=0,
+            boost=1,
+            place_wideness=0,
+            binding=0,
+            numa=None,
+        )
+        base_wrapper.prepare_and_execute(self.numa_machine, NONE, params_none, [])
+        mock_set_numa.assert_not_called()
+
+        # When machine does NOT have NUMA even if params.numa is set
+        params_non_numa = ExecutionParams(
+            machine=self.non_numa_machine,
+            n_threads=2,
+            freq_level=0,
+            boost=1,
+            place_wideness=0,
+            binding=0,
+            numa=0,
+        )
+        base_wrapper.prepare_and_execute(self.non_numa_machine, NONE, params_non_numa, [])
+        mock_set_numa.assert_not_called()
+
+    def test_easy_wrapper_parses_numa_when_present(self):
+        from src.wrappers import easy_wrapper
+        with tempfile.TemporaryDirectory() as tmpdir:
+            in_file = Path(tmpdir) / "input.csv"
+            out_file = Path(tmpdir) / "output.csv"
+            # 6 parameters: N_THREADS=2, CLK=1, PLACES=0, BINDING=0, BOOST=1, NUMA=0
+            in_file.write_text("2,1,0,0,1,0\n")
+
+            with patch("src.wrappers.base_wrapper.prepare_and_execute", return_value={"energy_uj": 100, "time": 1.0}) as mock_pe:
+                easy_wrapper.main(NONE, self.numa_machine, input_file=in_file.as_posix(), output_file=out_file.as_posix())
+                self.assertTrue(mock_pe.called)
+                passed_params = mock_pe.call_args[0][2]
+                self.assertEqual(passed_params.numa, 0)
+
+            # 5 parameters: NUMA omitted
+            in_file.write_text("2,1,0,0,1\n")
+            with patch("src.wrappers.base_wrapper.prepare_and_execute", return_value={"energy_uj": 100, "time": 1.0}) as mock_pe:
+                easy_wrapper.main(NONE, self.numa_machine, input_file=in_file.as_posix(), output_file=out_file.as_posix())
+                self.assertTrue(mock_pe.called)
+                passed_params = mock_pe.call_args[0][2]
+                self.assertIsNone(passed_params.numa)
+
+    def test_morris_screening_with_numa(self):
+        def eval_fn(pt):
+            # NUMA has an effect
+            return {"energy_uj": float(pt["N_THREADS"] * 100.0 + pt.get("NUMA", 0) * 50.0)}
+
+        result = energyuq.morris_screen(
+            NONE,
+            self.numa_machine,
+            r=2,
+            num_levels=4,
+            evaluate_fn=eval_fn,
+            default_params_fn=lambda m: energyuq.default_params(m, numa=True),
+        )
+        self.assertIn("NUMA", result.mu_star)
+
+    def test_create_campaign_numa_option(self):
+        import json
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            campaign = energyuq.create_campaign(NONE, self.numa_machine, root, numa=True)
+            app = campaign.get_active_app()
+            params_dict = json.loads(app["params"].serialize())
+            self.assertIn("NUMA", params_dict)
+            self.assertIn("NUMA", campaign.active_params)
+
+            campaign_no_numa = energyuq.create_campaign(NONE, self.numa_machine, root / "sub", numa=False)
+            app_no_numa = campaign_no_numa.get_active_app()
+            params_no_numa_dict = json.loads(app_no_numa["params"].serialize())
+            self.assertNotIn("NUMA", params_no_numa_dict)
+            self.assertNotIn("NUMA", campaign_no_numa.active_params)
+
+    def test_create_with_numa_flag(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            with patch("src.wrappers.base_wrapper.prepare_and_execute", return_value={"energy_uj": 100.0, "time": 1.0, "EDP": 100.0}):
+                c, a = energyuq.create(
+                    NONE,
+                    self.numa_machine,
+                    dir=root.as_posix(),
+                    screen_morris=False,
+                    active_params=["N_THREADS", "NUMA"],
+                    numa=True,
+                )
+                self.assertIn("NUMA", c.active_params)
+
+
 if __name__ == "__main__":
     unittest.main()
+

@@ -88,6 +88,8 @@ def _format_param_value(machine: Machine, param_name: str, def_idx: int) -> str:
         return f"{machine.proc_bind[def_idx]} (idx {def_idx})"
     if param_name == "BOOST" and 0 <= def_idx < len(machine.turbo_boost):
         return f"{machine.turbo_boost[def_idx]} (idx {def_idx})"
+    if param_name == "NUMA" and 0 <= def_idx < len(machine.numactl):
+        return f"{machine.numactl[def_idx]} (idx {def_idx})"
     return str(def_idx)
 
 
@@ -345,6 +347,7 @@ def morris_screen(
                 place_wideness=point["PLACES"],
                 binding=point["BINDING"],
                 boost=point["BOOST"],
+                numa=point.get("NUMA"),
             )
             return base_wrapper.prepare_and_execute(machine, program, execution_params, [])
         evaluate_fn = default_eval

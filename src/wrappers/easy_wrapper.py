@@ -17,9 +17,10 @@ def main(program: type[Program], machine: Machine, input_file: str = "input.csv"
         freq_level=arg(1),
         place_wideness=arg(2),
         binding=arg(3),
-        boost=arg(4))
+        boost=arg(4),
+        numa=int(args[5]) if len(args) > 5 else None)
 
-    result = base_wrapper.prepare_and_execute(machine, program, params, args[5:])
+    result = base_wrapper.prepare_and_execute(machine, program, params, args[6:] if len(args) > 5 else args[5:])
 
     ks, vs = zip(*result.items())
     header = ",".join(ks)

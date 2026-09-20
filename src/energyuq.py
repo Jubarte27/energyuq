@@ -60,7 +60,7 @@ class ExecuteWrapper:
 
 
 def default_params(
-    machine: Machine, active_params: list[str] | None = None
+    machine: Machine, active_params: list[str] | None = None, numa: bool = False
 ) -> tuple[params_type, vary_type]:
     params: params_type = {
         "N_THREADS": {"type": "integer", "default": machine.max_threads},
@@ -76,15 +76,19 @@ def default_params(
         "BINDING": cp.DiscreteUniform(0, len(machine.proc_bind) - 1),
         "BOOST": cp.DiscreteUniform(0, len(machine.turbo_boost) - 1),
     }
+    if (numa or (active_params is not None and "NUMA" in active_params)) and machine.has_numa:
+        params["NUMA"] = {"type": "integer", "default": len(machine.numactl) - 1}
+        all_vary["NUMA"] = cp.DiscreteUniform(0, len(machine.numactl) - 1)
+
     active_set = set(active_params) if active_params is not None else set(all_vary.keys())
     vary: vary_type = {k: dist for k, dist in all_vary.items() if k in active_set}
     return params, vary
 
 
 def energy_wraper_actions(
-    program: type[Program], machine: Machine, root: Path
+    program: type[Program], machine: Machine, root: Path, numa: bool = False, active_params: list[str] | None = None
 ) -> Actions:
-    params_def, _ = default_params(machine)
+    params_def, _ = default_params(machine, active_params=active_params, numa=numa)
     template = ",".join(f"${param}" for param in params_def)
 
     Path("easy").mkdir(parents=True, exist_ok=True)
@@ -125,12 +129,13 @@ def create_campaign(
     machine: Machine,
     root: Path,
     active_params: list[str] | None = None,
+    numa: bool = False,
 ) -> uq.Campaign:
     path = campaign_path(root)
     create_dir(path)
     change_dir_permissions(path, 0o755)
 
-    params, vary = default_params(machine, active_params=active_params)
+    params, vary = default_params(machine, active_params=active_params, numa=numa)
     campaign = uq.Campaign(
         name="energy",
         db_location="sqlite:///" + path.as_posix() + "/campaign.db",
@@ -144,7 +149,7 @@ def create_campaign(
         campaign.add_app(
             name=campaign.campaign_name,
             params=params,
-            actions=energy_wraper_actions(program, machine, root),
+            actions=energy_wraper_actions(program, machine, root, numa=numa, active_params=active_params),
         )
         sampler = uq.sampling.SCSampler(
             vary=vary,
@@ -165,12 +170,13 @@ def prepare_campaign(
     root: Path,
     active_params: list[str] | None = None,
     screening_result: MorrisScreeningResult | None = None,
+    numa: bool = False,
 ) -> uq.Campaign:
     """
     Creates a campaign, optionally adds Morris screening runs to the database,
     and runs the first execution.
     """
-    campaign = create_campaign(program, machine, root, active_params=active_params)
+    campaign = create_campaign(program, machine, root, active_params=active_params, numa=numa)
     if screening_result is not None:
         add_morris_runs_to_campaign(campaign, screening_result)
         setattr(campaign, "morris_screening", screening_result)
@@ -284,7 +290,7 @@ def refine_sampling_plan(
             is_significant = any(
                 sobol > thresh
                 for perm, sobol in sobols.items()
-                if (dim + 1) in perm
+                if dim in perm
             )
             if is_significant and order <= 1:
                 return False
@@ -401,6 +407,7 @@ def create(
     morris_include_dummy: bool = True,
     morris_seed: int | None = None,
     resume: bool = False,
+    numa: bool = False,
 ) -> tuple[uq.Campaign, uq.analysis.SCAnalysis]:
     if resume:
         target_dir = Path(dir) if dir else latest_dir(RESULTS_DIR, "energy")
@@ -420,6 +427,11 @@ def create(
     root = run_dir(dir=dir)
     create_dir(root)
 
+    if numa and not machine.has_numa:
+        print("Warning: NUMA balancing requested but not available on this machine (has <= 1 NUMA node).")
+
+    use_numa = (numa or (active_params is not None and "NUMA" in active_params)) and machine.has_numa
+
     screening_result = None
     if screen_morris:
         screening_result = morris_screen(
@@ -431,7 +443,7 @@ def create(
             evaluate_fn=evaluate_fn,
             include_dummy=morris_include_dummy,
             seed=morris_seed,
-            default_params_fn=default_params,
+            default_params_fn=lambda m: default_params(m, numa=use_numa),
         )
         active_params = screening_result.active_params
         screening_result.save(root)
@@ -446,6 +458,7 @@ def create(
         root,
         active_params=active_params,
         screening_result=screening_result,
+        numa=use_numa,
     )
 
     analysis = prepare_analysis(campaign)

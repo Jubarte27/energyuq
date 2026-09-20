@@ -17,11 +17,13 @@ class Machine:
     proc_bind: list[str] = field(default_factory=lambda: ["true", "close", "spread", "false"])
     
     turbo_boost: list[str] = field(default_factory=lambda: ["false", "true"])
+    has_numa: bool = False
     numactl: list[str] = field(default_factory=lambda: ["false", "true"])
     # uncore: list[int] = field(default_factory=lambda: [])
 
 
     boost_setter: str | None = "cpufreq"
+    numa_setter: str | None = "sysctl"
     
     freq_getter: str | None = None
     freq_setter: str | None = None
@@ -115,7 +117,7 @@ def _available_programs(machine: Machine, slurm: bool=True) -> Machine:
     energy_tool = None
     if slurm:
         freq_tool="slurm"
-    if which("cpufreq-set"):
+    elif which("cpufreq-set"):
         freq_tool = "cpufreq-set"
     elif which("cpupower"):
         freq_tool = "cpupower"
@@ -166,6 +168,19 @@ def _check_cray() -> bool:
         for package in ("cpu_energy", "memory_energy")
     ])
 
+def _has_multiple_numa_nodes() -> bool:
+    node_path = Path("/sys/devices/system/node")
+    if not node_path.is_dir():
+        # UMA system or kernel compiled without CONFIG_NUMA
+        return False
+
+    nodes = [
+        entry
+        for entry in node_path.iterdir()
+        if entry.is_dir() and entry.name.startswith("node") and entry.name[4:].isdigit()
+    ]
+    return len(nodes) > 1
+
 def guess_machine() -> Machine:
     """Build a Machine from environment settings, system discovery, and safe defaults.
 
@@ -206,6 +221,7 @@ def guess_machine() -> Machine:
         sub_package=sub_packages,
         places=places,
         proc_bind=proc_bind,
+        has_numa=_has_multiple_numa_nodes(),
     ), slurm)
 
 @dataclass

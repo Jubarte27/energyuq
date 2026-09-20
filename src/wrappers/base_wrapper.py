@@ -1,4 +1,5 @@
 from dataclasses import replace
+from pathlib import Path
 import subprocess
 from sys import stderr
 from typing import Iterable, Union
@@ -17,6 +18,8 @@ def prepare_and_execute(machine: Machine, program: type[Program], params: Execut
 
     cpu_set(machine, params.freq_level)
     set_boost(machine, params.boost)
+    if params.numa is not None and machine.has_numa:
+        set_numa(machine, params.numa)
     
     accum, t = run(machine, program, params, args)
     return report(accum, t)
@@ -38,6 +41,15 @@ def set_boost(machine: Machine, value: int):
             return machine.boost_setter
 
     raise Exception(f"Unable to use {machine.boost_setter} for setting turbo boost, do i have permission?")
+
+def set_numa(machine: Machine, value: int):
+    if machine.numa_setter == "sysctl":
+        numa = "0" if machine.numactl[value] == "false" else "1"
+        if try_exec([["sudo", "/sbin/sysctl", f"kernel.numa_balancing={numa}"]]):
+            return machine.numa_setter
+
+    raise Exception(f"Unable to use {machine.numa_setter} for setting numa balancing, do i have permission?")
+    
 
 def set_freq(machine: Machine, frequency):
     if machine.freq_setter == "cpufreq-set":
@@ -144,26 +156,12 @@ class intel_rapl(EnergyReader):
         return used_energy
 
     def max_energy_range_uj(self, socket) -> int:
-        result = subprocess.run(
-            ["cat", f"/sys/class/powercap/intel-rapl:{socket}/max_energy_range_uj"],
-            capture_output=True,
-            text=True,
-        )
-        output_CompletedProcess(f"max_energy_range_uj:{socket}", result)
-        if result.returncode != 0:
-            raise RuntimeError(f"\"cat /sys/class/powercap/intel-rapl:{socket}/max_energy_range_uj\" failed with exit code:{result.returncode}")
-        return int(result.stdout)
+        result = Path(f"/sys/class/powercap/intel-rapl:{socket}/max_energy_range_uj").read_text()
+        return int(result)
 
     def energy(self, counter) -> int:
-        result = subprocess.run(
-            ["cat", f"/sys/class/powercap/intel-rapl:{counter}/energy_uj"],
-            capture_output=True,
-            text=True,
-        )
-        output_CompletedProcess(f"energy_uj:{counter}", result)
-        if result.returncode != 0:
-            raise RuntimeError(f"\"cat /sys/class/powercap/intel-rapl:{counter}/energy_uj\" failed with exit code:{result.returncode}")
-        return int(result.stdout)
+        result = Path(f"/sys/class/powercap/intel-rapl:{counter}/energy_uj").read_text()
+        return int(result)
     
     def all_energy(self, start: None | list[EnergyReading] = None) -> list[EnergyReading]:
         if start is not None:
@@ -191,16 +189,9 @@ class cray(EnergyReader):
         return int(sum(reading.end - reading.start for reading in readings))
 
     def energy(self, counter) -> int:
-        result = subprocess.run(
-            ["cat", f"/sys/cray/pm_counters/{counter}"],
-            capture_output=True,
-            text=True,
-        )
-        output_CompletedProcess(f"energy_j:{counter}", result)
-        if result.returncode != 0:
-            raise RuntimeError(f"\"cat /sys/cray/pm_counters/{counter}\" failed with exit code:{result.returncode}")
+        result = Path(f"/sys/cray/pm_counters/{counter}").read_text()
         
-        return int(result.stdout.split()[0])  * 1_000_000
+        return int(result.split()[0]) * 1_000_000
     
     def all_energy(self, start: None | list[EnergyReading] = None) -> list[EnergyReading]:
         if start is not None:

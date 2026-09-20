@@ -14,6 +14,7 @@ class  ExecutionParams():
     boost: int
     place_wideness: int
     binding: int
+    numa: int | None = None
 
 
 @dataclass
