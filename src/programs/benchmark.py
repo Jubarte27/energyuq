@@ -9,7 +9,7 @@ class ExecuteSH(Program):
     def run(cls, params: ExecutionParams, args: Iterable[str]) -> CompletedProcess[str]:
         execute = f"{os.path.dirname(__file__)}/../../scripts/run/execute-hpc-benchmarks.sh"
         print(f"Running {cls.name} with {params.n_threads} threads")
-        proc_bind = params.machine.proc_bind[params.affinity_distance]
+        proc_bind = params.machine.proc_bind[params.binding]
         places = params.machine.places[params.place_wideness]
         freq = params.machine.freq[params.freq_level]
         boost = params.machine.turbo_boost[params.boost]

@@ -16,7 +16,7 @@ def main(program: type[Program], machine: Machine, input_file: str = "input.csv"
         n_threads=arg(0),
         freq_level=arg(1),
         place_wideness=arg(2),
-        affinity_distance=arg(3),
+        binding=arg(3),
         boost=arg(4))
 
     result = base_wrapper.prepare_and_execute(machine, program, params, args[5:])

@@ -64,6 +64,8 @@ def _normalize_output(res: Any, qoi: str = QOI) -> dict[str, float]:
         out = {qoi: float(res)}
     else:
         out = {qoi: 0.0}
+    if "EDP" not in out and "energy_uj" in out and "time" in out:
+        out["EDP"] = float((out["energy_uj"] * 1e-6) * out["time"])
     for col in QOIS:
         out.setdefault(col, 1.0)
     return out
@@ -80,9 +82,9 @@ def _format_param_value(machine: Machine, param_name: str, def_idx: int) -> str:
         return f"{def_idx} threads"
     if param_name == "CLK" and 0 <= def_idx < len(machine.freq):
         return f"{machine.freq[def_idx]} Hz (idx {def_idx})"
-    if param_name == "PLACE_WIDE" and 0 <= def_idx < len(machine.places):
+    if param_name == "PLACES" and 0 <= def_idx < len(machine.places):
         return f"{machine.places[def_idx]} (idx {def_idx})"
-    if param_name == "AFF_DISTANCE" and 0 <= def_idx < len(machine.proc_bind):
+    if param_name == "BINDING" and 0 <= def_idx < len(machine.proc_bind):
         return f"{machine.proc_bind[def_idx]} (idx {def_idx})"
     if param_name == "BOOST" and 0 <= def_idx < len(machine.turbo_boost):
         return f"{machine.turbo_boost[def_idx]} (idx {def_idx})"
@@ -340,8 +342,8 @@ def morris_screen(
                 machine=machine,
                 n_threads=point["N_THREADS"],
                 freq_level=point["CLK"],
-                place_wideness=point["PLACE_WIDE"],
-                affinity_distance=point["AFF_DISTANCE"],
+                place_wideness=point["PLACES"],
+                binding=point["BINDING"],
                 boost=point["BOOST"],
             )
             return base_wrapper.prepare_and_execute(machine, program, execution_params, [])

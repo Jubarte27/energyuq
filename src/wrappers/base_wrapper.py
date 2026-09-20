@@ -97,7 +97,7 @@ def report(used_energy: int, elapsed: float):
 
     return {
         "energy_uj": used_energy,
-        "energy_scaled": used_energy, #arrumar
+        "EDP": float((used_energy * 1e-6) * elapsed),
         "time": elapsed
     }
 class EnergyReader(ABC):

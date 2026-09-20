@@ -13,7 +13,7 @@ class  ExecutionParams():
     freq_level: int
     boost: int
     place_wideness: int
-    affinity_distance: int
+    binding: int
 
 
 @dataclass

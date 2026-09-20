@@ -63,15 +63,15 @@ def default_params(
     params: params_type = {
         "N_THREADS": {"type": "integer", "default": machine.max_threads},
         "CLK": {"type": "integer", "default": len(machine.freq) - 1},
-        "PLACE_WIDE": {"type": "integer", "default": len(machine.places) - 1},
-        "AFF_DISTANCE": {"type": "integer", "default": len(machine.proc_bind) - 1},
+        "PLACES": {"type": "integer", "default": len(machine.places) - 1},
+        "BINDING": {"type": "integer", "default": len(machine.proc_bind) - 1},
         "BOOST": {"type": "integer", "default": len(machine.turbo_boost) - 1},
     }
     all_vary = {
         "N_THREADS": cp.DiscreteUniform(1, machine.max_threads),
         "CLK": cp.DiscreteUniform(0, len(machine.freq) - 1),
-        "PLACE_WIDE": cp.DiscreteUniform(0, len(machine.places) - 1),
-        "AFF_DISTANCE": cp.DiscreteUniform(0, len(machine.proc_bind) - 1),
+        "PLACES": cp.DiscreteUniform(0, len(machine.places) - 1),
+        "BINDING": cp.DiscreteUniform(0, len(machine.proc_bind) - 1),
         "BOOST": cp.DiscreteUniform(0, len(machine.turbo_boost) - 1),
     }
     active_set = set(active_params) if active_params is not None else set(all_vary.keys())

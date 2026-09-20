@@ -35,7 +35,7 @@ class TestMorrisScreening(unittest.TestCase):
 
     def test_morris_screening_identifies_unimportant_variables(self):
         # Synthetic evaluation: Only N_THREADS and CLK affect the energy output.
-        # PLACE_WIDE, AFF_DISTANCE, and BOOST have ZERO effect.
+        # PLACES, BINDING, and BOOST have ZERO effect.
         def mock_evaluate(point: dict[str, int]) -> dict[str, float]:
             return {
                 "energy_uj": float(point["N_THREADS"] * 500.0 + point["CLK"] * 100.0 + 50.0),
@@ -53,14 +53,14 @@ class TestMorrisScreening(unittest.TestCase):
 
         self.assertIn("N_THREADS", result.active_params)
         self.assertIn("CLK", result.active_params)
-        self.assertIn("PLACE_WIDE", result.ignored_params)
-        self.assertIn("AFF_DISTANCE", result.ignored_params)
+        self.assertIn("PLACES", result.ignored_params)
+        self.assertIn("BINDING", result.ignored_params)
         self.assertIn("BOOST", result.ignored_params)
 
         self.assertGreater(result.mu_star["N_THREADS"], 0.0)
         self.assertGreater(result.mu_star["CLK"], 0.0)
-        self.assertEqual(result.mu_star["PLACE_WIDE"], 0.0)
-        self.assertEqual(result.mu_star["AFF_DISTANCE"], 0.0)
+        self.assertEqual(result.mu_star["PLACES"], 0.0)
+        self.assertEqual(result.mu_star["BINDING"], 0.0)
         self.assertEqual(result.mu_star["BOOST"], 0.0)
 
         # Test serialization
@@ -78,7 +78,7 @@ class TestMorrisScreening(unittest.TestCase):
             self.assertEqual(loaded_result.active_params, result.active_params)
             self.assertEqual(loaded_result.ignored_params, result.ignored_params)
             self.assertEqual(loaded_result.frozen_params, result.frozen_params)
-            self.assertIn("PLACE_WIDE", loaded_result.frozen_details)
+            self.assertIn("PLACES", loaded_result.frozen_details)
             self.assertTrue(len(loaded_result.summary()) > 0)
 
     def test_morris_screening_with_constant_bounds(self):
@@ -105,7 +105,7 @@ class TestMorrisScreening(unittest.TestCase):
         )
 
         self.assertEqual(result.mu_star["BOOST"], 0.0)
-        self.assertEqual(result.mu_star["PLACE_WIDE"], 0.0)
+        self.assertEqual(result.mu_star["PLACES"], 0.0)
         self.assertIn("N_THREADS", result.active_params)
 
     def test_campaign_creation_with_active_params(self):
@@ -175,7 +175,7 @@ class TestMorrisScreening(unittest.TestCase):
                 clk = vals[1] if len(vals) > 1 else 0
                 energy = float(n_threads * 100.0 + clk * 20.0)
                 with open(output_file, "w") as f:
-                    f.write("energy_uj,energy_scaled,time\n")
+                    f.write("energy_uj,EDP,time\n")
                     f.write(f"{energy},1.0,1.0\n")
 
             import unittest.mock as mock
@@ -202,17 +202,17 @@ class TestMorrisScreening(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             # Include an uninfluential parameter in vary
-            active_params = ["N_THREADS", "PLACE_WIDE"]
+            active_params = ["N_THREADS", "PLACES"]
 
             def mock_easy_wrapper(program, machine, input_file="input.csv", output_file="output.csv"):
                 with open(input_file, "r") as f:
                     line = f.readline().strip()
                 vals = [float(x) for x in line.split(",") if x.strip()]
                 n_threads = vals[0]
-                # PLACE_WIDE has 0 effect on energy
+                # PLACES has 0 effect on energy
                 energy = float(n_threads * 100.0 + 50.0)
                 with open(output_file, "w") as f:
-                    f.write("energy_uj,energy_scaled,time\n")
+                    f.write("energy_uj,EDP,time\n")
                     f.write(f"{energy},1.0,1.0\n")
 
             import unittest.mock as mock
@@ -241,7 +241,7 @@ class TestMorrisScreening(unittest.TestCase):
             root = Path(tmpdir)
 
             def mock_eval(pt):
-                return {"energy_uj": float(pt["N_THREADS"] * 100.0), "energy_scaled": 1.0, "time": 1.0}
+                return {"energy_uj": float(pt["N_THREADS"] * 100.0), "EDP": 1.0, "time": 1.0}
 
             result = energyuq.morris_screen(
                 NONE,
@@ -269,14 +269,14 @@ class TestMorrisScreening(unittest.TestCase):
             root = Path(tmpdir)
 
             def mock_eval(pt):
-                return {"energy_uj": float(pt["N_THREADS"] * 100.0 + pt["CLK"] * 20.0), "energy_scaled": 1.0, "time": 1.0}
+                return {"energy_uj": float(pt["N_THREADS"] * 100.0 + pt["CLK"] * 20.0), "EDP": 1.0, "time": 1.0}
 
             def mock_easy_wrapper(program, machine, input_file="input.csv", output_file="output.csv"):
                 with open(input_file, "r") as f:
                     vals = [float(x) for x in f.readline().split(",") if x.strip()]
                 energy = float(vals[0] * 100.0 + vals[1] * 20.0)
                 with open(output_file, "w") as f:
-                    f.write(f"energy_uj,energy_scaled,time\n{energy},1.0,1.0\n")
+                    f.write(f"energy_uj,EDP,time\n{energy},1.0,1.0\n")
 
             import unittest.mock as mock
             with mock.patch("src.wrappers.easy_wrapper.main", side_effect=mock_easy_wrapper):

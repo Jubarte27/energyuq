@@ -4,6 +4,7 @@ import pickle
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Sequence, Union, cast
+from matplotlib.figure import Figure
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -101,10 +102,10 @@ class RunData:
 
             # Auto-detect QoIs and input params if defaults aren't fully matching
             existing_cols = set(self.df.columns)
-            potential_qois = ["energy_uj", "energy_j", "energy_scaled", "time", "power_w", "edp_j_s"]
+            potential_qois = ["energy_uj", "energy_j", "EDP", "energy_scaled", "time", "power_w", "edp_j_s"]
             self.qois = [q for q in potential_qois if q in existing_cols]
 
-            potential_inputs = ["N_THREADS", "CLK", "THREADS", "CLK_LEVEL", "POWER_CAP", "PLACE_WIDE", "AFF_DISTANCE"]
+            potential_inputs = ["N_THREADS", "CLK", "THREADS", "CLK_LEVEL", "POWER_CAP", "PLACES", "BINDING"]
             detected_inputs = [p for p in potential_inputs if p in existing_cols]
             if detected_inputs:
                 self.input_params = detected_inputs
@@ -309,7 +310,7 @@ class RunData:
                     if not hasattr(self.results, "qois") or qoi in self.results.qois:
                         from unittest.mock import patch
                         with patch("matplotlib.pyplot.show", lambda *args, **kwargs: None), \
-                             patch.object(plt.Figure, "show", lambda self: None):
+                             patch.object(Figure, "show", lambda self: None):
                             self.results.plot_sobols_treemap(qoi)
                         fig_tm = plt.gcf()
                         if len(fig_tm.axes) > 0:

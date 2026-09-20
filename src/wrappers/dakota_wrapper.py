@@ -15,7 +15,10 @@ def main(program: type[Program], machine: Machine, parameters: interfacing.Param
     result = base_wrapper.prepare_and_execute(machine, program, params, [])
 
     results["energy_uj"].function = result["energy_uj"]
-    results["energy_scaled"].function = result["energy_scaled"]
+    if "EDP" in results and "EDP" in result:
+        results["EDP"].function = result["EDP"]
+    elif "energy_scaled" in results and "energy_scaled" in result:
+        results["energy_scaled"].function = result["energy_scaled"]
     results["time"].function = result["time"]
 
     results.write()

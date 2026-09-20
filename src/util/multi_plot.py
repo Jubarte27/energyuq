@@ -23,8 +23,8 @@ def _to_run_list(runs: RunsInput) -> list[RunData]:
 def _format_qoi_label(qoi: str | Callable[..., Any]) -> str:
     """Format QoI column name or callable into a clean publication label."""
     if callable(qoi):
-        if hasattr(qoi, "name") and isinstance(qoi.name, str) and qoi.name:
-            return _format_qoi_label(qoi.name)
+        if hasattr(qoi, "name") and isinstance(qoi.name, str) and qoi.name: # type: ignore
+            return _format_qoi_label(qoi.name) # type: ignore
         name = getattr(qoi, "__name__", "")
         if not name or name == "<lambda>":
             return "Computed Metric"
@@ -33,6 +33,7 @@ def _format_qoi_label(qoi: str | Callable[..., Any]) -> str:
         "energy_uj": r"Energy ($\mu$J)",
         "energy_j": "Energy (J)",
         "energy_scaled": "Scaled Energy",
+        "EDP": "Energy-Delay Product (J·s)",
         "time": "Execution Time (s)",
         "power_w": "Power (W)",
         "edp_j_s": "Energy-Delay Product (J·s)",
@@ -578,7 +579,7 @@ def _evaluate_qoi_callable(
                 return None
         if isinstance(res, (pd.Series, np.ndarray, list, tuple)):
             if len(res) == len(df):
-                raw_vals = res.values if hasattr(res, "values") else np.asarray(res)
+                raw_vals = res.values if hasattr(res, "values") else np.asarray(res) # type: ignore
                 s = pd.to_numeric(pd.Series(raw_vals, index=df.index), errors="coerce")
                 return s.replace([np.inf, -np.inf], np.nan)
         elif len(df) == 1 and isinstance(res, (int, float, np.number)):
@@ -713,7 +714,7 @@ def plot_multi_parameter_effects(
                 from .plot import get_unit_converter
                 _, p_conv = get_unit_converter(param, units)
                 if p_conv is not None:
-                    r_df[param] = r_df[param].map(lambda v: p_conv(float(v)) if not pd.isna(v) else v)
+                    r_df[param] = r_df[param].map(lambda v: p_conv(float(v)) if not pd.isna(v) else v) # type: ignore
 
             r_df = r_df.dropna(subset=[param, target_col])
             if r_df.empty:
