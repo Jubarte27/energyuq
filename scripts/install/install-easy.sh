@@ -2,6 +2,7 @@
 set -e
 main() {
     set_log_depth 0
+    ensure install_uv
     ensure create_venv
     ensure install_local_easyvvuq
     # ensure install_jupyter
@@ -32,16 +33,15 @@ _setConfigArgs() {
 
 create_venv() {
     enter_new_func "Creating python venv"
+    install_uv
     
     if [ ! -f "$VENV_DIR/bin/activate" ]; then
-        python3 -m venv "$VENV_DIR"
+        uv venv "$VENV_DIR"
     fi
     
     # shellcheck disable=SC1091
     source "$VENV_DIR/bin/activate"
-    which pip
-    pip install --upgrade pip
-    pip install -r "$VENV_DIR/../requirements.txt"
+    uv pip install -e "$PROJECT_DIR"
 }
 
 install_local_easyvvuq() {
@@ -51,14 +51,14 @@ install_local_easyvvuq() {
     if [ ! -f "$EasyVVUQ_DIR/requirements.txt" ]; then
         git submodule update --init "$EasyVVUQ_DIR" "$PROJECT_DIR/hpc-benchmarks"
     fi
-    pip install setuptools wheel build
-    pip install -e "$EasyVVUQ_DIR"
+    uv pip install setuptools wheel build
+    uv pip install -e "$EasyVVUQ_DIR"
 }
 
 install_jupyter() {
     enter_new_func "Installing jupyter"
 
-    pip install jupyter notebook
+    uv pip install -e "$PROJECT_DIR[jupyter]"
 }
 
 python39() {

@@ -2,6 +2,7 @@
 main() {
     set_log_depth 0
     ensure python_install
+    ensure install_uv
     ensure create_venv
     ensure install_jupyter
 }
@@ -24,22 +25,22 @@ _setConfigArgs() {
 
 create_venv() {
     enter_new_func "Creating python venv"
+    install_uv
     
     if [ ! -f "$PROJECT_DIR/.venv/bin/activate" ]; then
-        python3 -m venv "$PROJECT_DIR/.venv"
+        uv venv "$PROJECT_DIR/.venv"
     fi
     
     # shellcheck disable=SC1091
     source "$PROJECT_DIR/.venv/bin/activate"
 
-    pip install --upgrade pip
-    pip install -r "$PROJECT_DIR/requirements.txt"
+    uv pip install -e "$PROJECT_DIR"
 }
 
 install_jupyter() {
     enter_new_func "Installing jupyter"
 
-    pip install jupyter notebook
+    uv pip install -e "$PROJECT_DIR[jupyter]"
 }
 
 python_install() {

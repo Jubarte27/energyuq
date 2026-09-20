@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "energyuq"
+version = "0.1.0"
+description = "Uncertainty Quantification for Energy & Performance in HPC"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "chaospy",
+    "dill",
+    "matplotlib",
+    "msgpack",
+    "numpy",
+    "pandas",
+    "python-dotenv",
+    "SALib",
+    "scipy",
+    "setuptools==81.0.0",
+]
+
+[project.optional-dependencies]
+jupyter = [
+    "jupyter",
+    "notebook",
+]
+dakota = [
+    "h5py",
+    "myst-parser",
+    "numpy",
+    "scipy",
+    "sphinx",
+    "sphinx-rtd-theme",
+    "sphinxcontrib-bibtex",
+]
+dev = [
+    "pytest",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+

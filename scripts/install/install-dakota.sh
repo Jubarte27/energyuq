@@ -5,6 +5,7 @@ main() {
     set_log_depth 0
     ensure install_deps
     ensure install_python
+    ensure install_uv
     ensure create_venv
     ensure install_dakota
 
@@ -159,16 +160,16 @@ get_dev() {
 
 create_venv() {
     enter_new_func "Creating python venv"
+    install_uv
     
     if [ ! -f "$DAK_VENV/bin/activate" ]; then
         ensure cd "$BASE_DIR"
-        python3 -m venv "$DAK_VENV"
+        uv venv "$DAK_VENV"
     fi
     
     # shellcheck disable=SC1091
     source "$DAK_VENV/bin/activate"
-    pip install --upgrade pip
-    pip install sphinx myst-parser sphinx-rtd-theme sphinxcontrib-bibtex h5py scipy numpy
+    uv pip install -e "$PROJECT_DIR[dakota]"
 }
 
 install_python() {
@@ -182,11 +183,6 @@ install_python() {
     else
         pyenv install --skip-existing 3.14
         pyenv local 3.14
-    fi
-
-    # do i need this?
-    if ! python3 -m pip &> /dev/null; then
-        python3 -m ensurepip --upgrade
     fi
 }
 
