@@ -66,6 +66,9 @@ def set_freq(machine: Machine, frequency):
         ]):
             return machine.freq_setter
 
+    if machine.freq_getter == "slurm":
+        return machine.freq_setter
+
     raise Exception(f"Unable to use {machine.freq_setter} for setting cpu frequency, do i have permission?")
 
 def cpu_set(machine: Machine, freq_level: int):
