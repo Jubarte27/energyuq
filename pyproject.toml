@@ -26,15 +26,6 @@ jupyter = [
     "jupyter",
     "notebook",
 ]
-dakota = [
-    "h5py",
-    "myst-parser",
-    "numpy",
-    "scipy",
-    "sphinx",
-    "sphinx-rtd-theme",
-    "sphinxcontrib-bibtex",
-]
 dev = [
     "pytest",
 ]

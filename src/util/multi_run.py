@@ -509,7 +509,7 @@ def load_run(
     campaign_name: str = "energy",
 ) -> RunData:
     """
-    Load a single run directory containing an EasyVVUQ campaign, Dakota results, or compilation CSV.
+    Load a single run directory containing an EasyVVUQ campaign, or compilation CSV.
     """
     p = Path(path).resolve()
     if not p.is_dir():
