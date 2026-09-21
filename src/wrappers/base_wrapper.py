@@ -3,8 +3,8 @@ from pathlib import Path
 import subprocess
 from sys import stderr
 from typing import Iterable, Union
-from ..programs import *
-from ..machines import *
+from ..programs import Program
+from ..machines import Machine
 from ..util.data import ExecutionParams, EnergyReading
 from time import perf_counter
 from abc import ABC, abstractmethod

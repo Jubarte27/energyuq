@@ -16,11 +16,11 @@ import numpy as np
 from SALib.analyze import morris as morris_analyzer
 from SALib.sample import morris as morris_sampler
 
-from ..machines.machine import Machine
-from ..programs.program import Program
-from ..wrappers import base_wrapper
-from .constants import QOI, QOIS, params_type, vary_type
-from .data import ExecutionParams
+from .machines.machine import Machine
+from .programs.program import Program
+from .wrappers import base_wrapper
+from .util.constants import QOI, QOIS, params_type, vary_type
+from .util.data import ExecutionParams
 
 
 def create_dir(path: Path | str) -> Path:
@@ -275,7 +275,7 @@ def morris_screen(
     default_params_fn: Callable[..., tuple[params_type, vary_type]] | None = None,
 ) -> MorrisScreeningResult:
     if default_params_fn is None:
-        from ..energyuq import default_params
+        from .energyuq import default_params
         default_params_fn = default_params
 
     defaults_dict, all_vary = default_params_fn(machine)

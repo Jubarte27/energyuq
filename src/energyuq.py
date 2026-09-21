@@ -18,7 +18,7 @@ import numpy as np
 from .machines.machine import Machine
 from .programs.program import Program
 from .util.constants import QOI, QOIS, RESULTS_DIR, params_type, vary_type
-from .util.morris import (
+from .morris import (
     MorrisScreeningResult,
     _msgpack_default,
     _pack,

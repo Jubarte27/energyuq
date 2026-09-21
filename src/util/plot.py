@@ -1,7 +1,8 @@
+from collections.abc import Callable
 from math import floor, ceil, sqrt
-from typing import Sequence
+from typing import Any, Sequence
 
-from matplotlib.figure import SubFigure
+from matplotlib.figure import Figure, SubFigure
 import numpy as np
 
 import matplotlib.pyplot as plt
@@ -14,14 +15,18 @@ import pandas as pd
 from pandas import DataFrame
 
 from .. import energyuq
-
 from ..machines.machine import Machine
-from .data import *
+from .data import EasyResult, Result, limit
+
 
 def pad_to_even_and_split(arr: np.ndarray, value=None) -> np.ndarray:
+    arr = np.asarray(arr)
     pad_by = arr.shape[-1] % 2
-    new_shape = [*arr.shape[:-1], 2, -1]
-    return np.pad(arr, (0, pad_by), mode='constant', constant_values=value).reshape(new_shape)
+    pad_width = [(0, 0)] * (arr.ndim - 1) + [(0, pad_by)]
+    padded = np.pad(arr, pad_width, mode='constant', constant_values=value)
+    new_shape = [*padded.shape[:-1], -1, 2]
+    return padded.reshape(new_shape).swapaxes(-2, -1)
+
 
 def mostly_square_grid(blocks: int, total_width: float, min_block_width: float):
     max_col = floor(total_width / min_block_width)
@@ -31,7 +36,6 @@ def mostly_square_grid(blocks: int, total_width: float, min_block_width: float):
     total_height = rows * total_width
     return (cols, rows), (total_width, total_height)
 
-current_machine: Machine | None = None
 
 SI_PREFIX_FACTORS: dict[str, float] = {
     "p": 1e-12,
@@ -48,6 +52,7 @@ SI_PREFIX_FACTORS: dict[str, float] = {
     "G": 1e9,
     "T": 1e12,
 }
+
 
 def parse_unit_spec(spec: Any) -> tuple[str | None, str | None, float | Callable[[float], float] | None]:
     """
@@ -99,172 +104,9 @@ def parse_unit_spec(spec: Any) -> tuple[str | None, str | None, float | Callable
         return None, s, None
     return None, str(spec).strip(), None
 
+
 DEFAULT_PARAM_UNITS: dict[str, Any] = {"CLK": "Hz"}
-param_units: dict[str, Any] = dict(DEFAULT_PARAM_UNITS)
 
-def set_param_units(units: dict[str, Any]):
-    global param_units, nd_labels
-    param_units = dict(units)
-    if "labels" in globals() and labels is not None and len(labels) > 0:
-        axis_labels = np.array([get_axis_label(lbl) for lbl in labels], dtype=str)
-        nd_labels = pad_to_even_and_split(axis_labels)
-
-set_units = set_param_units
-
-def get_unit(param: str, units: dict[str, Any] | None = None) -> Any:
-    def _find_in_dict(p: str, d: dict[str, Any]) -> tuple[bool, Any]:
-        if p in d:
-            return True, d[p]
-        for k, v in d.items():
-            if k.upper() == p.upper():
-                return True, v
-        if p.upper() == "CLK_LEVEL":
-            for k, v in d.items():
-                if k.upper() == "CLK":
-                    return True, v
-        if p.upper() == "CLK":
-            for k, v in d.items():
-                if k.upper() == "CLK_LEVEL":
-                    return True, v
-        return False, None
-
-    if units is not None:
-        found, val = _find_in_dict(param, units)
-        if found:
-            return val
-    found, val = _find_in_dict(param, param_units)
-    if found:
-        return val
-    return None
-
-def get_unit_converter(param: str, units: dict[str, Any] | None = None) -> tuple[str | None, Callable[[float], float] | None]:
-    """
-    Returns (display_unit, convert_function) for the specified parameter.
-    If no conversion is needed, convert_function is None.
-    """
-    spec = get_unit(param, units)
-    if spec is None:
-        return None, None
-
-    from_u, to_u, explicit_scale = parse_unit_spec(spec)
-
-    if callable(explicit_scale):
-        return to_u, explicit_scale
-
-    if isinstance(explicit_scale, (int, float)):
-        factor = float(explicit_scale)
-        return to_u, (lambda v: v * factor)
-
-    target_unit = to_u or from_u
-    if target_unit is None or target_unit.lower() in ("none", ""):
-        return None, None
-
-    # Frequency / CLK handling: machine.freq is in kHz (e.g. 1400000 = 1.4 GHz)
-    if param.upper() in ("CLK", "CLK_LEVEL"):
-        target_lower = target_unit.lower()
-        if target_lower == "ghz":
-            return target_unit, (lambda v: v * 1e-6)
-        elif target_lower == "mhz":
-            return target_unit, (lambda v: v * 1e-3)
-        elif target_lower == "khz":
-            return target_unit, (lambda v: v * 1.0)
-        elif target_lower == "hz":
-            if from_u and from_u.lower() == "khz":
-                return target_unit, (lambda v: v * 1e3)
-            return target_unit, None
-        else:
-            return target_unit, None
-
-    # General SI prefix conversion
-    if from_u and to_u and from_u != to_u:
-        for p_from, f_from in SI_PREFIX_FACTORS.items():
-            for p_to, f_to in SI_PREFIX_FACTORS.items():
-                if from_u.startswith(p_from) and to_u.startswith(p_to):
-                    base_from = from_u[len(p_from):]
-                    base_to = to_u[len(p_to):]
-                    if base_from == base_to:
-                        factor = f_from / f_to
-                        return target_unit, (lambda v: v * factor)
-
-    return target_unit, None
-
-def get_axis_label(param: str, units: dict[str, Any] | None = None) -> str:
-    target_unit, _ = get_unit_converter(param, units)
-    if target_unit is not None and str(target_unit).strip().lower() not in ("", "none"):
-        return f"{param} ({str(target_unit).strip()})"
-    return str(param)
-
-def to_real_clk(val, mach: Machine | None = None, units: dict[str, Any] | None = None):
-    if mach is None:
-        mach = current_machine
-    if mach is None or not hasattr(mach, "freq") or not mach.freq:
-        return val
-    try:
-        if pd.isna(val):
-            return val
-        f_val = float(val)
-        _, conv_fn = get_unit_converter("CLK", units)
-        scale_fn = conv_fn if conv_fn is not None else (lambda v: v)
-
-        # 1. Non-integer float with fractional part (e.g. 1.4, 2.3):
-        # Indices are strictly integers (0, 1, 2...), so a fractional value
-        # is already a converted frequency (e.g. in GHz).
-        if not np.isclose(f_val, round(f_val)):
-            return val
-
-        # 2. Raw frequency in kHz (e.g. 1400000):
-        min_raw = min(mach.freq) if mach.freq else 1e5
-        if f_val >= min_raw * 0.5:
-            return scale_fn(f_val if conv_fn is not None else int(round(f_val)))
-
-        # 3. Frequency already converted to MHz (e.g. 1400):
-        # If f_val > len(mach.freq) and f_val < min_raw * 0.5:
-        # It's larger than any valid index, but smaller than raw kHz.
-        if f_val >= len(mach.freq):
-            return val
-
-        # 4. Discrete index (0 <= i_val < len(mach.freq)):
-        i_val = int(round(f_val))
-        if 0 <= i_val < len(mach.freq):
-            real_val = mach.freq[i_val]
-            return scale_fn(real_val)
-
-        return val
-    except Exception:
-        pass
-    return val
-
-def convert_clk_series(series: pd.Series, mach: Machine | None = None, units: dict[str, Any] | None = None) -> pd.Series:
-    if mach is None:
-        mach = current_machine
-    if mach is None or not hasattr(mach, "freq") or not mach.freq:
-        return series
-    clean = series.dropna()
-    if clean.empty:
-        return series
-
-    # If series already has fractional numbers, it is already converted (e.g. to GHz)
-    if not np.all(np.isclose(clean, np.round(clean))):
-        return series
-
-    # If values are larger than index count but smaller than raw frequency, already converted (e.g. to MHz)
-    min_raw = min(mach.freq) if mach.freq else 1e5
-    if clean.min() >= len(mach.freq) and clean.max() < min_raw * 0.5:
-        return series
-
-    return series.map(lambda v: to_real_clk(v, mach, units))
-
-def convert_clk_df(df: DataFrame, mach: Machine | None = None, units: dict[str, Any] | None = None) -> DataFrame:
-    if mach is None:
-        mach = current_machine
-    if mach is None or not hasattr(mach, "freq") or not mach.freq:
-        return df
-    df_copy = df.copy()
-    for col in df_copy.columns:
-        col_name = col[0] if isinstance(col, tuple) else col
-        if str(col_name).upper() in ("CLK", "CLK_LEVEL"):
-            df_copy[col] = convert_clk_series(df_copy[col], mach, units)
-    return df_copy
 
 def _is_integer_range(lower: Any, upper: Any) -> bool:
     try:
@@ -276,585 +118,961 @@ def _is_integer_range(lower: Any, upper: Any) -> bool:
     except Exception:
         return False
 
+
 def get_machine(result: Any = None) -> Machine | None:
+    """Retrieve Machine instance associated with result or campaign."""
     if result is not None:
         if hasattr(result, "machine") and isinstance(result.machine, Machine):
             return result.machine
         if hasattr(result, "sampler") and hasattr(result.sampler, "machine") and isinstance(result.sampler.machine, Machine):
             return result.sampler.machine
-    return current_machine
-
-def _ensure_real_clk_limits(mach: Machine | None = None, units: dict[str, Any] | None = None):
-    global values, nd_values
-    if mach is None:
-        mach = current_machine
-    if mach is None or not hasattr(mach, "freq") or not mach.freq:
-        return
-    if "labels" not in globals() or labels is None:
-        return
-    _, conv_fn = get_unit_converter("CLK", units)
-    min_val = min(mach.freq)
-    max_val = max(mach.freq)
-    if conv_fn is not None:
-        min_val = conv_fn(min_val)
-        max_val = conv_fn(max_val)
-
-    new_values = []
-    for lbl, val in zip(labels, values):
-        if str(lbl).upper() in ("CLK", "CLK_LEVEL"):
-            new_values.append(limit(lower=min_val, upper=max_val))
-        else:
-            new_values.append(val)
-    values = np.array(new_values, dtype=limit)
-    nd_values = pad_to_even_and_split(values)
-
-def init(mach: Machine, units: dict[str, Any] | None = None):
-    global current_machine
-    current_machine = mach
-    _, vary = energyuq.default_params(mach)
-    global labels, values, grid_fig_size, L, C, R, full_rows, nd_labels, nd_values, legend_handles
-
-    _, conv_fn = get_unit_converter("CLK", units)
-    min_freq = min(mach.freq) if (hasattr(mach, "freq") and mach.freq) else 0
-    max_freq = max(mach.freq) if (hasattr(mach, "freq") and mach.freq) else 0
-    if conv_fn is not None:
-        min_freq = conv_fn(min_freq)
-        max_freq = conv_fn(max_freq)
-
-    limits = {}
-    for k, v in vary.items():
-        if str(k).upper() in ("CLK", "CLK_LEVEL") and hasattr(mach, "freq") and mach.freq:
-            limits[k] = limit(lower=min_freq, upper=max_freq)
-        else:
-            limits[k] = limit(lower=int(v.lower), upper=int(v.upper))
-
-    labels = np.array(list(limits.keys()), dtype=str)
-    values = np.array(list(limits.values()), dtype=limit)
-
-    L = (labels.size+1)//2
-    (C, R), grid_fig_size = mostly_square_grid(L, 6, 2)
-    full_rows = L // C
-
-    nd_values = pad_to_even_and_split(values)
-    axis_labels = np.array([get_axis_label(lbl, units) for lbl in labels], dtype=str)
-    nd_labels = pad_to_even_and_split(axis_labels)
-
-    more_red = Line2D([0], [0], color='red', lw=2, marker="o", linestyle='')
-    more_blue = Line2D([0], [0], color='blue', lw=2, marker="o", linestyle='')
-
-    legend_handles = [more_red, more_blue]
-
-def colors_for(qoi) -> dict[str, tuple[str,str,str,str]]:
-    return {
-        'high_low': ('#0000ff', f'lower {qoi}', '#ff0000', f'higher {qoi}'),
-        'highest_lowest': ( '#0000ff00', f'lowest {qoi}', '#0000ff', f'highest {qoi}'),
-    }
-
-def key_for(result, qoi) -> str | tuple[str, int]:
-    if hasattr(result, "df") and hasattr(result.df, "columns"):
-        if isinstance(result.df.columns, pd.MultiIndex) and (qoi, 0) in result.df.columns:
-            return (qoi, 0)
-        if qoi in result.df.columns:
-            return qoi
-    if isinstance(result, EasyResult):
-        return (qoi, 0)
-    return qoi
+        if hasattr(result, "campaign") and hasattr(result.campaign, "machine") and isinstance(result.campaign.machine, Machine):
+            return result.campaign.machine
+    return None
 
 
-
-def plot_grid_2D(result: EasyResult, units: dict[str, str | None] | None = None):
-    analysis = result.analysis
-    sampler = result.sampler
-
-    mach = get_machine(result)
-    _ensure_real_clk_limits(mach, units)
-
-    fig = plt.figure(figsize=grid_fig_size, layout="constrained")
-    fig.supylabel("Configurations chosen")
-
-    ax=[]
-    i = 0
-    cols = C
-    index = lambda: i + 1
-    axis_labels = np.array([get_axis_label(lbl, units) for lbl in labels], dtype=str)
-    cur_nd_labels = pad_to_even_and_split(axis_labels)
-    for _ in range(full_rows):
-        if R > full_rows:
-            cols = L % C
-            index = lambda: R * cols - (R * C - i)
-        for _ in range(cols):
-            xd = nd_values[0, i].upper - nd_values[0, i].lower
-            yd = nd_values[1, i].upper - nd_values[1, i].lower
-            ax.append(fig.add_subplot(R, cols, index(),
-                                    xlim=[nd_values[0, i].lower - xd/10, nd_values[0, i].upper + xd/10],
-                                    ylim=[nd_values[1, i].lower - yd/10, nd_values[1, i].upper + yd/10], 
-                                    xlabel=cur_nd_labels[0, i], ylabel=cur_nd_labels[1, i])
-                    )
-            x_is_int = _is_integer_range(nd_values[0, i].lower, nd_values[0, i].upper)
-            y_is_int = _is_integer_range(nd_values[1, i].lower, nd_values[1, i].upper)
-            ax[-1].xaxis.set_major_locator(MaxNLocator(integer=x_is_int))
-            ax[-1].yaxis.set_major_locator(MaxNLocator(integer=y_is_int))
-            i += 1
-
-    raw_grid = sampler.generate_grid(analysis.l_norm).astype(object)
-    if raw_grid.ndim == 2:
-        if raw_grid.shape[1] == len(labels):
-            for col_idx, lbl in enumerate(labels):
-                if str(lbl).upper() in ("CLK", "CLK_LEVEL") and mach is not None and hasattr(mach, "freq"):
-                    raw_grid[:, col_idx] = [to_real_clk(v, mach, units) for v in raw_grid[:, col_idx]]
-        elif raw_grid.shape[0] == len(labels):
-            for row_idx, lbl in enumerate(labels):
-                if str(lbl).upper() in ("CLK", "CLK_LEVEL") and mach is not None and hasattr(mach, "freq"):
-                    raw_grid[row_idx, :] = [to_real_clk(v, mach, units) for v in raw_grid[row_idx, :]]
-
-    accepted_grid = pad_to_even_and_split(raw_grid)
-    ic=0
-    for i in range(L):
-        ax[i].plot(accepted_grid[:,0, ic], accepted_grid[:,1,ic], 'o', alpha=0.25)
-        ic += 1
-    # plt.tight_layout()
-    return fig
-
-
-def plot_grid_2D_best(result: Result, qoi=None, order_focus=False, subfig=None, units: dict[str, str | None] | None = None):
-    if qoi is None:
-        qoi = result.qois[0]
-    key = key_for(result, qoi)
-    mach = get_machine(result)
-    _ensure_real_clk_limits(mach, units)
-    df = convert_clk_df(result.df, mach, units)
-
-    pretty_colors = colors_for(qoi)
-
-    if subfig is None:
-        fig = plt.figure(figsize=grid_fig_size, layout="constrained")
-        fig.supylabel(f"Configurations evaluated by {qoi}")
-    else:
-        fig = subfig
+class Plotter:
+    """
+    Self-contained plotter for single-run and multi-dimensional EnergyUQ evaluation results.
     
-    try:
-        ax=[]
+    Encapsulates all visualization logic, machine parameter scaling, axis bound calculations,
+    and figure formatting without relying on global state.
+    """
+
+    def __init__(
+        self,
+        machine: Machine | None = None,
+        units: dict[str, Any] | None = None,
+        active_params: list[str] | None = None,
+    ):
+        self.machine: Machine | None = machine
+        self.units: dict[str, Any] = dict(DEFAULT_PARAM_UNITS)
+        if units:
+            self.units.update(units)
+        self.active_params: list[str] | None = list(active_params) if active_params else None
+
+        self.labels: np.ndarray = np.array([], dtype=str)
+        self.values: np.ndarray = np.array([], dtype=limit)
+        self.nd_labels: np.ndarray = np.array([])
+        self.nd_values: np.ndarray = np.array([])
+        self.grid_fig_size: tuple[float, float] = (6.0, 6.0)
+        self.L: int = 0
+        self.C: int = 1
+        self.R: int = 1
+        self.full_rows: int = 0
+        self.legend_handles: list[Line2D] = []
+
+        if machine is not None:
+            self.init(machine, units=units, active_params=active_params)
+
+    @classmethod
+    def from_result(cls, result: Any, units: dict[str, Any] | None = None) -> "Plotter":
+        """Create a Plotter configured from the machine and parameters inside result."""
+        mach = get_machine(result)
+        active_params = None
+        if hasattr(result, "sampler") and hasattr(result.sampler, "vary"):
+            if hasattr(result.sampler.vary, "get_keys"):
+                active_params = list(result.sampler.vary.get_keys())
+            elif isinstance(result.sampler.vary, dict):
+                active_params = list(result.sampler.vary.keys())
+        return cls(machine=mach, units=units, active_params=active_params)
+
+    def init(
+        self,
+        mach: Machine,
+        units: dict[str, Any] | None = None,
+        active_params: list[str] | None = None,
+    ):
+        """Initialize parameter boundaries, labels, and grid layout for the given machine."""
+        self.machine = mach
+        if units:
+            self.units.update(units)
+        if active_params is not None:
+            self.active_params = list(active_params)
+
+        _, vary = energyuq.default_params(mach, active_params=self.active_params)
+
+        _, conv_fn = self.get_unit_converter("CLK", self.units)
+        min_freq = min(mach.freq) if (hasattr(mach, "freq") and mach.freq) else 0
+        max_freq = max(mach.freq) if (hasattr(mach, "freq") and mach.freq) else 0
+        if conv_fn is not None:
+            min_freq = conv_fn(min_freq)
+            max_freq = conv_fn(max_freq)
+
+        limits = {}
+        for k, v in vary.items():
+            if str(k).upper() in ("CLK", "CLK_LEVEL") and hasattr(mach, "freq") and mach.freq:
+                limits[k] = limit(lower=int(min_freq), upper=int(max_freq))
+            else:
+                v_low = int(np.asarray(v.lower).item()) if hasattr(v.lower, "__len__") else int(v.lower)
+                v_up = int(np.asarray(v.upper).item()) if hasattr(v.upper, "__len__") else int(v.upper)
+                limits[k] = limit(lower=v_low, upper=v_up)
+
+        self.labels = np.array(list(limits.keys()), dtype=str)
+        self.values = np.array(list(limits.values()), dtype=limit)
+
+        self.L = (self.labels.size + 1) // 2
+        (self.C, self.R), self.grid_fig_size = mostly_square_grid(self.L, 6, 2)
+        self.full_rows = self.L // self.C if self.C > 0 else 0
+
+        self.nd_values = pad_to_even_and_split(self.values, value=limit(lower=0, upper=1))
+        axis_labels = np.array([self.get_axis_label(lbl, self.units) for lbl in self.labels], dtype=str)
+        self.nd_labels = pad_to_even_and_split(axis_labels, value="")
+
+        more_red = Line2D([0], [0], color='red', lw=2, marker="o", linestyle='')
+        more_blue = Line2D([0], [0], color='blue', lw=2, marker="o", linestyle='')
+        self.legend_handles = [more_red, more_blue]
+
+    def set_units(self, units: dict[str, Any]):
+        """Set unit configurations and recompute axis labels."""
+        self.units.update(units)
+        if len(self.labels) > 0:
+            axis_labels = np.array([self.get_axis_label(lbl, self.units) for lbl in self.labels], dtype=str)
+            self.nd_labels = pad_to_even_and_split(axis_labels, value="")
+
+    def get_axis_bounds(
+        self,
+        val_low: float,
+        val_high: float,
+        data: Any,
+    ) -> tuple[float, float]:
+        """
+        Dynamically compute safe, padded [min, max] bounds ensuring all data points
+        are strictly visible in the plot.
+        """
+        if data is not None:
+            arr = np.asarray(data, dtype=float)
+            arr = arr[~np.isnan(arr)]
+        else:
+            arr = np.array([], dtype=float)
+
+        if len(arr) > 0:
+            d_min = float(np.min(arr))
+            d_max = float(np.max(arr))
+            if val_high > val_low and val_low <= d_min and d_max <= val_high:
+                low = float(val_low)
+                high = float(val_high)
+            elif val_high > val_low:
+                low = float(min(val_low, d_min))
+                high = float(max(val_high, d_max))
+            else:
+                low = d_min
+                high = d_max
+        else:
+            if val_high > val_low:
+                low = float(val_low)
+                high = float(val_high)
+            else:
+                low = 0.0
+                high = 1.0
+
+        if np.isclose(low, high):
+            low -= 0.5
+            high += 0.5
+
+        span = high - low
+        return low - span / 10.0, high + span / 10.0
+
+    def get_result_params(self, result: Any, df: DataFrame | None = None) -> list[str]:
+        """Identify which parameter names belong to the given result and are present in df."""
+        if df is None and hasattr(result, "df"):
+            df = result.df
+
+        df_cols: list[str] = []
+        if df is not None and hasattr(df, "columns"):
+            df_cols = [c[0] if isinstance(c, tuple) else c for c in df.columns]
+
+        sampler_params: list[str] = []
+        if hasattr(result, "sampler") and hasattr(result.sampler, "vary"):
+            if hasattr(result.sampler.vary, "get_keys"):
+                sampler_params = list(result.sampler.vary.get_keys())
+            elif isinstance(result.sampler.vary, dict):
+                sampler_params = list(result.sampler.vary.keys())
+
+        candidates = sampler_params or df_cols
+        if len(self.labels) > 0:
+            matching = [lbl for lbl in self.labels if lbl in candidates and (not df_cols or lbl in df_cols)]
+            if matching:
+                return matching
+
+        if df_cols:
+            known = ["N_THREADS", "CLK", "CLK_LEVEL", "PLACES", "BINDING", "BOOST", "NUMA"]
+            matching = [c for c in df_cols if c in known or c in candidates]
+            if matching:
+                return matching
+
+        return list(self.labels) if len(self.labels) > 0 else ["N_THREADS", "CLK"]
+
+    def get_unit(self, param: str, units: dict[str, Any] | None = None) -> Any:
+        def _find_in_dict(p: str, d: dict[str, Any]) -> tuple[bool, Any]:
+            if p in d:
+                return True, d[p]
+            for k, v in d.items():
+                if k.upper() == p.upper():
+                    return True, v
+            if p.upper() == "CLK_LEVEL":
+                for k, v in d.items():
+                    if k.upper() == "CLK":
+                        return True, v
+            if p.upper() == "CLK":
+                for k, v in d.items():
+                    if k.upper() == "CLK_LEVEL":
+                        return True, v
+            return False, None
+
+        if units is not None:
+            found, val = _find_in_dict(param, units)
+            if found:
+                return val
+        found, val = _find_in_dict(param, self.units)
+        if found:
+            return val
+        return None
+
+    def get_unit_converter(
+        self,
+        param: str,
+        units: dict[str, Any] | None = None,
+    ) -> tuple[str | None, Callable[[float], float] | None]:
+        spec = self.get_unit(param, units)
+        if spec is None:
+            return None, None
+
+        from_u, to_u, explicit_scale = parse_unit_spec(spec)
+
+        if callable(explicit_scale):
+            return to_u, explicit_scale
+
+        if isinstance(explicit_scale, (int, float)):
+            factor = float(explicit_scale)
+            return to_u, (lambda v: v * factor)
+
+        target_unit = to_u or from_u
+        if target_unit is None or target_unit.lower() in ("none", ""):
+            return None, None
+
+        if param.upper() in ("CLK", "CLK_LEVEL"):
+            target_lower = target_unit.lower()
+            if target_lower == "ghz":
+                return target_unit, (lambda v: v * 1e-6)
+            elif target_lower == "mhz":
+                return target_unit, (lambda v: v * 1e-3)
+            elif target_lower == "khz":
+                return target_unit, (lambda v: v * 1.0)
+            elif target_lower == "hz":
+                if from_u and from_u.lower() == "khz":
+                    return target_unit, (lambda v: v * 1e3)
+                return target_unit, None
+            else:
+                return target_unit, None
+
+        if from_u and to_u and from_u != to_u:
+            for p_from, f_from in SI_PREFIX_FACTORS.items():
+                for p_to, f_to in SI_PREFIX_FACTORS.items():
+                    if from_u.startswith(p_from) and to_u.startswith(p_to):
+                        base_from = from_u[len(p_from):]
+                        base_to = to_u[len(p_to):]
+                        if base_from == base_to:
+                            factor = f_from / f_to
+                            return target_unit, (lambda v: v * factor)
+
+        return target_unit, None
+
+    def get_axis_label(self, param: str, units: dict[str, Any] | None = None) -> str:
+        target_unit, _ = self.get_unit_converter(param, units)
+        if target_unit is not None and str(target_unit).strip().lower() not in ("", "none"):
+            return f"{param} ({str(target_unit).strip()})"
+        return str(param)
+
+    def to_real_clk(self, val: Any, mach: Machine | None = None, units: dict[str, Any] | None = None) -> Any:
+        if mach is None:
+            mach = self.machine
+        if mach is None or not hasattr(mach, "freq") or not mach.freq:
+            return val
+        try:
+            if pd.isna(val):
+                return val
+            f_val = float(val)
+            _, conv_fn = self.get_unit_converter("CLK", units)
+            scale_fn = conv_fn if conv_fn is not None else (lambda v: v)
+
+            if not np.isclose(f_val, round(f_val)):
+                return val
+
+            min_raw = min(mach.freq) if mach.freq else 1e5
+            if f_val >= min_raw * 0.5:
+                return scale_fn(f_val if conv_fn is not None else int(round(f_val)))
+
+            if f_val >= len(mach.freq):
+                return val
+
+            i_val = int(round(f_val))
+            if 0 <= i_val < len(mach.freq):
+                real_val = mach.freq[i_val]
+                return scale_fn(real_val)
+
+            return val
+        except Exception:
+            pass
+        return val
+
+    def convert_clk_series(
+        self,
+        series: pd.Series,
+        mach: Machine | None = None,
+        units: dict[str, Any] | None = None,
+    ) -> pd.Series:
+        if mach is None:
+            mach = self.machine
+        if mach is None or not hasattr(mach, "freq") or not mach.freq:
+            return series
+        clean = series.dropna()
+        if clean.empty:
+            return series
+
+        if not np.all(np.isclose(clean, np.round(clean))):
+            return series
+
+        min_raw = min(mach.freq) if mach.freq else 1e5
+        if clean.min() >= len(mach.freq) and clean.max() < min_raw * 0.5:
+            return series
+
+        return series.map(lambda v: self.to_real_clk(v, mach, units))
+
+    def convert_clk_df(
+        self,
+        df: DataFrame,
+        mach: Machine | None = None,
+        units: dict[str, Any] | None = None,
+    ) -> DataFrame:
+        if mach is None:
+            mach = self.machine
+        if mach is None or not hasattr(mach, "freq") or not mach.freq:
+            return df
+        df_copy = df.copy()
+        for col in df_copy.columns:
+            col_name = col[0] if isinstance(col, tuple) else col
+            if str(col_name).upper() in ("CLK", "CLK_LEVEL"):
+                df_copy[col] = self.convert_clk_series(df_copy[col], mach, units)
+        return df_copy
+
+    def _ensure_real_clk_limits(self, mach: Machine | None = None, units: dict[str, Any] | None = None):
+        if mach is None:
+            mach = self.machine
+        if mach is None or not hasattr(mach, "freq") or not mach.freq:
+            return
+        if len(self.labels) == 0:
+            return
+        _, conv_fn = self.get_unit_converter("CLK", units)
+        min_val = min(mach.freq)
+        max_val = max(mach.freq)
+        if conv_fn is not None:
+            min_val = conv_fn(min_val)
+            max_val = conv_fn(max_val)
+
+        new_values = []
+        for lbl, val in zip(self.labels, self.values):
+            if str(lbl).upper() in ("CLK", "CLK_LEVEL"):
+                new_values.append(limit(lower=int(min_val), upper=int(max_val)))
+            else:
+                new_values.append(val)
+        self.values = np.array(new_values, dtype=limit)
+        self.nd_values = pad_to_even_and_split(self.values, value=limit(lower=0, upper=1))
+
+    def colors_for(self, qoi: str) -> dict[str, tuple[str, str, str, str]]:
+        return {
+            'high_low': ('#0000ff', f'lower {qoi}', '#ff0000', f'higher {qoi}'),
+            'highest_lowest': ('#0000ff00', f'lowest {qoi}', '#0000ff', f'highest {qoi}'),
+        }
+
+    def key_for(self, result: Result, qoi: str) -> str | tuple[str, int]:
+        if hasattr(result, "df") and hasattr(result.df, "columns"):
+            if isinstance(result.df.columns, pd.MultiIndex) and (qoi, 0) in result.df.columns:
+                return (qoi, 0)
+            if qoi in result.df.columns:
+                return qoi
+        if isinstance(result, EasyResult):
+            return (qoi, 0)
+        return qoi
+
+    def plot_grid_2D(self, result: EasyResult, units: dict[str, str | None] | None = None) -> Figure:
+        """Plot chosen sampling grid in 2D pairwise projections."""
+        analysis = result.analysis
+        sampler = result.sampler
+
+        mach = get_machine(result) or self.machine
+        if self.machine is None and mach is not None:
+            self.init(mach, units=units)
+        self._ensure_real_clk_limits(mach, units)
+
+        cur_labels = self.get_result_params(result)
+        cur_values = np.array(
+            [self.values[list(self.labels).index(lbl)] if (len(self.labels) > 0 and lbl in self.labels) else limit(lower=0, upper=1) for lbl in cur_labels],
+            dtype=limit,
+        )
+
+        cur_L = (len(cur_labels) + 1) // 2
+        (cur_C, cur_R), cur_fig_size = mostly_square_grid(cur_L, 6, 2)
+        cur_full_rows = cur_L // cur_C if cur_C > 0 else 0
+        rem = cur_L % cur_C if cur_C > 0 else 0
+        row_col_counts = [cur_C] * cur_full_rows + ([rem] if rem > 0 else [])
+
+        cur_nd_values = pad_to_even_and_split(cur_values, value=limit(lower=0, upper=1))
+        axis_labels = np.array([self.get_axis_label(lbl, units) for lbl in cur_labels], dtype=str)
+        cur_nd_labels = pad_to_even_and_split(axis_labels, value="")
+
+        raw_grid = sampler.generate_grid(analysis.l_norm).astype(object)
+        if raw_grid.ndim == 2:
+            if raw_grid.shape[1] == len(cur_labels):
+                for col_idx, lbl in enumerate(cur_labels):
+                    if str(lbl).upper() in ("CLK", "CLK_LEVEL") and mach is not None and hasattr(mach, "freq"):
+                        raw_grid[:, col_idx] = [self.to_real_clk(v, mach, units) for v in raw_grid[:, col_idx]]
+            elif raw_grid.shape[0] == len(cur_labels):
+                for row_idx, lbl in enumerate(cur_labels):
+                    if str(lbl).upper() in ("CLK", "CLK_LEVEL") and mach is not None and hasattr(mach, "freq"):
+                        raw_grid[row_idx, :] = [self.to_real_clk(v, mach, units) for v in raw_grid[row_idx, :]]
+
+        accepted_grid = pad_to_even_and_split(raw_grid, value=0)
+
+        fig = plt.figure(figsize=cur_fig_size, layout="constrained")
+        fig.supylabel("Configurations chosen")
+
+        ax: list[Axes] = []
         i = 0
-        cols = C
-        index = lambda: i + 1
-        ax: list[Axes]=[]
-        axis_labels = np.array([get_axis_label(lbl, units) for lbl in labels], dtype=str)
-        cur_nd_labels = pad_to_even_and_split(axis_labels)
-        for _ in range(full_rows):
-            if R > full_rows:
-                cols = L % C
-                index = lambda: R * cols - (R * C - i)
-            for _ in range(cols):
-                xd = nd_values[0, i].upper - nd_values[0, i].lower
-                yd = nd_values[1, i].upper - nd_values[1, i].lower
-                ax.append(fig.add_subplot(R, cols, index(),
-                                        xlim=[nd_values[0, i].lower - xd/10, nd_values[0, i].upper + xd/10],
-                                        ylim=[nd_values[1, i].lower - yd/10, nd_values[1, i].upper + yd/10], 
-                                        xlabel=cur_nd_labels[0, i], ylabel=cur_nd_labels[1, i])
-                        )
-                x_is_int = _is_integer_range(nd_values[0, i].lower, nd_values[0, i].upper)
-                y_is_int = _is_integer_range(nd_values[1, i].lower, nd_values[1, i].upper)
+        for r, cols in enumerate(row_col_counts):
+            for c in range(cols):
+                subplot_num = r * cols + c + 1
+                xs_data = accepted_grid[:, 0, i] if accepted_grid.ndim == 3 and i < accepted_grid.shape[2] else None
+                ys_data = accepted_grid[:, 1, i] if accepted_grid.ndim == 3 and i < accepted_grid.shape[2] else None
+
+                xlim = self.get_axis_bounds(cur_nd_values[0, i].lower, cur_nd_values[0, i].upper, xs_data)
+                ylim = self.get_axis_bounds(cur_nd_values[1, i].lower, cur_nd_values[1, i].upper, ys_data)
+
+                ax.append(
+                    fig.add_subplot(
+                        cur_R,
+                        cols,
+                        subplot_num,
+                        xlim=list(xlim),
+                        ylim=list(ylim),
+                        xlabel=cur_nd_labels[0, i],
+                        ylabel=cur_nd_labels[1, i],
+                    )
+                )
+                x_is_int = _is_integer_range(cur_nd_values[0, i].lower, cur_nd_values[0, i].upper)
+                y_is_int = _is_integer_range(cur_nd_values[1, i].lower, cur_nd_values[1, i].upper)
                 ax[-1].xaxis.set_major_locator(MaxNLocator(integer=x_is_int))
                 ax[-1].yaxis.set_major_locator(MaxNLocator(integer=y_is_int))
                 ax[-1].set_box_aspect(1)
                 ax[-1].set_anchor('N')
                 i += 1
 
-        dataframe: DataFrame = df.sort_values(by=key, ascending=False)
-        column = dataframe[qoi]
-        if isinstance(column, pd.DataFrame):
-            column = column.iloc[:, 0]
+        for ic in range(cur_L):
+            ax[ic].plot(accepted_grid[:, 0, ic], accepted_grid[:, 1, ic], 'o', alpha=0.25)
 
-        # Detect outliers using the Interquartile Range (IQR) method
-        Q1 = column.quantile(0.25)
-        Q3 = column.quantile(0.75)
-        IQR = Q3 - Q1
-        
-        high_outlier_mask = column > (Q3 + 1.5 * IQR)
-        low_outlier_mask = column < (Q1 - 1.5 * IQR)
-        outlier_mask = high_outlier_mask | low_outlier_mask
-        inlier_mask = ~outlier_mask
+        return fig
 
-        # Compute normalization bounds exclusively using non-outlier (inlier) values
-        inlier_column = column[inlier_mask]
-        inlier_min = inlier_column.min()
-        inlier_max = inlier_column.max()
+    def plot_grid_2D_best(
+        self,
+        result: Result,
+        qoi: str | None = None,
+        order_focus: bool = False,
+        subfig: SubFigure | None = None,
+        units: dict[str, str | None] | None = None,
+    ) -> Figure | SubFigure:
+        """Plot pairwise 2D parameter evaluations colored by QoI cost."""
+        if qoi is None:
+            qoi = result.qois[0]
+        key = self.key_for(result, qoi)
 
-        if hasattr(inlier_min, "item"):
-            inlier_min = inlier_min.item()
-        if hasattr(inlier_max, "item"):
-            inlier_max = inlier_max.item()
+        mach = get_machine(result) or self.machine
+        if self.machine is None and mach is not None:
+            self.init(mach, units=units)
+        self._ensure_real_clk_limits(mach, units)
 
-        if inlier_max == inlier_min:
-            norm_vals = pd.Series(0.5, index=dataframe.index)
+        df = self.convert_clk_df(result.df, mach, units)
+        pretty_colors = self.colors_for(qoi)
+
+        cur_labels = self.get_result_params(result, df)
+        cur_values = np.array(
+            [self.values[list(self.labels).index(lbl)] if (len(self.labels) > 0 and lbl in self.labels) else limit(lower=0, upper=1) for lbl in cur_labels],
+            dtype=limit,
+        )
+
+        cur_L = (len(cur_labels) + 1) // 2
+        (cur_C, cur_R), cur_fig_size = mostly_square_grid(cur_L, 6, 2)
+        cur_full_rows = cur_L // cur_C if cur_C > 0 else 0
+        rem = cur_L % cur_C if cur_C > 0 else 0
+        row_col_counts = [cur_C] * cur_full_rows + ([rem] if rem > 0 else [])
+
+        cur_nd_values = pad_to_even_and_split(cur_values, value=limit(lower=0, upper=1))
+        axis_labels = np.array([self.get_axis_label(lbl, units) for lbl in cur_labels], dtype=str)
+        cur_nd_labels = pad_to_even_and_split(axis_labels, value="")
+
+        if subfig is None:
+            fig = plt.figure(figsize=cur_fig_size, layout="constrained")
+            fig.supylabel(f"Configurations evaluated by {qoi}")
         else:
-            norm_vals = (column - inlier_min) / (inlier_max - inlier_min)
-        
-        dataframe[f"{qoi}_norm"] = norm_vals.clip(0, 1)
+            fig = subfig
 
-        custom_handles = []
-        legend_labels = []
+        try:
+            if df.empty:
+                ax_empty = fig.add_subplot(1, 1, 1)
+                ax_empty.text(0.5, 0.5, "No evaluation data available", ha="center", va="center", transform=ax_empty.transAxes)
+                return fig
 
-        if order_focus:
-            cmap = mcolors.LinearSegmentedColormap.from_list("ba", list(pretty_colors['highest_lowest'][::2]))
-            c_low, c_high = cmap(0.0), cmap(1.0)
-            custom_handles.append(Line2D([], [], color='w', marker='o', markerfacecolor=c_low, markersize=8))
-            legend_labels.append("Lower ranked")
-            custom_handles.append(Line2D([], [], color='w', marker='o', markerfacecolor=c_high, markersize=8))
-            legend_labels.append("Higher ranked")
-        else:
-            cmap = mcolors.LinearSegmentedColormap.from_list("ba", list(pretty_colors['high_low'][::2]))
-            c_low, c_high = cmap(0.0), cmap(1.0)
-            custom_handles.append(Line2D([], [], color='w', marker='o', markerfacecolor=c_low, markersize=8))
-            legend_labels.append(f"Lesser {qoi}")
-            custom_handles.append(Line2D([], [], color='w', marker='o', markerfacecolor=c_high, markersize=8))
-            legend_labels.append(f"Higher {qoi}")
+            dataframe: DataFrame = df.sort_values(by=key, ascending=False)
+            column = dataframe[qoi]
+            if isinstance(column, pd.DataFrame):
+                column = column.iloc[:, 0]
 
-        if high_outlier_mask.any():
-            custom_handles.append(Line2D([], [], color='w', marker='o', markerfacecolor='magenta', markersize=8))
-            legend_labels.append("High outlier")
+            Q1 = column.quantile(0.25)
+            Q3 = column.quantile(0.75)
+            IQR = Q3 - Q1
 
-        if low_outlier_mask.any():
-            custom_handles.append(Line2D([], [], color='w', marker='o', markerfacecolor='cyan', markersize=8))
-            legend_labels.append("Low outlier")
+            high_outlier_mask = column > (Q3 + 1.5 * IQR)
+            low_outlier_mask = column < (Q1 - 1.5 * IQR)
+            outlier_mask = high_outlier_mask | low_outlier_mask
+            inlier_mask = ~outlier_mask
 
-        colors = []
-        for idx in dataframe.index:
-            if high_outlier_mask[idx]:
-                colors.append("magenta")
-            elif low_outlier_mask[idx]:
-                colors.append("cyan")
+            inlier_column = column[inlier_mask]
+            inlier_min = inlier_column.min() if not inlier_column.empty else column.min()
+            inlier_max = inlier_column.max() if not inlier_column.empty else column.max()
+
+            if hasattr(inlier_min, "item"):
+                inlier_min = inlier_min.item()
+            if hasattr(inlier_max, "item"):
+                inlier_max = inlier_max.item()
+
+            if inlier_max == inlier_min:
+                norm_vals = pd.Series(0.5, index=dataframe.index)
             else:
-                colors.append(cmap(dataframe.loc[idx, f"{qoi}_norm"]))
+                norm_vals = (column - inlier_min) / (inlier_max - inlier_min)
 
-        for i in range(L):
-            xs = dataframe[labels[i*2]].to_numpy()
-            ys = dataframe[labels[i*2 + 1]].to_numpy()
-            ax[i].legend(handles=custom_handles, labels=legend_labels, draggable=True, fontsize='x-small', ncols=2, bbox_to_anchor=(1, 1.1), loc='upper right')
-            ax[i].scatter(xs, ys, c=colors)
-        
-        return fig
-    except Exception:
-        if subfig is None:
-            plt.close(fig)
-        raise
+            dataframe[f"{qoi}_norm"] = norm_vals.clip(0, 1)
 
+            custom_handles = []
+            legend_labels = []
 
-def plot_sobols1(result: Result, qoi=None, subfig: SubFigure | None=None, title: str | None = None, units: dict[str, str | None] | None = None):
-    results = result.results
-    if results is None:
-        raise ValueError("No analysis results available for Sobol indices.")
-    if qoi is None:
-        qoi = result.qois[0]
-    
-    # Retrieve sobol values first before opening a matplotlib figure
-    sobols_first = np.array(list(results.sobols_first(qoi).values()))
-    d = len(labels)
-    
-    fig = subfig if subfig is not None else plt.figure(layout="constrained")
-    try:
-        if title:
-            ax = fig.add_subplot(title=title, ylim=[0,1])
-        else:
-            ax = fig.add_subplot(ylim=[0,1])
-        ax.set_ylabel(r'$S_i$', fontsize=14)
-        
-        ax.bar(0, np.sum(sobols_first), color='salmon')
-        ax.bar(np.arange(1, d+1), sobols_first.flatten(), color='dodgerblue')
+            if order_focus:
+                cmap = mcolors.LinearSegmentedColormap.from_list("ba", list(pretty_colors['highest_lowest'][::2]))
+                c_low, c_high = cmap(0.0), cmap(1.0)
+                custom_handles.append(Line2D([], [], color='w', marker='o', markerfacecolor=c_low, markersize=8))
+                legend_labels.append("Lower ranked")
+                custom_handles.append(Line2D([], [], color='w', marker='o', markerfacecolor=c_high, markersize=8))
+                legend_labels.append("Higher ranked")
+            else:
+                cmap = mcolors.LinearSegmentedColormap.from_list("ba", list(pretty_colors['high_low'][::2]))
+                c_low, c_high = cmap(0.0), cmap(1.0)
+                custom_handles.append(Line2D([], [], color='w', marker='o', markerfacecolor=c_low, markersize=8))
+                legend_labels.append(f"Lesser {qoi}")
+                custom_handles.append(Line2D([], [], color='w', marker='o', markerfacecolor=c_high, markersize=8))
+                legend_labels.append(f"Higher {qoi}")
 
-        ax.set_xticks(np.arange(d+1))
-        formatted_labels = [get_axis_label(lbl, units) for lbl in labels]
-        ax.set_xticklabels(['Total first order', *formatted_labels], rotation=90)
-        return fig
-    except Exception:
-        if subfig is None:
-            plt.close(fig)
-        raise
+            if high_outlier_mask.any():
+                custom_handles.append(Line2D([], [], color='w', marker='o', markerfacecolor='magenta', markersize=8))
+                legend_labels.append("High outlier")
 
+            if low_outlier_mask.any():
+                custom_handles.append(Line2D([], [], color='w', marker='o', markerfacecolor='cyan', markersize=8))
+                legend_labels.append("Low outlier")
 
-def draw_gradients(*color_list):
-    n_items = len(color_list)
-    
-    fig, ax = plt.subplots(figsize=(6, 0.9 * n_items + 0.4))
-    
-    ax.set_facecolor('#ffffff')
-    for spine in ax.spines.values():
-        spine.set_color('#cccccc')
-        spine.set_linewidth(1.0)
+            colors = []
+            for idx in dataframe.index:
+                if high_outlier_mask[idx]:
+                    colors.append("magenta")
+                elif low_outlier_mask[idx]:
+                    colors.append("cyan")
+                else:
+                    colors.append(cmap(dataframe.loc[idx, f"{qoi}_norm"]))
 
-    ax.get_xaxis().set_visible(False)
-    ax.get_yaxis().set_visible(False)
+            ax: list[Axes] = []
+            i = 0
+            for r, cols in enumerate(row_col_counts):
+                for c in range(cols):
+                    subplot_num = r * cols + c + 1
+                    col_x = cur_labels[i * 2]
+                    xs = dataframe[col_x].to_numpy().flatten()
+                    if i * 2 + 1 < len(cur_labels):
+                        col_y = cur_labels[i * 2 + 1]
+                        ys = dataframe[col_y].to_numpy().flatten()
+                        y_low = cur_nd_values[1, i].lower
+                        y_high = cur_nd_values[1, i].upper
+                        ylim = self.get_axis_bounds(y_low, y_high, ys)
+                        ylabel_text = cur_nd_labels[1, i]
+                    else:
+                        ys = np.zeros_like(xs)
+                        ylim = (-0.5, 0.5)
+                        ylabel_text = ""
 
-    ax.set_xlim(-0.06, 1.06)
-    ax.set_ylim(-0.2, n_items)
+                    xlim = self.get_axis_bounds(cur_nd_values[0, i].lower, cur_nd_values[0, i].upper, xs)
 
-    gradient_base = np.linspace(0, 1, 256).reshape(1, -1)
+                    ax.append(
+                        fig.add_subplot(
+                            cur_R,
+                            cols,
+                            subplot_num,
+                            xlim=list(xlim),
+                            ylim=list(ylim),
+                            xlabel=cur_nd_labels[0, i],
+                            ylabel=ylabel_text,
+                        )
+                    )
+                    x_is_int = _is_integer_range(cur_nd_values[0, i].lower, cur_nd_values[0, i].upper)
+                    y_is_int = _is_integer_range(cur_nd_values[1, i].lower, cur_nd_values[1, i].upper)
+                    ax[-1].xaxis.set_major_locator(MaxNLocator(integer=x_is_int))
+                    ax[-1].yaxis.set_major_locator(MaxNLocator(integer=y_is_int))
+                    ax[-1].set_box_aspect(1)
+                    ax[-1].set_anchor('N')
 
-    for i, (color_a, label_a, color_b, label_b) in enumerate(reversed(color_list)):
-        y_bottom = i * 1.0
-        y_top = y_bottom + 0.28
-    
-        cmap = mcolors.LinearSegmentedColormap.from_list(f"legend_cmap_{i}", [color_a, color_b])
-        
-        ax.imshow(gradient_base, aspect='auto', cmap=cmap, extent=(0, 1, y_bottom, y_top))
-        ax.text(0.0, y_top + 0.05, label_a, ha='left', va='bottom', fontsize=10, color='#333333')
-        ax.text(1.0, y_top + 0.05, label_b, ha='right', va='bottom', fontsize=10, color='#333333')
-        
-    # plt.tight_layout()
-    return fig
+                    ax[-1].legend(
+                        handles=custom_handles,
+                        labels=legend_labels,
+                        draggable=True,
+                        fontsize='x-small',
+                        ncols=2,
+                        bbox_to_anchor=(1, 1.1),
+                        loc='upper right',
+                    )
+                    ax[-1].scatter(xs, ys, c=colors)
+                    i += 1
 
-def plot_sorted(result: Result, qoi=None, subfig: SubFigure | None=None, title: str | None = None):
-    if qoi is None:
-        qoi = result.qois[0]
-    key = key_for(result, qoi)
-    dataframe = result.df
-    
-    if not subfig:
-        fig, ax = plt.subplots(figsize=(12,12), layout="constrained")
-    else:
-        fig = subfig
-        ax = fig.subplots()
+            return fig
+        except Exception:
+            if subfig is None:
+                plt.close(fig)
+            raise
 
-    try:
-        sorted_dataframe: DataFrame = dataframe.sort_values(by=key, ascending=False)
+    def plot_sorted(
+        self,
+        result: Result,
+        qoi: str | None = None,
+        subfig: SubFigure | None = None,
+        title: str | None = None,
+    ) -> Figure | SubFigure:
+        """Plot evaluations sorted monotonically by QoI cost."""
+        if qoi is None:
+            qoi = result.qois[0]
+        key = self.key_for(result, qoi)
+        dataframe = result.df
 
-        ax.semilogy(sorted_dataframe[key].to_numpy())
-        ax.set_box_aspect(1)
-        ax.set_anchor('N')
-        if not subfig and title:
-            ax.set_title(title)
-        return fig
-    except Exception:
         if not subfig:
-            plt.close(fig)
-        raise
+            fig, ax = plt.subplots(figsize=(12, 12), layout="constrained")
+        else:
+            fig = subfig
+            ax = fig.subplots()
 
+        try:
+            if dataframe.empty:
+                ax.text(0.5, 0.5, "No evaluation data available", ha="center", va="center", transform=ax.transAxes)
+                return fig
 
-def get_confidence_intervals(samples, conf=0.9):
-    """
-    Compute the confidence intervals given an array of samples
+            sorted_dataframe: DataFrame = dataframe.sort_values(by=key, ascending=False)
+            ax.semilogy(sorted_dataframe[key].to_numpy())
+            ax.set_box_aspect(1)
+            ax.set_anchor('N')
+            if not subfig and title:
+                ax.set_title(title)
+            return fig
+        except Exception:
+            if not subfig:
+                plt.close(fig)
+            raise
 
-    Parameters
-    ----------
-    samples : array
-        Samples on which to compute the intervals.
-    conf : float, optional, must be in [0, 1].
-        The confidence interval percentage. The default is 0.9.
+    def plot_2D_single_dimension(
+        self,
+        result: Result,
+        qoi: str | None = None,
+        subfig: SubFigure | None = None,
+        units: dict[str, str | None] | None = None,
+    ) -> Figure | SubFigure:
+        """Plot 2D projections of each parameter against the QoI."""
+        if qoi is None:
+            qoi = result.qois[0]
+        key = self.key_for(result, qoi)
 
-    Returns
-    -------
-    lower : array
-        The lower confidence bound..
-    upper : array
-        The upper confidence bound.
+        mach = get_machine(result) or self.machine
+        if self.machine is None and mach is not None:
+            self.init(mach, units=units)
+        self._ensure_real_clk_limits(mach, units)
 
-    """
+        df = self.convert_clk_df(result.df, mach, units)
+        cur_labels = self.get_result_params(result, df)
+        L = len(cur_labels)
 
-    # ake sure conf is in [0, 1]
-    if conf < 0.0 or conf > 1.0:
-        print('conf must be specified within [0, 1]')
-        return
+        if L <= 1:
+            C, R = 1, 1
+        elif L == 2:
+            C, R = 2, 1
+        else:
+            C = 2
+            R = int(np.ceil(L / C))
 
-    # lower bound = alpha, upper bound = 1 - alpha
-    alpha = 0.5 * (1.0 - conf)
+        if subfig:
+            fig = subfig
+        else:
+            fig = plt.figure(figsize=(12, max(4.0, 12 / C * R)), layout="constrained")
+            fig.supylabel(f"For {qoi}")
 
-    # arrays for lower and upper bound of the interval
-    n_samples = samples.shape[0]
-    N_qoi = samples.shape[1]
-    lower = np.zeros(N_qoi)
-    upper = np.zeros(N_qoi)
+        try:
+            if df.empty:
+                ax_empty = fig.add_subplot(1, 1, 1)
+                ax_empty.text(0.5, 0.5, "No evaluation data available", ha="center", va="center", transform=ax_empty.transAxes)
+                return fig
 
-    # the probabilities of the ecdf
-    prob = np.linspace(0, 1, n_samples)
-    # the closest locations in prob that correspond to the interval bounds
-    idx0 = np.where(prob <= alpha)[0][-1]
-    idx1 = np.where(prob <= 1.0 - alpha)[0][-1]
+            ax_grid = fig.subplots(R, C, sharey=False)
+            ax = list(ax_grid.flatten()) if isinstance(ax_grid, np.ndarray) else [ax_grid]
 
-    # for every location of qoi compute the ecdf-based confidence interval
-    for i in range(N_qoi):
-        # the sorted surrogate samples at the current location
-        samples_sorted = np.sort(samples[:, i])
-        # the corresponding confidence interval
-        lower[i] = samples_sorted[idx0]
-        upper[i] = samples_sorted[idx1]
+            for i in range(L):
+                lbl = cur_labels[i]
+                xs = df[lbl].to_numpy().flatten()
+                ys = df[key].to_numpy().flatten()
 
-    return lower, upper
+                val_low, val_high = (
+                    (self.values[list(self.labels).index(lbl)].lower, self.values[list(self.labels).index(lbl)].upper)
+                    if (len(self.labels) > 0 and lbl in self.labels)
+                    else (0, 1)
+                )
+                xlim = self.get_axis_bounds(val_low, val_high, xs)
 
-def plot_2D_single_dimension(result: Result, qoi=None, subfig=None, units: dict[str, str | None] | None = None):
-    if qoi is None:
-        qoi = result.qois[0]
-    key = key_for(result, qoi)
-    mach = get_machine(result)
-    _ensure_real_clk_limits(mach, units)
-    df = convert_clk_df(result.df, mach, units)
+                ax[i].set_xlim(xlim)
+                ax[i].set_xlabel(xlabel=self.get_axis_label(lbl, units))
+                ax[i].set_ylabel(qoi)
+                is_int = _is_integer_range(val_low, val_high)
+                ax[i].xaxis.set_major_locator(MaxNLocator(integer=is_int))
+                ax[i].yaxis.set_major_locator(MaxNLocator(integer=True))
+                ax[i].set_box_aspect(1)
+                ax[i].set_anchor('N')
+                ax[i].scatter(xs, ys)
 
-    L = len(labels)
-    C = 2
-    R = int(np.ceil(L / C))
+            for j in range(L, len(ax)):
+                fig.delaxes(ax[j])
 
-    if subfig:
-        fig = subfig
-    else:
-        fig = plt.figure(figsize=(12,12/C*R), layout="constrained")
+            return fig
+        except Exception:
+            if not subfig:
+                plt.close(fig)
+            raise
+
+    def plot_boxplot(
+        self,
+        result: Result,
+        qoi: str | None = None,
+        units: dict[str, str | None] | None = None,
+    ) -> Figure:
+        """Plot boxplots per discrete parameter level against the QoI."""
+        if qoi is None:
+            qoi = result.qois[0]
+        key = self.key_for(result, qoi)
+
+        mach = get_machine(result) or self.machine
+        if self.machine is None and mach is not None:
+            self.init(mach, units=units)
+        self._ensure_real_clk_limits(mach, units)
+
+        df = self.convert_clk_df(result.df, mach, units)
+        cur_labels = self.get_result_params(result, df)
+        L = len(cur_labels)
+
+        if L <= 1:
+            C, R = 1, 1
+        elif L == 2:
+            C, R = 2, 1
+        else:
+            C = 2
+            R = int(np.ceil(L / C))
+
+        fig = plt.figure(figsize=(12, max(4.0, 12 / C * R)), layout="constrained")
         fig.supylabel(f"For {qoi}")
 
-    try:
-        ax = []
-        i=0
-        
-        ax = fig.subplots(R, C, sharey=False)
-        if isinstance(ax, np.ndarray):
-            ax = ax.flatten()
+        try:
+            if df.empty:
+                ax_empty = fig.add_subplot(1, 1, 1)
+                ax_empty.text(0.5, 0.5, "No evaluation data available", ha="center", va="center", transform=ax_empty.transAxes)
+                return fig
 
-        for i in range(L):
-            xd = values[i].upper - values[i].lower
-            ax[i].set_xlim((values[i].lower - xd/10, values[i].upper + xd/10))
-            ax[i].set_xlabel(xlabel=get_axis_label(labels[i], units))
-            ax[i].set_ylabel(qoi)
-            is_int = _is_integer_range(values[i].lower, values[i].upper)
-            ax[i].xaxis.set_major_locator(MaxNLocator(integer=is_int))
-            ax[i].yaxis.set_major_locator(MaxNLocator(integer=True))
-            ax[i].set_box_aspect(1)
-            ax[i].set_anchor('N')
+            ax: list[Axes] = []
+            for i in range(L):
+                lbl = cur_labels[i]
+                val_low, val_high = (
+                    (self.values[list(self.labels).index(lbl)].lower, self.values[list(self.labels).index(lbl)].upper)
+                    if (len(self.labels) > 0 and lbl in self.labels)
+                    else (0, 1)
+                )
+                xlim = self.get_axis_bounds(val_low, val_high, df[lbl])
+                ax.append(
+                    fig.add_subplot(
+                        R,
+                        C,
+                        i + 1,
+                        xlim=list(xlim),
+                        xlabel=self.get_axis_label(lbl, units),
+                        ylabel=qoi,
+                    )
+                )
+                is_int = _is_integer_range(val_low, val_high)
+                ax[-1].xaxis.set_major_locator(MaxNLocator(integer=is_int))
+                ax[-1].yaxis.set_major_locator(MaxNLocator(integer=True))
 
-        for i in range(L):
-            ax[i].scatter(df[labels[i]], df[key])
-        
-        return fig
-    except Exception:
-        if not subfig:
+            def col_to_numpy(x: DataFrame):
+                return x[key].to_numpy()
+
+            for i in range(L):
+                lbl = cur_labels[i]
+                label_c = (lbl, 0) if isinstance(key, tuple) else lbl
+                box_frame = df[[key, label_c]].groupby(by=label_c)[[key]].apply(col_to_numpy)
+
+                positions = np.array(box_frame.index.to_list(), dtype=float)
+                diffs = np.diff(np.sort(positions))
+                if len(diffs) > 0 and np.min(diffs) > 0:
+                    width = 0.5 * float(np.min(diffs))
+                else:
+                    width = 0.5
+
+                ax[i].boxplot(
+                    box_frame.to_numpy(),
+                    positions=positions,
+                    widths=width,
+                    patch_artist=True,
+                    boxprops={"facecolor": "lightblue", "edgecolor": "C0", "linewidth": 1.5},
+                    medianprops={"color": "darkblue", "linewidth": 2},
+                    whiskerprops={"color": "C0", "linewidth": 1.5},
+                    capprops={"color": "C0", "linewidth": 1.5},
+                )
+
+            return fig
+        except Exception:
             plt.close(fig)
-        raise
+            raise
 
-def plot_boxplot(result: Result, qoi=None, units: dict[str, str | None] | None = None):
-    if qoi is None:
-        qoi = result.qois[0]
-    key = key_for(result, qoi)
-    mach = get_machine(result)
-    _ensure_real_clk_limits(mach, units)
-    df = convert_clk_df(result.df, mach, units)
+    def plot_sobols1(
+        self,
+        result: Result,
+        qoi: str | None = None,
+        subfig: SubFigure | None = None,
+        title: str | None = None,
+        units: dict[str, str | None] | None = None,
+    ) -> Figure | SubFigure:
+        """Plot first-order Sobol sensitivity indices."""
+        results = getattr(result, "results", None)
+        if results is None:
+            raise ValueError("No analysis results available for Sobol indices.")
+        if qoi is None:
+            qoi = result.qois[0]
 
-    L = len(labels)
-    C = int(np.ceil(np.sqrt((10+1)//2)))
-    R = int(np.ceil(L / C))
+        sobol_dict = results.sobols_first(qoi)
+        param_names = list(sobol_dict.keys())
+        sobols_first = np.array([float(v) for v in sobol_dict.values()])
+        d = len(param_names)
 
-    fig = plt.figure(figsize=(12,12/C*R), layout="constrained")
-    fig.supylabel(f"For {qoi}")
-    
-    try:
-        ax: list[Axes]=[]
-        for i in range(L):
-            xd = values[i].upper - values[i].lower
-            ax.append(fig.add_subplot(R, C, i+1,
-                                      xlim=[values[i].lower - xd/10, values[i].upper + xd/10],
-                                      xlabel=get_axis_label(labels[i], units), ylabel=qoi
-                        )
-                     )
-            is_int = _is_integer_range(values[i].lower, values[i].upper)
-            ax[-1].xaxis.set_major_locator(MaxNLocator(integer=is_int))
-            ax[-1].yaxis.set_major_locator(MaxNLocator(integer=True))
-
-        def col_to_numpy(x: DataFrame):
-            return x[key].to_numpy()
-
-        for i in range(L):
-            label_c = (labels[i], 0) if isinstance(key, tuple) else labels[i]
-            box_frame = df[[key, label_c]].groupby(by=label_c)[[key]].apply(col_to_numpy) # pyright: ignore[reportArgumentType, reportCallIssue]
-
-            positions = np.array(box_frame.index.to_list(), dtype=float)
-            diffs = np.diff(np.sort(positions))
-            xd = values[i].upper - values[i].lower
-            if len(diffs) > 0 and np.min(diffs) > 0:
-                width = 0.5 * np.min(diffs)
-            elif xd > 0:
-                width = 0.05 * xd
+        fig = subfig if subfig is not None else plt.figure(layout="constrained")
+        try:
+            if title:
+                ax = fig.add_subplot(title=title, ylim=[0, 1])
             else:
-                width = 0.5
+                ax = fig.add_subplot(ylim=[0, 1])
+            ax.set_ylabel(r'$S_i$', fontsize=14)
 
-            VP = ax[i].boxplot(box_frame.to_numpy(),
-                                positions=positions,
-                                widths=width,
-                                patch_artist=True,
-                                showmeans=False, showfliers=False, manage_ticks = False,
-                                medianprops={"color": "white", "linewidth": 0.5},
-                                boxprops={"facecolor": "C0", "edgecolor": "white", "linewidth": 0.5},
-                                whiskerprops={"color": "C0", "linewidth": 1.5},
-                                capprops={"color": "C0", "linewidth": 1.5}
-                            )
+            ax.bar(0, np.sum(sobols_first), color='salmon')
+            ax.bar(np.arange(1, d + 1), sobols_first.flatten(), color='dodgerblue')
 
+            ax.set_xticks(np.arange(d + 1))
+            formatted_labels = [self.get_axis_label(lbl, units) for lbl in param_names]
+            ax.set_xticklabels(['Total first order', *formatted_labels], rotation=90)
+            return fig
+        except Exception:
+            if subfig is None:
+                plt.close(fig)
+            raise
+
+    def draw_gradients(self, *color_list) -> Figure:
+        """Render horizontal gradient swatches."""
+        n_items = len(color_list)
+        fig, ax = plt.subplots(figsize=(6, 0.9 * n_items + 0.4))
+        ax.set_facecolor('#ffffff')
+        for spine in ax.spines.values():
+            spine.set_color('#cccccc')
+
+        gradient = np.linspace(0, 1, 256).reshape(1, -1)
+        for i, colors in enumerate(color_list):
+            cmap = mcolors.LinearSegmentedColormap.from_list(f'cmap_{i}', colors)
+            ax.imshow(gradient, extent=[0, 10, i, i + 0.6], cmap=cmap, aspect='auto')
+
+        ax.set_xlim(0, 10)
+        ax.set_ylim(-0.2, n_items)
+        ax.set_xticks([])
+        ax.set_yticks([])
         return fig
-    except Exception:
-        plt.close(fig)
-        raise
-    return fig
 
-
-def plot_stat_convergence(result: Any, title: str | None = None) -> Figure | None:
-    """Generate EasyVVUQ statistical moments convergence plot."""
-    from unittest.mock import patch
-    analysis = getattr(result, "analysis", result)
-    if not hasattr(analysis, "plot_stat_convergence"):
-        return None
-    plt.close("stat_conv")
-    with patch("matplotlib.pyplot.show", lambda *args, **kwargs: None):
-        analysis.plot_stat_convergence()
-    fig = plt.figure("stat_conv")
-    if len(fig.axes) == 0:
+    def plot_stat_convergence(self, result: Any, title: str | None = None) -> Figure | None:
+        """Generate EasyVVUQ statistical moments convergence plot."""
+        from unittest.mock import patch
+        analysis = getattr(result, "analysis", result)
+        if not hasattr(analysis, "plot_stat_convergence"):
+            return None
         plt.close("stat_conv")
-        return None
-    if title:
-        fig.suptitle(title, fontsize=11)
-    else:
-        if getattr(fig, "_suptitle", None) is not None:
-            fig._suptitle.set_text("")
-        for ax in fig.axes:
-            ax.set_title("")
-    return fig
+        with patch("matplotlib.pyplot.show", lambda *args, **kwargs: None):
+            analysis.plot_stat_convergence()
+        fig = plt.figure("stat_conv")
+        if len(fig.axes) == 0:
+            plt.close("stat_conv")
+            return None
+        if title:
+            fig.suptitle(title, fontsize=11)
+        else:
+            if getattr(fig, "_suptitle", None) is not None:
+                fig._suptitle.set_text("")
+            for ax in fig.axes:
+                ax.set_title("")
+        return fig
 
-
-def plot_adaptation_histogram(result: Any, title: str | None = None) -> Figure | None:
-    """Generate EasyVVUQ adaptation histogram plot."""
-    from unittest.mock import patch
-    analysis = getattr(result, "analysis", result)
-    if not hasattr(analysis, "adaptation_histogram"):
-        return None
-    plt.close("adapt_hist")
-    with patch("matplotlib.pyplot.show", lambda *args, **kwargs: None):
-        analysis.adaptation_histogram()
-    fig = plt.figure("adapt_hist")
-    if len(fig.axes) == 0:
+    def plot_adaptation_histogram(self, result: Any, title: str | None = None) -> Figure | None:
+        """Generate EasyVVUQ adaptation histogram plot."""
+        from unittest.mock import patch
+        analysis = getattr(result, "analysis", result)
+        if not hasattr(analysis, "adaptation_histogram"):
+            return None
         plt.close("adapt_hist")
-        return None
-    if title:
-        fig.suptitle(title, fontsize=11)
-    else:
-        if getattr(fig, "_suptitle", None) is not None:
-            fig._suptitle.set_text("")
-        for ax in fig.axes:
-            ax.set_title("")
-    return fig
+        with patch("matplotlib.pyplot.show", lambda *args, **kwargs: None):
+            analysis.adaptation_histogram()
+        fig = plt.figure("adapt_hist")
+        if len(fig.axes) == 0:
+            plt.close("adapt_hist")
+            return None
+        if title:
+            fig.suptitle(title, fontsize=11)
+        else:
+            if getattr(fig, "_suptitle", None) is not None:
+                fig._suptitle.set_text("")
+            for ax in fig.axes:
+                ax.set_title("")
+        return fig
+
+    def plot_adaptation_table(self, result: Any, title: str | None = None) -> Figure | None:
+        """Generate EasyVVUQ adaptation table plot."""
+        from unittest.mock import patch
+        analysis = getattr(result, "analysis", result)
+        if not hasattr(analysis, "adaptation_table"):
+            return None
+        with patch("matplotlib.pyplot.show", lambda *args, **kwargs: None):
+            analysis.adaptation_table()
+        fig = plt.gcf()
+        if len(fig.axes) == 0:
+            plt.close(fig)
+            return None
+        if title:
+            fig.suptitle(title, fontsize=11)
+        else:
+            if getattr(fig, "_suptitle", None) is not None:
+                fig._suptitle.set_text("")
+            for ax in fig.axes:
+                ax.set_title("")
+        return fig
 
 
-def plot_adaptation_table(result: Any, title: str | None = None) -> Figure | None:
-    """Generate EasyVVUQ adaptation table plot."""
-    from unittest.mock import patch
-    analysis = getattr(result, "analysis", result)
-    if not hasattr(analysis, "adaptation_table"):
-        return None
-    with patch("matplotlib.pyplot.show", lambda *args, **kwargs: None):
-        analysis.adaptation_table()
-    fig = plt.gcf()
-    if len(fig.axes) == 0:
-        plt.close(fig)
-        return None
-    if title:
-        fig.suptitle(title, fontsize=11)
-    else:
-        if getattr(fig, "_suptitle", None) is not None:
-            fig._suptitle.set_text("")
-        for ax in fig.axes:
-            ax.set_title("")
-    return fig
+# Helper function for standalone palette lookup
+def colors_for(qoi: str) -> dict[str, tuple[str, str, str, str]]:
+    return Plotter().colors_for(qoi)
 
 
 # Re-export multi-run plotting functions

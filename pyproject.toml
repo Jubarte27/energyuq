@@ -13,7 +13,7 @@ dependencies = [
     "dill",
     "matplotlib",
     "msgpack",
-    "numpy",
+    "numpy>=2",
     "pandas",
     "python-dotenv",
     "SALib",

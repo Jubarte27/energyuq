@@ -7,7 +7,7 @@ from unittest.mock import patch
 from src import energyuq
 from src.machines.machine import Machine
 from src.programs import NONE
-from src.util.morris import MorrisScreeningResult
+from src.morris import MorrisScreeningResult
 
 
 class TestSaveResume(unittest.TestCase):
