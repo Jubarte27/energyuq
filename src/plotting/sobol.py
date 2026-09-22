@@ -5,6 +5,7 @@ from matplotlib.figure import Figure, SubFigure
 from matplotlib.patches import Patch
 
 from ..util.data import Result
+from .layout import get_sampler_params
 
 
 class SobolOrderResult(dict):
@@ -219,17 +220,7 @@ class PlotterSobolMixin:
         d_val = float(np.asarray(D).ravel()[0]) if (D is not None and np.asarray(D).size > 0) else None
 
         # Resolve parameter names
-        param_names: list[str] = []
-        if hasattr(analysis, "sampler") and hasattr(analysis.sampler, "vary"):
-            if hasattr(analysis.sampler.vary, "get_keys"):
-                param_names = list(analysis.sampler.vary.get_keys())
-            elif isinstance(analysis.sampler.vary, dict):
-                param_names = list(analysis.sampler.vary.keys())
-        if not param_names and hasattr(result, "sampler") and hasattr(result.sampler, "vary"):
-            if hasattr(result.sampler.vary, "get_keys"):
-                param_names = list(result.sampler.vary.get_keys())
-            elif isinstance(result.sampler.vary, dict):
-                param_names = list(result.sampler.vary.keys())
+        param_names: list[str] = get_sampler_params(analysis) or get_sampler_params(result)
         if not param_names and hasattr(self, "get_result_params"):
             param_names = self.get_result_params(result)
 

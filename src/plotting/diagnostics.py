@@ -27,19 +27,34 @@ class PlotterDiagnosticsMixin:
         ax.set_yticks([])
         return fig
 
-    def plot_stat_convergence(self, result: Any, title: str | None = None) -> Figure | None:
-        """Generate EasyVVUQ statistical moments convergence plot."""
+    def _capture_analysis_plot(
+        self,
+        result: Any,
+        method_name: str,
+        fig_name: str | None = None,
+        title: str | None = None,
+    ) -> Figure | None:
+        """Capture and clean an EasyVVUQ analytical plot rendered via pyplot."""
         from unittest.mock import patch
+
         analysis = getattr(result, "analysis", result)
-        if not hasattr(analysis, "plot_stat_convergence"):
+        if not hasattr(analysis, method_name):
             return None
-        plt.close("stat_conv")
+
+        if fig_name:
+            plt.close(fig_name)
+
         with patch("matplotlib.pyplot.show", lambda *args, **kwargs: None):
-            analysis.plot_stat_convergence()
-        fig = plt.figure("stat_conv")
+            getattr(analysis, method_name)()
+
+        fig = plt.figure(fig_name) if fig_name else plt.gcf()
         if len(fig.axes) == 0:
-            plt.close("stat_conv")
+            if fig_name:
+                plt.close(fig_name)
+            else:
+                plt.close(fig)
             return None
+
         if title:
             fig.suptitle(title, fontsize=11)
         else:
@@ -48,49 +63,18 @@ class PlotterDiagnosticsMixin:
             for ax in fig.axes:
                 ax.set_title("")
         return fig
+
+    def plot_stat_convergence(self, result: Any, title: str | None = None) -> Figure | None:
+        """Generate EasyVVUQ statistical moments convergence plot."""
+        return self._capture_analysis_plot(result, "plot_stat_convergence", fig_name="stat_conv", title=title)
 
     def plot_adaptation_histogram(self, result: Any, title: str | None = None) -> Figure | None:
         """Generate EasyVVUQ adaptation histogram plot."""
-        from unittest.mock import patch
-        analysis = getattr(result, "analysis", result)
-        if not hasattr(analysis, "adaptation_histogram"):
-            return None
-        plt.close("adapt_hist")
-        with patch("matplotlib.pyplot.show", lambda *args, **kwargs: None):
-            analysis.adaptation_histogram()
-        fig = plt.figure("adapt_hist")
-        if len(fig.axes) == 0:
-            plt.close("adapt_hist")
-            return None
-        if title:
-            fig.suptitle(title, fontsize=11)
-        else:
-            if getattr(fig, "_suptitle", None) is not None:
-                fig._suptitle.set_text("")
-            for ax in fig.axes:
-                ax.set_title("")
-        return fig
+        return self._capture_analysis_plot(result, "adaptation_histogram", fig_name="adapt_hist", title=title)
 
     def plot_adaptation_table(self, result: Any, title: str | None = None) -> Figure | None:
         """Generate EasyVVUQ adaptation table plot."""
-        from unittest.mock import patch
-        analysis = getattr(result, "analysis", result)
-        if not hasattr(analysis, "adaptation_table"):
-            return None
-        with patch("matplotlib.pyplot.show", lambda *args, **kwargs: None):
-            analysis.adaptation_table()
-        fig = plt.gcf()
-        if len(fig.axes) == 0:
-            plt.close(fig)
-            return None
-        if title:
-            fig.suptitle(title, fontsize=11)
-        else:
-            if getattr(fig, "_suptitle", None) is not None:
-                fig._suptitle.set_text("")
-            for ax in fig.axes:
-                ax.set_title("")
-        return fig
+        return self._capture_analysis_plot(result, "adaptation_table", fig_name=None, title=title)
 
 
 # Standalone module-level delegators

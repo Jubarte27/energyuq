@@ -10,6 +10,7 @@ from .layout import (
     mostly_square_grid,
     pad_to_even_and_split,
     get_machine,
+    get_sampler_params,
     PlotterLayoutMixin,
 )
 from .grid import PlotterGridMixin
@@ -61,19 +62,8 @@ class Plotter(
     def from_result(cls, result: Any, units: dict[str, Any] | None = None) -> "Plotter":
         """Create a Plotter configured from the machine and parameters inside result."""
         mach = get_machine(result)
-        active_params = None
-        if hasattr(result, "sampler") and hasattr(result.sampler, "vary"):
-            if hasattr(result.sampler.vary, "get_keys"):
-                active_params = list(result.sampler.vary.get_keys())
-            elif isinstance(result.sampler.vary, dict):
-                active_params = list(result.sampler.vary.keys())
-        elif hasattr(result, "analysis") and hasattr(result.analysis, "sampler"):
-            sampler = result.analysis.sampler
-            if hasattr(sampler, "vary"):
-                if hasattr(sampler.vary, "get_keys"):
-                    active_params = list(sampler.vary.get_keys())
-                elif isinstance(sampler.vary, dict):
-                    active_params = list(sampler.vary.keys())
+        sampler_params = get_sampler_params(result)
+        active_params = sampler_params if sampler_params else None
         return cls(machine=mach, units=units, active_params=active_params)
 
     def init(

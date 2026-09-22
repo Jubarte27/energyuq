@@ -45,5 +45,8 @@ install_uv() {
 }
 
 ensure_uv() {
-    install_uv "$@"
+    if command -v uv > /dev/null; then
+        return
+    fi
+    install_uv
 }

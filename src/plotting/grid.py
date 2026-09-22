@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from typing import Any
 import numpy as np
 import pandas as pd
@@ -36,22 +37,36 @@ class PlotterGridMixin:
     def key_for(self, result: Result, qoi: str) -> str | tuple[str, int]: ...
     def colors_for(self, qoi: str) -> dict[str, tuple[str, str, str, str]]: ...
 
-    def plot_grid_2D(self, result: EasyResult, units: dict[str, str | None] | None = None) -> Figure:
-        """Plot chosen sampling grid in 2D pairwise projections."""
-        analysis = result.analysis
-        sampler = result.sampler
-
+    def _prepare_context(
+        self,
+        result: Any,
+        units: dict[str, Any] | None = None,
+        qoi: str | None = None,
+    ) -> tuple[Machine | None, str, Any, DataFrame]:
         mach = get_machine(result) or self.machine
         if self.machine is None and mach is not None:
             self.init(mach, units=units)
         self._ensure_real_clk_limits(mach, units)
 
-        cur_labels = self.get_result_params(result)
+        resolved_qoi = qoi if qoi is not None else (result.qois[0] if hasattr(result, "qois") and result.qois else "")
+        key = self.key_for(result, resolved_qoi) if resolved_qoi and hasattr(self, "key_for") else resolved_qoi
+        raw_df = getattr(result, "df", None)
+        df = self.convert_clk_df(raw_df, mach, units) if raw_df is not None else DataFrame()
+        return mach, resolved_qoi, key, df
+
+    def _get_param_bounds(self, lbl: str) -> tuple[float, float]:
+        if len(self.labels) > 0 and lbl in self.labels:
+            lim = self.values[list(self.labels).index(lbl)]
+            return float(lim.lower), float(lim.upper)
+        return 0.0, 1.0
+
+    def _setup_pairwise_grid_layout(
+        self, cur_labels: Sequence[str], units: dict[str, Any] | None = None
+    ) -> tuple[int, int, tuple[float, float], list[int], np.ndarray, np.ndarray]:
         cur_values = np.array(
-            [self.values[list(self.labels).index(lbl)] if (len(self.labels) > 0 and lbl in self.labels) else limit(lower=0, upper=1) for lbl in cur_labels],
+            [limit(*self._get_param_bounds(lbl)) for lbl in cur_labels],
             dtype=limit,
         )
-
         cur_L = (len(cur_labels) + 1) // 2
         (cur_C, cur_R), cur_fig_size = mostly_square_grid(cur_L, 6, 2)
         cur_full_rows = cur_L // cur_C if cur_C > 0 else 0
@@ -61,6 +76,26 @@ class PlotterGridMixin:
         cur_nd_values = pad_to_even_and_split(cur_values, value=limit(lower=0, upper=1))
         axis_labels = np.array([self.get_axis_label(lbl, units) for lbl in cur_labels], dtype=str)
         cur_nd_labels = pad_to_even_and_split(axis_labels, value="")
+        return cur_L, cur_R, cur_fig_size, row_col_counts, cur_nd_values, cur_nd_labels
+
+    def _setup_subgrid_dims(self, L: int) -> tuple[int, int]:
+        if L <= 1:
+            return 1, 1
+        if L == 2:
+            return 2, 1
+        return 2, int(np.ceil(L / 2))
+
+    def plot_grid_2D(self, result: EasyResult, units: dict[str, str | None] | None = None) -> Figure:
+        """Plot chosen sampling grid in 2D pairwise projections."""
+        analysis = result.analysis
+        sampler = result.sampler
+
+        mach, _, _, _ = self._prepare_context(result, units=units)
+
+        cur_labels = self.get_result_params(result)
+        cur_L, cur_R, cur_fig_size, row_col_counts, cur_nd_values, cur_nd_labels = self._setup_pairwise_grid_layout(
+            cur_labels, units
+        )
 
         raw_grid = sampler.generate_grid(analysis.l_norm).astype(object)
         if raw_grid.ndim == 2:
@@ -122,33 +157,13 @@ class PlotterGridMixin:
         units: dict[str, str | None] | None = None,
     ) -> Figure | SubFigure:
         """Plot pairwise 2D parameter evaluations colored by QoI cost."""
-        if qoi is None:
-            qoi = result.qois[0]
-        key = self.key_for(result, qoi)
-
-        mach = get_machine(result) or self.machine
-        if self.machine is None and mach is not None:
-            self.init(mach, units=units)
-        self._ensure_real_clk_limits(mach, units)
-
-        df = self.convert_clk_df(result.df, mach, units)
+        mach, qoi, key, df = self._prepare_context(result, units=units, qoi=qoi)
         pretty_colors = self.colors_for(qoi)
 
         cur_labels = self.get_result_params(result, df)
-        cur_values = np.array(
-            [self.values[list(self.labels).index(lbl)] if (len(self.labels) > 0 and lbl in self.labels) else limit(lower=0, upper=1) for lbl in cur_labels],
-            dtype=limit,
+        cur_L, cur_R, cur_fig_size, row_col_counts, cur_nd_values, cur_nd_labels = self._setup_pairwise_grid_layout(
+            cur_labels, units
         )
-
-        cur_L = (len(cur_labels) + 1) // 2
-        (cur_C, cur_R), cur_fig_size = mostly_square_grid(cur_L, 6, 2)
-        cur_full_rows = cur_L // cur_C if cur_C > 0 else 0
-        rem = cur_L % cur_C if cur_C > 0 else 0
-        row_col_counts = [cur_C] * cur_full_rows + ([rem] if rem > 0 else [])
-
-        cur_nd_values = pad_to_even_and_split(cur_values, value=limit(lower=0, upper=1))
-        axis_labels = np.array([self.get_axis_label(lbl, units) for lbl in cur_labels], dtype=str)
-        cur_nd_labels = pad_to_even_and_split(axis_labels, value="")
 
         if subfig is None:
             fig = plt.figure(figsize=cur_fig_size, layout="constrained")
@@ -327,26 +342,10 @@ class PlotterGridMixin:
         units: dict[str, str | None] | None = None,
     ) -> Figure | SubFigure:
         """Plot 2D projections of each parameter against the QoI."""
-        if qoi is None:
-            qoi = result.qois[0]
-        key = self.key_for(result, qoi)
-
-        mach = get_machine(result) or self.machine
-        if self.machine is None and mach is not None:
-            self.init(mach, units=units)
-        self._ensure_real_clk_limits(mach, units)
-
-        df = self.convert_clk_df(result.df, mach, units)
+        mach, qoi, key, df = self._prepare_context(result, units=units, qoi=qoi)
         cur_labels = self.get_result_params(result, df)
         L = len(cur_labels)
-
-        if L <= 1:
-            C, R = 1, 1
-        elif L == 2:
-            C, R = 2, 1
-        else:
-            C = 2
-            R = int(np.ceil(L / C))
+        C, R = self._setup_subgrid_dims(L)
 
         if subfig:
             fig = subfig
@@ -368,11 +367,7 @@ class PlotterGridMixin:
                 xs = df[lbl].to_numpy().flatten()
                 ys = df[key].to_numpy().flatten()
 
-                val_low, val_high = (
-                    (self.values[list(self.labels).index(lbl)].lower, self.values[list(self.labels).index(lbl)].upper)
-                    if (len(self.labels) > 0 and lbl in self.labels)
-                    else (0, 1)
-                )
+                val_low, val_high = self._get_param_bounds(lbl)
                 xlim = self.get_axis_bounds(val_low, val_high, xs)
 
                 ax[i].set_xlim(xlim)
@@ -401,26 +396,10 @@ class PlotterGridMixin:
         units: dict[str, str | None] | None = None,
     ) -> Figure:
         """Plot boxplots per discrete parameter level against the QoI."""
-        if qoi is None:
-            qoi = result.qois[0]
-        key = self.key_for(result, qoi)
-
-        mach = get_machine(result) or self.machine
-        if self.machine is None and mach is not None:
-            self.init(mach, units=units)
-        self._ensure_real_clk_limits(mach, units)
-
-        df = self.convert_clk_df(result.df, mach, units)
+        mach, qoi, key, df = self._prepare_context(result, units=units, qoi=qoi)
         cur_labels = self.get_result_params(result, df)
         L = len(cur_labels)
-
-        if L <= 1:
-            C, R = 1, 1
-        elif L == 2:
-            C, R = 2, 1
-        else:
-            C = 2
-            R = int(np.ceil(L / C))
+        C, R = self._setup_subgrid_dims(L)
 
         fig = plt.figure(figsize=(12, max(4.0, 12 / C * R)), layout="constrained")
         fig.supylabel(f"For {qoi}")
@@ -434,11 +413,7 @@ class PlotterGridMixin:
             ax: list[Axes] = []
             for i in range(L):
                 lbl = cur_labels[i]
-                val_low, val_high = (
-                    (self.values[list(self.labels).index(lbl)].lower, self.values[list(self.labels).index(lbl)].upper)
-                    if (len(self.labels) > 0 and lbl in self.labels)
-                    else (0, 1)
-                )
+                val_low, val_high = self._get_param_bounds(lbl)
                 xlim = self.get_axis_bounds(val_low, val_high, df[lbl])
                 ax.append(
                     fig.add_subplot(

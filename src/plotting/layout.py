@@ -38,6 +38,25 @@ def get_machine(result: Any = None) -> Machine | None:
     return None
 
 
+def get_sampler_params(result: Any) -> list[str]:
+    """Extract varied parameter names from a result, analysis, campaign, or sampler."""
+    sampler = None
+    if hasattr(result, "sampler"):
+        sampler = result.sampler
+    elif hasattr(result, "analysis") and hasattr(result.analysis, "sampler"):
+        sampler = result.analysis.sampler
+    elif hasattr(result, "vary"):
+        sampler = result
+
+    if sampler is not None and hasattr(sampler, "vary"):
+        vary = sampler.vary
+        if hasattr(vary, "get_keys"):
+            return list(vary.get_keys())
+        elif isinstance(vary, dict):
+            return list(vary.keys())
+    return []
+
+
 class PlotterLayoutMixin:
     """Mixin providing layout calculations, parameter inspection, and axis bounds."""
 
@@ -95,13 +114,7 @@ class PlotterLayoutMixin:
         if df is not None and hasattr(df, "columns"):
             df_cols = [c[0] if isinstance(c, tuple) else c for c in df.columns]
 
-        sampler_params: list[str] = []
-        if hasattr(result, "sampler") and hasattr(result.sampler, "vary"):
-            if hasattr(result.sampler.vary, "get_keys"):
-                sampler_params = list(result.sampler.vary.get_keys())
-            elif isinstance(result.sampler.vary, dict):
-                sampler_params = list(result.sampler.vary.keys())
-
+        sampler_params = get_sampler_params(result)
         candidates = sampler_params or df_cols
         if len(self.labels) > 0:
             matching = [lbl for lbl in self.labels if lbl in candidates and (not df_cols or lbl in df_cols)]

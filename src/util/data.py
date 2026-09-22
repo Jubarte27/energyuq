@@ -3,14 +3,14 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass, is_dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 import pandas as pd
+from easyvvuq.analysis.sc_analysis import SCAnalysis, SCAnalysisResults
 from easyvvuq.campaign import Campaign
 from easyvvuq.sampling.stochastic_collocation import SCSampler
 from pandas import DataFrame
-from easyvvuq.analysis.sc_analysis import SCAnalysis, SCAnalysisResults
 
 if TYPE_CHECKING:
     from ..machines.machine import Machine
@@ -39,7 +39,7 @@ def to_serializable_primitive(obj: Any) -> Any:
         return {str(k): to_serializable_primitive(v) for k, v in obj.items()}
     if isinstance(obj, Path):
         return str(obj)
-    if pd.isna(obj):
+    if pd.isna(cast(Any,obj)):
         return None
     return obj
 
