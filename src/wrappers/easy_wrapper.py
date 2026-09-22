@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
+from ..machines import *
+from ..programs import *
 from ..util.data import ExecutionParams
-
 from . import base_wrapper
 
-from ..programs import *
-from ..machines import *
 
 def main(program: type[Program], machine: Machine, input_file: str = "input.csv", output_file: str = "output.csv"):
     with open(input_file, "r") as f:

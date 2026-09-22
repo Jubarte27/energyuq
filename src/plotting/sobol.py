@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 from typing import Any
-import numpy as np
+
 import matplotlib.pyplot as plt
+import numpy as np
 from matplotlib.figure import Figure, SubFigure
 from matplotlib.patches import Patch
 
@@ -207,12 +210,11 @@ class PlotterSobolMixin:
         # Call SCAnalysis.get_pce_sobol_indices
         ret = analysis.get_pce_sobol_indices(qoi, typ="all", **kwargs)
         if isinstance(ret, tuple) and len(ret) == 4:
-            mean, D, D_u, S_u = ret
+            mean, D, _, S_u = ret
         elif isinstance(ret, tuple) and len(ret) == 3:
             mean, D, S_u = ret
-            D_u = {}
         elif isinstance(ret, dict):
-            mean, D, D_u, S_u = None, None, {}, ret
+            mean, D, _, S_u = None, None, {}, ret
         else:
             raise ValueError(f"Unexpected return format from get_pce_sobol_indices: {type(ret)}")
 
@@ -224,7 +226,7 @@ class PlotterSobolMixin:
         if not param_names and hasattr(self, "get_result_params"):
             param_names = self.get_result_params(result)
 
-        max_idx = max((max(u) for u in S_u.keys() if u), default=-1)
+        max_idx = max((max(u) for u in S_u if u), default=-1)
         N = getattr(analysis, "N", max_idx + 1)
         if len(param_names) < N:
             param_names = param_names + [f"X{i}" for i in range(len(param_names), N)]
@@ -249,7 +251,7 @@ class PlotterSobolMixin:
         else:
             k_pct = float(k)
 
-        max_order = max((len(u) for u in sobol_values.keys()), default=1)
+        max_order = max((len(u) for u in sobol_values), default=1)
         if order is not None:
             n = max(1, min(int(order), max_order))
         else:

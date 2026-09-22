@@ -1,6 +1,9 @@
+from collections.abc import Iterable
 from subprocess import CompletedProcess
-from typing import ClassVar, Iterable, Protocol
+from typing import ClassVar, Protocol
+
 from ..util.data import ExecutionParams
+
 
 class Program(Protocol):
 

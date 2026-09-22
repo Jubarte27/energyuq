@@ -1,10 +1,11 @@
 """
 Operating system interface utilities for EnergyUQ.
 """
+from __future__ import annotations
 
-from collections.abc import Sequence
 import subprocess
 import sys
+from collections.abc import Sequence
 
 
 def try_exec(
@@ -19,7 +20,13 @@ def try_exec(
     """
     for cmd in cmds:
         cmd_list = list(cmd)
-        result = subprocess.run(cmd_list, capture_output=True, text=True, input=input)
+        result = subprocess.run(
+            cmd_list,
+            capture_output=True,
+            text=True,
+            input=input, 
+            check=False,
+        )
         if result.returncode != 0:
             if err_msg:
                 print(err_msg, file=sys.stderr)

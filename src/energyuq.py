@@ -1,32 +1,32 @@
-from collections.abc import Callable
-from contextlib import redirect_stdout
-from dataclasses import fields
+from __future__ import annotations
+
 import datetime
 import json
 import os
+from collections.abc import Callable
+from contextlib import redirect_stdout
 from pathlib import Path
 from typing import Any, cast
 
 import chaospy as cp
 import dill
 import easyvvuq as uq
-from easyvvuq.actions import Actions, CreateRunDirectory, Decode, Encode
-from easyvvuq.sampling.stochastic_collocation import SCSampler
 import matplotlib.pyplot as plt
 import numpy as np
+from easyvvuq.actions import Actions, CreateRunDirectory, Decode, Encode
+from easyvvuq.sampling.stochastic_collocation import SCSampler
 
 from .machines.machine import Machine, load_machine, save_machine
-from .programs.program import Program
-from .util.constants import QOI, QOIS, RESULTS_DIR, params_type, vary_type
 from .morris import (
     MorrisScreeningResult,
-    _msgpack_default,
     _pack,
     _unpack,
     add_morris_runs_to_campaign,
     create_dir,
     morris_screen,
 )
+from .programs.program import Program
+from .util.constants import QOI, QOIS, RESULTS_DIR, params_type, vary_type
 from .util.path import change_dir_permissions, latest_dir, next_dir, next_file
 from .wrappers import easy_wrapper
 
@@ -141,9 +141,9 @@ def create_campaign(
         db_location="sqlite:///" + path.as_posix() + "/campaign.db",
         work_dir=path.as_posix(),
     )
-    setattr(campaign, "root_path", root)
-    setattr(campaign, "machine", machine)
-    setattr(campaign, "active_params", active_params if active_params is not None else list(vary.keys()))
+    campaign.root_path = root
+    campaign.machine = machine
+    campaign.active_params = active_params if active_params is not None else list(vary.keys())
 
     if campaign.get_active_app() is None:
         campaign.add_app(
@@ -179,7 +179,7 @@ def prepare_campaign(
     campaign = create_campaign(program, machine, root, active_params=active_params, numa=numa)
     if screening_result is not None:
         add_morris_runs_to_campaign(campaign, screening_result)
-        setattr(campaign, "morris_screening", screening_result)
+        campaign.morris_screening = screening_result
 
     campaign.execute(sequential=True).collate(progress_bar=True)
     return campaign
@@ -384,7 +384,7 @@ def run_dir(
         return Path(dir)
     if campaign:
         if hasattr(campaign, "root_path"):
-            return Path(getattr(campaign, "root_path"))
+            return Path(campaign.root_path)
         app = campaign.get_active_app()
         if app:
             name = app["name"]
@@ -447,10 +447,7 @@ def create(
         )
         active_params = screening_result.active_params
         screening_result.save(root)
-        try:
-            screening_result.plot(root / "morris_screening.png")
-        except Exception as e:
-            print(f"Warning: Could not save Morris screening plot: {e}")
+        screening_result.plot(root / "morris_screening.png")
 
     campaign = prepare_campaign(
         program,
@@ -496,12 +493,9 @@ def save(
         sampler.save_state((path / "sampler").as_posix())
 
     total_samples = 0
-    try:
-        collation = campaign.get_collation_result()
-        if collation is not None and not collation.empty:
-            total_samples = int(len(collation))
-    except Exception:
-        pass
+    collation = campaign.get_collation_result()
+    if collation is not None and not collation.empty:
+        total_samples = len(collation)
 
     latest_surplus = None
     if hasattr(analysis, "adaptation_errors") and len(analysis.adaptation_errors) > 0:
@@ -544,24 +538,18 @@ def load(
     active_params = _unpack(active_params_path) if active_params_path.exists() else None
 
     campaign = create_campaign(program, machine, path, active_params=active_params)
-    setattr(campaign, "machine", machine)
+    campaign.machine = machine
 
     screening_path = path / "morris_screening.msgpack"
     if screening_path.exists():
-        try:
-            screening_result = MorrisScreeningResult.load(screening_path)
-            setattr(campaign, "morris_screening", screening_result)
-        except Exception:
-            pass
+        screening_result = MorrisScreeningResult.load(screening_path)
+        campaign.morris_screening = screening_result
 
     sampler_path = path / "sampler"
     if sampler_path.exists():
-        try:
-            sampler = get_sampler(campaign)
-            if sampler is not None:
-                sampler.load_state(sampler_path.as_posix())
-        except Exception as e:
-            print(f"Warning: Could not load sampler state: {e}")
+        sampler = get_sampler(campaign)
+        if sampler is not None:
+            sampler.load_state(sampler_path.as_posix())
 
     analysis = prepare_analysis(campaign)
     analysis_path = path / "analysis"

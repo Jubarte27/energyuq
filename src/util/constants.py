@@ -1,4 +1,5 @@
 from typing import Any
+
 import chaospy as cp
 
 # Quantity of Interest constants

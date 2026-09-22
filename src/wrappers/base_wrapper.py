@@ -1,19 +1,20 @@
+from __future__ import annotations
+
+import subprocess
+from abc import ABC, abstractmethod
+from collections.abc import Iterable
 from dataclasses import replace
 from pathlib import Path
-import subprocess
-from sys import stderr
-from typing import Iterable, Union
-from ..programs import Program
-from ..machines import Machine
-from ..util.data import ExecutionParams, EnergyReading, compute_edp
-from ..util.system import try_exec
-from time import perf_counter
-from abc import ABC, abstractmethod
-
 from textwrap import indent
+from time import perf_counter
+
+from ..machines import Machine
+from ..programs import Program
+from ..util.data import EnergyReading, ExecutionParams, compute_edp
+from ..util.system import try_exec
 
 
-def prepare_and_execute(machine: Machine, program: type[Program], params: ExecutionParams, args: Union[None, Iterable[str]]):
+def prepare_and_execute(machine: Machine, program: type[Program], params: ExecutionParams, args: None | Iterable[str]):
     if not args:
         args = []
 
@@ -36,7 +37,7 @@ def set_boost(machine: Machine, value: int):
         if try_exec([["tee", "/sys/devices/system/cpu/intel_pstate/no_turbo"]], input=boost):
             return machine.boost_setter
 
-    raise Exception(f"Unable to use {machine.boost_setter} for setting turbo boost, do i have permission?")
+    raise RuntimeError(f"Unable to use {machine.boost_setter} for setting turbo boost, do i have permission?")
 
 def set_numa(machine: Machine, value: int):
     if machine.numa_setter == "sysctl":
@@ -44,28 +45,26 @@ def set_numa(machine: Machine, value: int):
         if try_exec([["sudo", "/sbin/sysctl", f"kernel.numa_balancing={numa}"]]):
             return machine.numa_setter
 
-    raise Exception(f"Unable to use {machine.numa_setter} for setting numa balancing, do i have permission?")
+    raise RuntimeError(f"Unable to use {machine.numa_setter} for setting numa balancing, do i have permission?")
     
 
 def set_freq(machine: Machine, frequency):
-    if machine.freq_setter == "cpufreq-set":
-        if try_exec([
-            *(["cpufreq-set", "--cpu", f"{cpu}", "--governor", "userspace"] for cpu in range(machine.max_threads)),
-            *(["cpufreq-set", "--cpu", f"{cpu}", "--freq", f"{frequency}"] for cpu in range(machine.max_threads))
-        ]):
-            return machine.freq_setter
+    if machine.freq_setter == "cpufreq-set" and try_exec([
+        *(["cpufreq-set", "--cpu", f"{cpu}", "--governor", "userspace"] for cpu in range(machine.max_threads)),
+        *(["cpufreq-set", "--cpu", f"{cpu}", "--freq", f"{frequency}"] for cpu in range(machine.max_threads))
+    ]):
+        return machine.freq_setter
 
-    if machine.freq_setter == "cpupower":
-        if try_exec([
-            ["cpupower", "frequency-set", "--governor", "userspace"],
-            ["cpupower", "frequency-set", "--freq", f"{frequency}"]
-        ]):
-            return machine.freq_setter
+    if machine.freq_setter == "cpupower" and try_exec([
+        ["cpupower", "frequency-set", "--governor", "userspace"],
+        ["cpupower", "frequency-set", "--freq", f"{frequency}"]
+    ]):
+        return machine.freq_setter
 
     if machine.freq_getter == "slurm":
         return machine.freq_setter
 
-    raise Exception(f"Unable to use {machine.freq_setter} for setting cpu frequency, do i have permission?")
+    raise RuntimeError(f"Unable to use {machine.freq_setter} for setting cpu frequency, do i have permission?")
 
 def cpu_set(machine: Machine, freq_level: int):
 
@@ -125,6 +124,7 @@ def set_sysfs(full_path: str, value: object, name=None):
         input=str(value),
         capture_output=True,
         text=True,
+        check=False,
     )
 
     output_CompletedProcess(full_path if name is None else name, result)

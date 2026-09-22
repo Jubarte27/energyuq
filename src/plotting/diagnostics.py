@@ -1,8 +1,11 @@
+from __future__ import annotations
+
 from typing import Any
-import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.figure import Figure
+
 import matplotlib.colors as mcolors
+import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib.figure import Figure
 
 
 class PlotterDiagnosticsMixin:

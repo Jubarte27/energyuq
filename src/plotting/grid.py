@@ -1,21 +1,24 @@
+from __future__ import annotations
+
 from collections.abc import Sequence
 from typing import Any
+
+import matplotlib.colors as mcolors
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from pandas import DataFrame
-import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure, SubFigure
 from matplotlib.lines import Line2D
 from matplotlib.ticker import MaxNLocator
-import matplotlib.colors as mcolors
+from pandas import DataFrame
 
 from ..machines.machine import Machine
 from ..util.data import EasyResult, Result, limit
 from .layout import (
+    get_machine,
     mostly_square_grid,
     pad_to_even_and_split,
-    get_machine,
 )
 from .units import _is_integer_range
 
@@ -157,11 +160,11 @@ class PlotterGridMixin:
         units: dict[str, str | None] | None = None,
     ) -> Figure | SubFigure:
         """Plot pairwise 2D parameter evaluations colored by QoI cost."""
-        mach, qoi, key, df = self._prepare_context(result, units=units, qoi=qoi)
+        _, qoi, key, df = self._prepare_context(result, units=units, qoi=qoi)
         pretty_colors = self.colors_for(qoi)
 
         cur_labels = self.get_result_params(result, df)
-        cur_L, cur_R, cur_fig_size, row_col_counts, cur_nd_values, cur_nd_labels = self._setup_pairwise_grid_layout(
+        _, cur_R, cur_fig_size, row_col_counts, cur_nd_values, cur_nd_labels = self._setup_pairwise_grid_layout(
             cur_labels, units
         )
 
@@ -342,7 +345,7 @@ class PlotterGridMixin:
         units: dict[str, str | None] | None = None,
     ) -> Figure | SubFigure:
         """Plot 2D projections of each parameter against the QoI."""
-        mach, qoi, key, df = self._prepare_context(result, units=units, qoi=qoi)
+        _, qoi, key, df = self._prepare_context(result, units=units, qoi=qoi)
         cur_labels = self.get_result_params(result, df)
         L = len(cur_labels)
         C, R = self._setup_subgrid_dims(L)
@@ -396,7 +399,7 @@ class PlotterGridMixin:
         units: dict[str, str | None] | None = None,
     ) -> Figure:
         """Plot boxplots per discrete parameter level against the QoI."""
-        mach, qoi, key, df = self._prepare_context(result, units=units, qoi=qoi)
+        _, qoi, key, df = self._prepare_context(result, units=units, qoi=qoi)
         cur_labels = self.get_result_params(result, df)
         L = len(cur_labels)
         C, R = self._setup_subgrid_dims(L)

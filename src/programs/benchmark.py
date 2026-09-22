@@ -1,8 +1,11 @@
-from subprocess import CompletedProcess, run
 import os
-from typing import ClassVar, Iterable
+from collections.abc import Iterable
+from subprocess import CompletedProcess, run
+from typing import ClassVar
+
 from ..util.data import ExecutionParams
 from .program import Program
+
 
 class ExecuteSH(Program):
     @classmethod
@@ -18,6 +21,7 @@ class ExecuteSH(Program):
             env=os.environ | {"OMP_PLACES": places, "OMP_PROC_BIND": proc_bind},
             capture_output=True,
             text=True,
+            check=False
         )
     @classmethod
     def report(cls):

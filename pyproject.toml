@@ -34,3 +34,6 @@ dev = [
 where = ["."]
 include = ["src*"]
 
+
+[tool.ruff.lint]
+ignore = ["DTZ005"]

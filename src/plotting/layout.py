@@ -1,5 +1,8 @@
-from math import floor, ceil, sqrt
+from __future__ import annotations
+
+from math import ceil, floor, sqrt
 from typing import Any
+
 import numpy as np
 import pandas as pd
 from pandas import DataFrame

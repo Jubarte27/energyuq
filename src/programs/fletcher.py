@@ -1,11 +1,14 @@
-from subprocess import CompletedProcess
-import subprocess
-from typing import ClassVar, Iterable
-import numpy as np
 import os
+import subprocess
+from collections.abc import Iterable
+from subprocess import CompletedProcess
+from typing import ClassVar
+
+import numpy as np
 
 from ..util.data import ExecutionParams
 from .program import Program
+
 
 class Fletcher(Program):
     name: ClassVar[str] = "Fletcher"
@@ -47,6 +50,7 @@ class Fletcher(Program):
             ],
             capture_output=True,
             text=True,
+            check=False,
         )
 
     @classmethod

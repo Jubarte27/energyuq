@@ -1,21 +1,24 @@
+from __future__ import annotations
+
 from typing import Any
+
 import numpy as np
 from matplotlib.lines import Line2D
 
 from .. import energyuq
 from ..machines.machine import Machine
 from ..util.data import limit
-from .units import DEFAULT_PARAM_UNITS, PlotterUnitsMixin
+from .diagnostics import PlotterDiagnosticsMixin
+from .grid import PlotterGridMixin
 from .layout import (
-    mostly_square_grid,
-    pad_to_even_and_split,
+    PlotterLayoutMixin,
     get_machine,
     get_sampler_params,
-    PlotterLayoutMixin,
+    mostly_square_grid,
+    pad_to_even_and_split,
 )
-from .grid import PlotterGridMixin
 from .sobol import PlotterSobolMixin
-from .diagnostics import PlotterDiagnosticsMixin
+from .units import DEFAULT_PARAM_UNITS, PlotterUnitsMixin
 
 
 class Plotter(
@@ -59,7 +62,7 @@ class Plotter(
             self.init(machine, units=units, active_params=active_params)
 
     @classmethod
-    def from_result(cls, result: Any, units: dict[str, Any] | None = None) -> "Plotter":
+    def from_result(cls, result: Any, units: dict[str, Any] | None = None) -> Plotter:
         """Create a Plotter configured from the machine and parameters inside result."""
         mach = get_machine(result)
         sampler_params = get_sampler_params(result)

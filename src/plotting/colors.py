@@ -8,7 +8,7 @@ categorical data, and stacked sensitivity indices.
 from __future__ import annotations
 
 import colorsys
-from typing import Any
+
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
@@ -155,8 +155,8 @@ get_n_distinct_colors = get_distinct_colors
 n_distinct_colors = get_distinct_colors
 
 __all__ = [
-    "get_distinct_colors",
     "distinct_colors",
+    "get_distinct_colors",
     "get_n_distinct_colors",
     "n_distinct_colors",
 ]

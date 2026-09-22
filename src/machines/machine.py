@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 import os
 import socket
 from dataclasses import asdict, dataclass, field, fields, replace
-from shutil import which
 from pathlib import Path
-import subprocess
+from shutil import which
+
 
 @dataclass
 class Machine:
@@ -124,7 +126,7 @@ def _available_programs(machine: Machine, slurm: bool=True) -> Machine:
         freq_tool = "cpupower"
 
     if freq_tool is None:
-        raise Exception("Unable to use cpufreq-set or cpupower, do i have permission?")
+        raise RuntimeError("Unable to use cpufreq-set or cpupower, do i have permission?")
 
     if _check_rapl(machine):
         energy_tool = "intel-rapl"
@@ -140,7 +142,7 @@ def _available_programs(machine: Machine, slurm: bool=True) -> Machine:
         raise RuntimeError("Couldn't find a way to set boost, do i have permission?")
 
     if energy_tool is None:
-        raise Exception("Couldn't find a way to read energy counters, do i have permission?")
+        raise RuntimeError("Couldn't find a way to read energy counters, do i have permission?")
 
     return replace(machine,
         freq_getter=freq_tool,
@@ -163,10 +165,11 @@ def _check_cpufreq_boost() -> bool:
 def _check_rapl(machine: Machine) -> bool:
     commands = [
         [
-            "cat",
-            f"/sys/class/powercap/intel-rapl:{package}"
-            f"{f':{sub_package}' if sub_package >= 0 else ''}"
-            "/energy_uj",
+            "cat",(
+                f"/sys/class/powercap/intel-rapl:{package}"
+                f"{f':{sub_package}' if sub_package >= 0 else ''}"
+                "/energy_uj"
+            ),
         ]
         for package in machine.package
         for sub_package in machine.sub_package
@@ -209,8 +212,7 @@ def guess_machine() -> Machine:
 
     env_max_threads = _environment_list("ENERGYUQ_MACHINE_MAX_THREADS", int)
     max_threads = env_max_threads[0] if env_max_threads else (os.cpu_count() or 1)
-    if max_threads < 1:
-        max_threads = 1
+    max_threads = max(max_threads, 1)
 
     packages = (
         _environment_list("ENERGYUQ_MACHINE_PACKAGE", int)

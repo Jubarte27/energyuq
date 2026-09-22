@@ -1,26 +1,27 @@
-from collections.abc import Callable
-from dataclasses import asdict, dataclass, field, fields, is_dataclass
+from __future__ import annotations
+
 import json
+from collections.abc import Callable
+from dataclasses import dataclass, field, fields
 from math import ceil, floor
-import os
 from pathlib import Path
 from typing import Any
 
 import chaospy as cp
 import easyvvuq as uq
-from matplotlib.lines import Line2D
-from matplotlib.patches import Patch
 import matplotlib.pyplot as plt
 import msgpack
 import numpy as np
+from matplotlib.lines import Line2D
+from matplotlib.patches import Patch
 from SALib.analyze import morris as morris_analyzer
 from SALib.sample import morris as morris_sampler
 
 from .machines.machine import Machine
 from .programs.program import Program
-from .wrappers import base_wrapper
 from .util.constants import QOI, QOIS, params_type, vary_type
 from .util.data import ExecutionParams, compute_edp, to_serializable_primitive
+from .wrappers import base_wrapper
 
 
 def create_dir(path: Path | str) -> Path:
@@ -182,7 +183,7 @@ class MorrisScreeningResult:
         _pack(self.to_dict(), target)
 
     @classmethod
-    def load(cls, path: Path | str) -> "MorrisScreeningResult":
+    def load(cls, path: Path | str) -> MorrisScreeningResult:
         p = Path(path)
         file_path = p if p.is_file() else p / "morris_screening.msgpack"
         data = _unpack(file_path)
@@ -379,9 +380,7 @@ def morris_screen(
     ignored_params: list[str] = []
     for name in param_names:
         m_lower = mu_star_lower.get(name, 0.0)
-        if max_mu > 0 and (m_lower / max_mu) < threshold_ratio:
-            ignored_params.append(name)
-        elif max_mu == 0.0 and name in const_names:
+        if max_mu > 0 and (m_lower / max_mu) < threshold_ratio or max_mu == 0.0 and name in const_names:
             ignored_params.append(name)
         else:
             active_params.append(name)

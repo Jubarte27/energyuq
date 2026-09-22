@@ -55,7 +55,7 @@ class ExecutionParams:
     numa: int | None = None
 
     @classmethod
-    def from_dict(cls, machine: Machine, data: dict[str, Any]) -> "ExecutionParams":
+    def from_dict(cls, machine: Machine, data: dict[str, Any]) -> ExecutionParams:
         n_threads = int(data.get("N_THREADS", data.get("THREADS", machine.max_threads)))
         freq_level = int(data.get("CLK", data.get("CLK_LEVEL", len(machine.freq) - 1)))
         place_wideness = int(data.get("PLACES", len(machine.places) - 1))
@@ -74,7 +74,7 @@ class ExecutionParams:
         )
 
     @classmethod
-    def from_args(cls, machine: Machine, args: Sequence[Any]) -> "ExecutionParams":
+    def from_args(cls, machine: Machine, args: Sequence[Any]) -> ExecutionParams:
         def arg(i: int, default: int = 0) -> int:
             if len(args) > i and str(args[i]).strip() != "":
                 try:
@@ -102,7 +102,7 @@ class ExecutionParams:
 
 
 @dataclass
-class EnergyReading():
+class EnergyReading:
     start: int
     end: int
     package: int | str
@@ -110,12 +110,12 @@ class EnergyReading():
 
 
 @dataclass
-class limit():
+class limit:
     lower: int # | float
     upper: int # | float
 
 @dataclass
-class Result():
+class Result:
     df: DataFrame
     qois: list[str]
 

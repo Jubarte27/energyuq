@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 from collections.abc import Callable
-from typing import Any, Sequence
+from typing import Any
+
 import numpy as np
 import pandas as pd
 from pandas import DataFrame
@@ -7,7 +10,6 @@ from pandas import DataFrame
 from ..machines.machine import Machine
 from ..util.data import limit
 from .layout import pad_to_even_and_split
-
 
 SI_PREFIX_FACTORS: dict[str, float] = {
     "p": 1e-12,
@@ -77,17 +79,6 @@ def parse_unit_spec(spec: Any) -> tuple[str | None, str | None, float | Callable
             return parts[0].strip(), parts[1].strip(), None
         return None, s, None
     return None, str(spec).strip(), None
-
-
-def _is_integer_range(lower: Any, upper: Any) -> bool:
-    try:
-        f_low = float(lower)
-        f_up = float(upper)
-        if f_up - f_low < 1:
-            return False
-        return f_low.is_integer() and f_up.is_integer()
-    except Exception:
-        return False
 
 
 class PlotterUnitsMixin:
@@ -178,7 +169,7 @@ class PlotterUnitsMixin:
                         base_to = to_u[len(p_to):]
                         if base_from == base_to:
                             factor = f_from / f_to
-                            return target_unit, (lambda v: v * factor)
+                            return target_unit, (lambda v, factor=factor: v * factor)
 
         return target_unit, None
 
@@ -193,31 +184,29 @@ class PlotterUnitsMixin:
             mach = self.machine
         if mach is None or not hasattr(mach, "freq") or not mach.freq:
             return val
-        try:
-            if pd.isna(val):
-                return val
-            f_val = float(val)
-            _, conv_fn = self.get_unit_converter("CLK", units)
-            scale_fn = conv_fn if conv_fn is not None else (lambda v: v)
 
-            if not np.isclose(f_val, round(f_val)):
-                return val
-
-            min_raw = min(mach.freq) if mach.freq else 1e5
-            if f_val >= min_raw * 0.5:
-                return scale_fn(f_val if conv_fn is not None else int(round(f_val)))
-
-            if f_val >= len(mach.freq):
-                return val
-
-            i_val = int(round(f_val))
-            if 0 <= i_val < len(mach.freq):
-                real_val = mach.freq[i_val]
-                return scale_fn(real_val)
-
+        if pd.isna(val):
             return val
-        except Exception:
-            pass
+        f_val = float(val)
+        _, conv_fn = self.get_unit_converter("CLK", units)
+        scale_fn = conv_fn if conv_fn is not None else (lambda v: v)
+
+        if not np.isclose(f_val, round(f_val)):
+            return val
+
+        min_raw = min(mach.freq) if mach.freq else 1e5
+        if f_val >= min_raw * 0.5:
+            return scale_fn(f_val if conv_fn is not None else round(f_val))
+
+        if f_val >= len(mach.freq):
+            return val
+
+        i_val = round(f_val)
+        if 0 <= i_val < len(mach.freq):
+            real_val = mach.freq[i_val]
+            return scale_fn(real_val)
+
+        return val
         return val
 
     def convert_clk_series(
