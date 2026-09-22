@@ -59,6 +59,41 @@ class ExecuteWrapper:
         return True
 
 
+class EnergyUQCampaign:
+    """Encapsulates an EasyVVUQ Campaign along with EnergyUQ metadata:
+    root directory, machine profile, screening results, and active parameters.
+    """
+
+    def __init__(
+        self,
+        campaign: uq.Campaign,
+        root_path: Path | str,
+        machine: Machine,
+        screening_result: MorrisScreeningResult | None = None,
+        active_params: list[str] | None = None,
+    ):
+        self.campaign: uq.Campaign = campaign
+        self.root_path = Path(root_path)
+        self.machine: Machine = machine
+        self.screening_result = screening_result
+        self.active_params = list(active_params) if active_params is not None else []
+
+    @property
+    def sampler(self) -> SCSampler:
+        return cast(SCSampler, self.campaign.get_active_sampler())
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self.campaign, name)
+
+    def __repr__(self) -> str:
+        camp_name = getattr(self.campaign, "campaign_name", None)
+        return (
+            f"EnergyUQCampaign(name={camp_name!r}, "
+            f"root_path={self.root_path}, machine={self.machine.name}, "
+            f"screening_result={'yes' if self.screening_result else 'no'})"
+        )
+
+
 def default_params(
     machine: Machine, active_params: list[str] | None = None, numa: bool = False
 ) -> tuple[params_type, vary_type]:
@@ -130,7 +165,8 @@ def create_campaign(
     root: Path,
     active_params: list[str] | None = None,
     numa: bool = False,
-) -> uq.Campaign:
+    screening_result: MorrisScreeningResult | None = None,
+) -> EnergyUQCampaign:
     path = campaign_path(root)
     create_dir(path)
     change_dir_permissions(path, 0o755)
@@ -141,9 +177,6 @@ def create_campaign(
         db_location="sqlite:///" + path.as_posix() + "/campaign.db",
         work_dir=path.as_posix(),
     )
-    campaign.root_path = root
-    campaign.machine = machine
-    campaign.active_params = active_params if active_params is not None else list(vary.keys())
 
     if campaign.get_active_app() is None:
         campaign.add_app(
@@ -161,7 +194,13 @@ def create_campaign(
         )
         campaign.set_sampler(sampler)
 
-    return campaign
+    return EnergyUQCampaign(
+        campaign=campaign,
+        root_path=root,
+        machine=machine,
+        screening_result=screening_result,
+        active_params=active_params if active_params is not None else list(vary.keys()),
+    )
 
 
 def prepare_campaign(
@@ -171,21 +210,22 @@ def prepare_campaign(
     active_params: list[str] | None = None,
     screening_result: MorrisScreeningResult | None = None,
     numa: bool = False,
-) -> uq.Campaign:
+) -> EnergyUQCampaign:
     """
     Creates a campaign, optionally adds Morris screening runs to the database,
     and runs the first execution.
     """
-    campaign = create_campaign(program, machine, root, active_params=active_params, numa=numa)
+    campaign = create_campaign(
+        program, machine, root, active_params=active_params, numa=numa, screening_result=screening_result
+    )
     if screening_result is not None:
         add_morris_runs_to_campaign(campaign, screening_result)
-        campaign.morris_screening = screening_result
 
     campaign.execute(sequential=True).collate(progress_bar=True)
     return campaign
 
 
-def prepare_analysis(campaign: uq.Campaign) -> uq.analysis.SCAnalysis:
+def prepare_analysis(campaign: EnergyUQCampaign) -> uq.analysis.SCAnalysis:
     sampler: SCSampler = cast(SCSampler, campaign.get_active_sampler())
     analysis = uq.analysis.SCAnalysis(sampler=sampler, qoi_cols=[QOI])
     if not hasattr(analysis, "l_norm"):
@@ -200,10 +240,6 @@ def plot_new_points(new_points: list[tuple[float, float]]) -> None:
     plt.show()
 
 
-def get_sampler(campaign: uq.Campaign) -> SCSampler:
-    return cast(SCSampler, campaign.get_active_sampler())
-
-
 def _ordinal(n: int) -> str:
     if 11 <= (n % 100) <= 13:
         return f"{n}th"
@@ -212,7 +248,7 @@ def _ordinal(n: int) -> str:
 
 
 def refine_sampling_plan(
-    campaign: uq.Campaign,
+    campaign: EnergyUQCampaign,
     analysis: uq.analysis.SCAnalysis,
     start_index: int | None = None,
     min_number_of_refinements: int = -1,
@@ -227,7 +263,7 @@ def refine_sampling_plan(
     save_every: int = 2,
     save_dir: Path | str | None = None,
 ) -> None:
-    sampler = get_sampler(campaign)
+    sampler = campaign.sampler
     ignored = set(ignored_dims) if ignored_dims is not None else set()
 
     for d in ignored:
@@ -353,7 +389,7 @@ def refine_sampling_plan(
 
 
 def refine_and_analyse(
-    campaign: uq.Campaign,
+    campaign: EnergyUQCampaign,
     analysis: uq.analysis.SCAnalysis,
     min_number_of_refinements: int = -1,
     max_number_of_refinements: int = 100,
@@ -378,7 +414,7 @@ def run_dir(
     *,
     name: str = "energy",
     dir: str | None = None,
-    campaign: uq.Campaign | None = None,
+    campaign: EnergyUQCampaign | None = None,
 ) -> Path:
     if dir:
         return Path(dir)
@@ -408,7 +444,7 @@ def create(
     morris_seed: int | None = None,
     resume: bool = False,
     numa: bool = False,
-) -> tuple[uq.Campaign, uq.analysis.SCAnalysis]:
+) -> tuple[EnergyUQCampaign, uq.analysis.SCAnalysis]:
     if resume:
         target_dir = Path(dir) if dir else latest_dir(RESULTS_DIR, "energy")
         if target_dir is not None and (
@@ -465,7 +501,7 @@ def create(
 
 
 def save(
-    campaign: uq.Campaign,
+    campaign: EnergyUQCampaign,
     analysis: uq.analysis.SCAnalysis,
     /,
     dir: str | Path | None = None,
@@ -488,7 +524,7 @@ def save(
 
     analysis.save_state((path / "analysis").as_posix())
 
-    sampler = get_sampler(campaign)
+    sampler = campaign.sampler
     if sampler is not None:
         sampler.save_state((path / "sampler").as_posix())
 
@@ -521,7 +557,7 @@ def load(
     campaign_name: str = "energy",
     /,
     dir: str | Path | None = None,
-) -> tuple[uq.Campaign, uq.analysis.SCAnalysis, Machine]:
+) -> tuple[EnergyUQCampaign, uq.analysis.SCAnalysis, Machine]:
     if not dir:
         path = latest_dir(RESULTS_DIR, campaign_name)
         if path is None:
@@ -537,17 +573,18 @@ def load(
     active_params_path = path / "active_params.msgpack"
     active_params = _unpack(active_params_path) if active_params_path.exists() else None
 
-    campaign = create_campaign(program, machine, path, active_params=active_params)
-    campaign.machine = machine
-
+    screening_result = None
     screening_path = path / "morris_screening.msgpack"
     if screening_path.exists():
         screening_result = MorrisScreeningResult.load(screening_path)
-        campaign.morris_screening = screening_result
+
+    campaign = create_campaign(
+        program, machine, path, active_params=active_params, screening_result=screening_result
+    )
 
     sampler_path = path / "sampler"
     if sampler_path.exists():
-        sampler = get_sampler(campaign)
+        sampler = campaign.sampler
         if sampler is not None:
             sampler.load_state(sampler_path.as_posix())
 
@@ -569,6 +606,6 @@ def resume(
     campaign_name: str = "energy",
     /,
     dir: str | Path | None = None,
-) -> tuple[uq.Campaign, uq.analysis.SCAnalysis]:
+) -> tuple[EnergyUQCampaign, uq.analysis.SCAnalysis]:
     campaign, analysis, _ = load(program, default_machine, campaign_name, dir=dir)
     return campaign, analysis

@@ -1,6 +1,6 @@
 from typing import Any
 
-from . import *
+from . import Plotter
 
 _default_plotter = Plotter()
 

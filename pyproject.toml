@@ -36,4 +36,16 @@ include = ["src*"]
 
 
 [tool.ruff.lint]
+select = [
+    # Pyflakes
+    "F",
+    # pyupgrade
+    "UP",
+    # flake8-bugbear
+    "B",
+    # flake8-simplify
+    "SIM",
+    # isort
+    "I",
+]
 ignore = ["DTZ005"]

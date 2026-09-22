@@ -81,6 +81,17 @@ def parse_unit_spec(spec: Any) -> tuple[str | None, str | None, float | Callable
     return None, str(spec).strip(), None
 
 
+def _is_integer_range(lower: Any, upper: Any) -> bool:
+    try:
+        f_low = float(lower)
+        f_up = float(upper)
+        if f_up - f_low < 1:
+            return False
+        return f_low.is_integer() and f_up.is_integer()
+    except (ValueError, TypeError, OverflowError):
+        return False
+
+
 class PlotterUnitsMixin:
     """Mixin providing unit management and machine clock conversions for Plotter."""
 

@@ -5,7 +5,10 @@ from collections.abc import Callable
 from dataclasses import dataclass, field, fields
 from math import ceil, floor
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from .energyuq import EnergyUQCampaign
 
 import chaospy as cp
 import easyvvuq as uq
@@ -444,7 +447,7 @@ def morris_screen(
 
 
 def add_morris_runs_to_campaign(
-    campaign: uq.campaign.Campaign,
+    campaign: EnergyUQCampaign,
     screening_result: MorrisScreeningResult,
     morris_dir: Path | str | None = None,
 ) -> None:
@@ -457,12 +460,8 @@ def add_morris_runs_to_campaign(
 
     if morris_dir is not None:
         runs_dir = Path(morris_dir)
-    elif hasattr(campaign, "root_path"):
-        runs_dir = Path(campaign.root_path) / "morris_runs" # type: ignore
-    elif hasattr(campaign, "campaign_dir"):
-        runs_dir = Path(campaign.campaign_dir).parent / "morris_runs"
     else:
-        runs_dir = Path(campaign.work_dir).parent / "morris_runs"
+        runs_dir = Path(campaign.root_path) / "morris_runs"
 
     create_dir(runs_dir)
 

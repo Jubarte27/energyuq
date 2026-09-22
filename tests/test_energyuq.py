@@ -220,6 +220,51 @@ class TestEnergyActionsAndAnalysis(unittest.TestCase):
             self.assertTrue(hasattr(analysis, "l_norm"))
 
 
+class TestEnergyUQCampaign(unittest.TestCase):
+    def setUp(self):
+        self.machine = Machine(
+            name="TestMachine",
+            freq=[1000, 2000],
+            max_threads=4,
+            places=["cores"],
+            proc_bind=["close"],
+            turbo_boost=["0", "1"],
+        )
+
+    def test_campaign_encapsulation_and_delegation(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            campaign = energyuq.create_campaign(NONE, self.machine, root, active_params=["N_THREADS"])
+            self.assertIsInstance(campaign, energyuq.EnergyUQCampaign)
+            self.assertEqual(campaign.root_path, root)
+            self.assertEqual(campaign.machine, self.machine)
+            self.assertEqual(campaign.active_params, ["N_THREADS"])
+            self.assertIsNone(campaign.screening_result)
+            self.assertIsNone(campaign.morris_screening)
+
+            # Test property setter alias
+            dummy_screening = MagicMock()
+            campaign.morris_screening = dummy_screening
+            self.assertEqual(campaign.screening_result, dummy_screening)
+            self.assertEqual(campaign.morris_screening, dummy_screening)
+            self.assertEqual(campaign.campaign.morris_screening, dummy_screening)
+
+            # Test delegation of EasyVVUQ methods and attributes
+            self.assertIsNotNone(campaign.get_active_app())
+            self.assertIsNotNone(campaign.get_active_sampler())
+            self.assertEqual(campaign.campaign_name, "energy")
+            self.assertTrue(repr(campaign).startswith("EnergyUQCampaign"))
+
+    def test_prepare_campaign_returns_energyuq_campaign(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            with patch("src.wrappers.base_wrapper.prepare_and_execute", return_value={"energy_uj": 100.0, "time": 1.0, "EDP": 100.0}):
+                campaign = energyuq.prepare_campaign(NONE, self.machine, root, active_params=["N_THREADS"])
+                self.assertIsInstance(campaign, energyuq.EnergyUQCampaign)
+                self.assertEqual(campaign.root_path, root)
+                self.assertEqual(campaign.machine, self.machine)
+
+
 class TestSaveAndLoadEdgeCases(unittest.TestCase):
     def setUp(self):
         self.machine = Machine(
@@ -684,7 +729,7 @@ class TestSystemAndExecutionUnification(unittest.TestCase):
 
     def test_multi_run_derived_qois_edp_only(self):
         import pandas as pd
-        from src.util.multi_run import _compute_derived_qois
+        from src.util.data import _compute_derived_qois
         df = pd.DataFrame({
             "energy_uj": [1_000_000.0, 2_000_000.0],
             "time": [2.0, 3.0],

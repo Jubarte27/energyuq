@@ -61,7 +61,7 @@ class Fletcher(Program):
         if os.path.exists(report_path):
             print(f"Report.csv found at {report_path}")
             # Read Report.csv and extract MSamples
-            with open(report_path, "r") as f:
+            with open(report_path) as f:
                 lines = f.readlines()
                 # MSamples is in the second line
                 if len(lines) >= 2:
