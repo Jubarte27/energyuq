@@ -5,7 +5,8 @@ from sys import stderr
 from typing import Iterable, Union
 from ..programs import Program
 from ..machines import Machine
-from ..util.data import ExecutionParams, EnergyReading
+from ..util.data import ExecutionParams, EnergyReading, compute_edp
+from ..util.system import try_exec
 from time import perf_counter
 from abc import ABC, abstractmethod
 
@@ -24,15 +25,6 @@ def prepare_and_execute(machine: Machine, program: type[Program], params: Execut
     accum, t = run(machine, program, params, args)
     return report(accum, t)
 
-def try_exec(cmds: list[list[str]], err_msg: str = "", input: str | None = None) -> bool:
-    for cmd in cmds:
-        result = subprocess.run(cmd, capture_output=True, text=True, input=input)
-        if result.returncode != 0:
-            if err_msg:
-                print(err_msg, file=stderr)
-            output_CompletedProcess(" ".join(cmd), result)
-            return False
-    return True
 
 def set_boost(machine: Machine, value: int):
     if machine.boost_setter == "cpufreq":
@@ -116,7 +108,7 @@ def report(used_energy: int, elapsed: float):
 
     return {
         "energy_uj": used_energy,
-        "EDP": float((used_energy * 1e-6) * elapsed),
+        "EDP": float(compute_edp(used_energy, elapsed)),
         "time": elapsed
     }
 class EnergyReader(ABC):

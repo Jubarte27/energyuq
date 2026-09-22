@@ -62,7 +62,7 @@ def _format_qoi_name(qoi: str) -> str:
         "energy_scaled": "Scaled Energy",
         "time": "Execution Time (s)",
         "power_w": "Power (W)",
-        "edp_j_s": "Energy-Delay Product (J·s)",
+        "EDP": "Energy-Delay Product (J·s)",
     }
     return mapping.get(qoi, qoi.replace("_", " ").title())
 

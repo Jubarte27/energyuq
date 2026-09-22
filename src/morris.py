@@ -20,7 +20,7 @@ from .machines.machine import Machine
 from .programs.program import Program
 from .wrappers import base_wrapper
 from .util.constants import QOI, QOIS, params_type, vary_type
-from .util.data import ExecutionParams
+from .util.data import ExecutionParams, compute_edp, to_serializable_primitive
 
 
 def create_dir(path: Path | str) -> Path:
@@ -30,19 +30,10 @@ def create_dir(path: Path | str) -> Path:
 
 
 def _msgpack_default(obj: Any) -> Any:
-    if is_dataclass(obj) and not isinstance(obj, type):
-        return asdict(obj)
-    if isinstance(obj, np.integer):
-        return int(obj)
-    if isinstance(obj, np.floating):
-        return float(obj)
-    if isinstance(obj, np.ndarray):
-        return obj.tolist()
-    if isinstance(obj, (set, tuple)):
-        return list(obj)
-    if isinstance(obj, Path):
-        return str(obj)
-    raise TypeError(f"Type {type(obj)} not serializable by msgpack")
+    converted = to_serializable_primitive(obj)
+    if converted is obj and not isinstance(obj, (int, float, str, bool, bytes, type(None))):
+        raise TypeError(f"Type {type(obj)} not serializable by msgpack")
+    return converted
 
 
 def _pack(obj: Any, path: Path) -> None:
@@ -65,7 +56,7 @@ def _normalize_output(res: Any, qoi: str = QOI) -> dict[str, float]:
     else:
         out = {qoi: 0.0}
     if "EDP" not in out and "energy_uj" in out and "time" in out:
-        out["EDP"] = float((out["energy_uj"] * 1e-6) * out["time"])
+        out["EDP"] = float(compute_edp(out["energy_uj"], out["time"]))
     for col in QOIS:
         out.setdefault(col, 1.0)
     return out
@@ -340,15 +331,7 @@ def morris_screen(
 
     if evaluate_fn is None:
         def default_eval(point: dict[str, int]) -> dict[str, Any]:
-            execution_params = ExecutionParams(
-                machine=machine,
-                n_threads=point["N_THREADS"],
-                freq_level=point["CLK"],
-                place_wideness=point["PLACES"],
-                binding=point["BINDING"],
-                boost=point["BOOST"],
-                numa=point.get("NUMA"),
-            )
+            execution_params = ExecutionParams.from_dict(machine, point)
             return base_wrapper.prepare_and_execute(machine, program, execution_params, [])
         evaluate_fn = default_eval
 

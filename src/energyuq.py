@@ -15,7 +15,7 @@ from easyvvuq.sampling.stochastic_collocation import SCSampler
 import matplotlib.pyplot as plt
 import numpy as np
 
-from .machines.machine import Machine
+from .machines.machine import Machine, load_machine, save_machine
 from .programs.program import Program
 from .util.constants import QOI, QOIS, RESULTS_DIR, params_type, vary_type
 from .morris import (
@@ -481,8 +481,8 @@ def save(
 
     machine_to_save = machine if machine is not None else getattr(campaign, "machine", None)
     if machine_to_save is not None:
-        _pack(machine_to_save, path / "machine.msgpack")
-    elif not (path / "machine.msgpack").exists():
+        save_machine(machine_to_save, path)
+    elif not (path / "machine.msgpack").exists() and not (path / "machine.pkl").exists():
         raise ValueError("No machine information available to save for this campaign")
 
     active_params = getattr(campaign, "active_params", None)
@@ -537,18 +537,8 @@ def load(
     else:
         path = Path(dir)
 
-    machine_path = path / "machine.msgpack"
-    if machine_path.exists():
-        machine_data = _unpack(machine_path)
-        if isinstance(machine_data, dict):
-            valid_fields = {f.name for f in fields(Machine)}
-            machine = Machine(**{k: v for k, v in machine_data.items() if k in valid_fields})
-        elif isinstance(machine_data, Machine):
-            machine = machine_data
-        else:
-            raise RuntimeError(f"machine at {machine_path.as_posix()} is invalid")
-    else:
-        machine = default_machine
+    loaded_machine = load_machine(path)
+    machine = loaded_machine if loaded_machine is not None else default_machine
 
     active_params_path = path / "active_params.msgpack"
     active_params = _unpack(active_params_path) if active_params_path.exists() else None

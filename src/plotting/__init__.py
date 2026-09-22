@@ -21,6 +21,11 @@ from .layout import (
     colors_for,
     key_for,
 )
+from .colors import (
+    get_distinct_colors,
+    distinct_colors,
+    get_n_distinct_colors,
+)
 from .sobol import (
     SobolOrderResult,
     PlotterSobolMixin,
@@ -70,6 +75,9 @@ __all__ = [
     "get_result_params",
     "colors_for",
     "key_for",
+    "get_distinct_colors",
+    "distinct_colors",
+    "get_n_distinct_colors",
     "get_sobols_up_to_order",
     "plot_sobols",
     "plot_sobols1",

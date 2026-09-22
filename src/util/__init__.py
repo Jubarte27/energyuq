@@ -1,4 +1,5 @@
-from .data import ExecutionParams, EnergyReading, limit, Result, EasyResult
+from .data import ExecutionParams, EnergyReading, limit, Result, EasyResult, compute_edp, to_serializable_primitive
+from .system import try_exec
 from .multi_run import RunData, RunCollection, discover_runs, load_run, analyze_runs_individually
 from .multi_plot import (
     plot_multi_sobols,
@@ -18,6 +19,9 @@ __all__ = [
     "limit",
     "Result",
     "EasyResult",
+    "compute_edp",
+    "to_serializable_primitive",
+    "try_exec",
     "RunData",
     "RunCollection",
     "discover_runs",

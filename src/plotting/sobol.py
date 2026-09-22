@@ -333,6 +333,8 @@ class PlotterSobolMixin:
         units: dict[str, str | None] | None = None,
         include_higher_orders: bool = True,
         include_total: bool = True,
+        stacked: bool = False,
+        normalize: bool = True,
         **kwargs,
     ) -> Figure | SubFigure:
         """
@@ -342,6 +344,81 @@ class PlotterSobolMixin:
         Uses SCAnalysis.get_pce_sobol_indices.
         """
         res = self.get_sobols_up_to_order(result, qoi=qoi, k=k, order=order, units=units, **kwargs)
+        resolved_qoi = qoi or (result.qois[0] if hasattr(result, "qois") and result.qois else "energy_uj")
+
+        if stacked:
+            from .colors import get_distinct_colors
+
+            labels: list[str] = []
+            heights: list[float] = []
+
+            for m in range(1, res.n + 1):
+                order_items = res.order_terms.get(m, {})
+                for term_lbl, val in order_items.items():
+                    labels.append(term_lbl)
+                    heights.append(val)
+
+            current_sum = sum(heights)
+            higher_val = max(res.higher_order_influence, max(0.0, 1.0 - current_sum))
+            if include_higher_orders and (higher_val > 1e-6 or res.higher_order_influence > 0):
+                higher_lbl = f"Higher orders (> {res.n})"
+                labels.append(higher_lbl)
+                heights.append(higher_val)
+
+            if normalize:
+                total_h = sum(heights)
+                if total_h > 0:
+                    heights = [h / total_h for h in heights]
+
+            n_segments = len(labels)
+            colors = kwargs.get("colors") or get_distinct_colors(n_segments)
+
+            fig_w, fig_h = kwargs.get("figsize", (5.5, 5.0))
+            fig = subfig if subfig is not None else plt.figure(figsize=(fig_w, fig_h), layout="constrained")
+
+            try:
+                if title:
+                    ax = fig.add_subplot(title=title)
+                else:
+                    default_title = (
+                        f"Sobol Sensitivity Indices up to Order {res.n} ({resolved_qoi}) "
+                        f"[Higher Orders < {res.k:.1f}%]"
+                    )
+                    ax = fig.add_subplot(title=default_title)
+
+                x_pos = 0.0
+                bar_width = kwargs.get("width", 0.45)
+                bottom = 0.0
+                legend_handles: list[Any] = []
+
+                for lbl, val, c in zip(labels, heights, colors):
+                    if val <= 0:
+                        continue
+                    ax.bar(x_pos, val, bottom=bottom, color=c, edgecolor="white", linewidth=0.8, width=bar_width)
+                    legend_handles.append(
+                        Patch(facecolor=c, edgecolor="none", label=f"{lbl} ({val:.1%})")
+                    )
+                    bottom += val
+
+                ax.set_ylabel(r"$S_u$", fontsize=14)
+                ax.set_ylim(0.0, 1.0)
+                ax.set_xlim(-0.5, 0.5)
+                ax.set_xticks([x_pos])
+                ax.set_xticklabels([resolved_qoi])
+                ax.grid(axis="y", linestyle="--", alpha=0.4)
+
+                if legend_handles:
+                    legend_loc = kwargs.get("legend_loc", "upper left")
+                    bbox = kwargs.get("bbox_to_anchor", (1.02, 1.0))
+                    ax.legend(handles=legend_handles, loc=legend_loc, bbox_to_anchor=bbox, framealpha=0.9, fontsize=9)
+
+                fig._sobol_result = res
+                ax._sobol_result = res
+                return fig
+            except Exception:
+                if subfig is None:
+                    plt.close(fig)
+                raise
 
         ORDER_COLORS = {
             1: "dodgerblue",
@@ -390,7 +467,6 @@ class PlotterSobolMixin:
         fig = subfig if subfig is not None else plt.figure(figsize=(fig_w, 5.0), layout="constrained")
 
         try:
-            resolved_qoi = qoi or (result.qois[0] if hasattr(result, "qois") and result.qois else "energy_uj")
             if title:
                 ax = fig.add_subplot(title=title)
             else:
@@ -461,6 +537,8 @@ def plot_sobols(
     units: dict[str, str | None] | None = None,
     include_higher_orders: bool = True,
     include_total: bool = True,
+    stacked: bool = False,
+    normalize: bool = True,
     **kwargs,
 ) -> Figure | SubFigure:
     """
@@ -481,6 +559,8 @@ def plot_sobols(
         units=units,
         include_higher_orders=include_higher_orders,
         include_total=include_total,
+        stacked=stacked,
+        normalize=normalize,
         **kwargs,
     )
 

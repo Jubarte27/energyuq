@@ -12,23 +12,12 @@ import matplotlib.pyplot as plt
 from ..machines.machine import Machine, NONE as NONE_MACHINE
 from .. import programs
 from ..programs.program import Program
+from .data import compute_edp, to_serializable_primitive
 
 
 def _to_json_serializable(obj: Any) -> Any:
-    """Convert numpy and pandas types to standard JSON-serializable types."""
-    if isinstance(obj, (np.integer, int)):
-        return int(obj)
-    elif isinstance(obj, (np.floating, float)):
-        return float(obj)
-    elif isinstance(obj, (np.ndarray, list, tuple)):
-        return [_to_json_serializable(x) for x in obj]
-    elif isinstance(obj, dict):
-        return {str(k): _to_json_serializable(v) for k, v in obj.items()}
-    elif isinstance(obj, Path):
-        return str(obj)
-    elif pd.isna(obj):
-        return None
-    return obj
+    """Convert numpy, pandas, dataclass, and path types to standard JSON-serializable types."""
+    return to_serializable_primitive(obj)
 
 
 def _flatten_columns(df: pd.DataFrame) -> pd.DataFrame:
@@ -51,8 +40,8 @@ def _compute_derived_qois(df: pd.DataFrame) -> pd.DataFrame:
         safe_time = df["time"].replace(0, np.nan)
         if "power_w" not in df.columns:
             df["power_w"] = (df["energy_uj"] * 1e-6) / safe_time
-        if "edp_j_s" not in df.columns:
-            df["edp_j_s"] = (df["energy_uj"] * 1e-6) * df["time"]
+        if "EDP" not in df.columns:
+            df["EDP"] = compute_edp(df["energy_uj"], df["time"])
 
     return df
 
@@ -102,7 +91,7 @@ class RunData:
 
             # Auto-detect QoIs and input params if defaults aren't fully matching
             existing_cols = set(self.df.columns)
-            potential_qois = ["energy_uj", "energy_j", "EDP", "energy_scaled", "time", "power_w", "edp_j_s"]
+            potential_qois = ["energy_uj", "energy_j", "EDP", "energy_scaled", "time", "power_w"]
             self.qois = [q for q in potential_qois if q in existing_cols]
 
             potential_inputs = ["N_THREADS", "CLK", "THREADS", "CLK_LEVEL", "POWER_CAP", "PLACES", "BINDING"]
@@ -536,15 +525,9 @@ def load_run(
     else:
         benchmark_name = getattr(benchmark, "name", benchmark.__name__)
 
-    # 2. Load machine.pkl if available
-    loaded_machine = None
-    machine_file = p / "machine.pkl"
-    if machine_file.exists():
-        try:
-            with open(machine_file, "rb") as f:
-                loaded_machine = pickle.load(f)
-        except Exception:
-            pass
+    # 2. Load machine if available (msgpack or pkl)
+    from ..machines.machine import load_machine
+    loaded_machine = load_machine(p)
 
     if machine is not None:
         active_machine = machine

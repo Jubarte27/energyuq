@@ -1,10 +1,9 @@
 import os
 import socket
-from dataclasses import dataclass, field, replace
+from dataclasses import asdict, dataclass, field, fields, replace
 from shutil import which
 from pathlib import Path
 import subprocess
-
 
 @dataclass
 class Machine:
@@ -21,7 +20,6 @@ class Machine:
     numactl: list[str] = field(default_factory=lambda: ["false", "true"])
     # uncore: list[int] = field(default_factory=lambda: [])
 
-
     boost_setter: str | None = "cpufreq"
     numa_setter: str | None = "sysctl"
     
@@ -32,6 +30,8 @@ class Machine:
 
 
 NONE = Machine(name="NONE", freq=[0], max_threads=0)
+
+from ..util.system import try_exec
 
 
 def _environment_list(name: str, parser):
@@ -150,12 +150,6 @@ def _available_programs(machine: Machine, slurm: bool=True) -> Machine:
         boost_setter=boost_tool
     )
 
-def try_exec(cmds: list[list[str]]) -> bool:
-    for cmd in cmds:
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode != 0:
-            return False
-    return True
 
 def _check_intel_pstate_boost() -> bool:
     p = Path("/sys/devices/system/cpu/intel_pstate/no_turbo")
@@ -242,8 +236,61 @@ def guess_machine() -> Machine:
         has_numa=_has_multiple_numa_nodes(),
     ), slurm)
 
-@dataclass
-class MachineParams():
-    machine: Machine = field(default_factory=lambda: NONE)
-    n_threads: int = 1
-    freq_level: int = 0
+
+def save_machine(machine: Machine, dir_path: Path | str) -> Path:
+    """Save machine configuration to machine.msgpack in the given directory."""
+    import msgpack
+
+    p = Path(dir_path)
+    p.mkdir(parents=True, exist_ok=True)
+    target = p / "machine.msgpack"
+    with target.open("wb") as f:
+        msgpack.pack(asdict(machine), f)
+    return target
+
+
+def load_machine(dir_path: Path | str) -> Machine | None:
+    """
+    Load Machine configuration from a run directory.
+    Checks machine.msgpack first, then falls back to legacy machine.pkl.
+    Raises RuntimeError if the file is corrupted or has an invalid structure.
+    """
+    p = Path(dir_path)
+
+    msgpack_file = p / "machine.msgpack"
+    if msgpack_file.exists():
+        try:
+            import msgpack
+
+            with msgpack_file.open("rb") as f:
+                data = msgpack.unpack(f)
+        except Exception as e:
+            raise RuntimeError(f"machine at {msgpack_file.as_posix()} is invalid: {e}") from e
+
+        if isinstance(data, dict):
+            valid_fields = {f.name for f in fields(Machine)}
+            return Machine(**{k: v for k, v in data.items() if k in valid_fields})
+        elif isinstance(data, Machine):
+            return data
+        else:
+            raise RuntimeError(f"machine at {msgpack_file.as_posix()} is invalid")
+
+    pkl_file = p / "machine.pkl"
+    if pkl_file.exists():
+        try:
+            import pickle
+
+            with pkl_file.open("rb") as f:
+                data = pickle.load(f)
+        except Exception as e:
+            raise RuntimeError(f"machine at {pkl_file.as_posix()} is invalid: {e}") from e
+
+        if isinstance(data, Machine):
+            return data
+        elif isinstance(data, dict):
+            valid_fields = {f.name for f in fields(Machine)}
+            return Machine(**{k: v for k, v in data.items() if k in valid_fields})
+        else:
+            raise RuntimeError(f"machine at {pkl_file.as_posix()} is invalid")
+
+    return None

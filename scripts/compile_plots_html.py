@@ -35,6 +35,7 @@ import pandas as pd
 import numpy as np
 
 from src.util.multi_run import RunCollection, RunData, discover_runs, load_run, _to_json_serializable
+from src.util.data import compute_edp
 from src.util import multi_plot
 
 
@@ -46,7 +47,7 @@ def _format_qoi_name(qoi: str) -> str:
         "energy_scaled": "Scaled Energy",
         "time": "Execution Time (s)",
         "power_w": "Power (W)",
-        "edp_j_s": "Energy-Delay Product (J·s)",
+        "EDP": "Energy-Delay Product (J·s)",
     }
     return mapping.get(qoi, qoi.replace("_", " ").title())
 
@@ -175,8 +176,8 @@ def _build_multi_plot_defs(
             "builder": (lambda m_mode: lambda r_set, bench_name, sc_name: multi_plot.plot_multi_sobols(r_set, qoi=qoi, mode=m_mode, show_title=True))(smode),
         })
 
-    # Parameter Effects for Energy, Time, and EDP ((df["energy_uj"] * 1e-6) * df["time"])
-    edp_callable = lambda df: (df["energy_uj"] * 1e-6) * df["time"]
+    # Parameter Effects for Energy, Time, and EDP
+    edp_callable = lambda df: compute_edp(df["energy_uj"], df["time"])
 
     for param in bench_params:
         # Energy

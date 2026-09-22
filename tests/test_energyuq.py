@@ -579,6 +579,124 @@ class TestNumaBalancing(unittest.TestCase):
                 self.assertIn("NUMA", c.active_params)
 
 
+class TestSystemAndExecutionUnification(unittest.TestCase):
+    def setUp(self):
+        self.machine = Machine(
+            name="TestMachine",
+            freq=[1000, 2000, 3000],
+            max_threads=4,
+            places=["threads", "cores"],
+            proc_bind=["close", "spread"],
+            turbo_boost=["0", "1"],
+            has_numa=True,
+            numactl=["0", "1"],
+        )
+
+    def test_try_exec_success(self):
+        from src.util.system import try_exec
+        self.assertTrue(try_exec([["true"], ["echo", "hello"]]))
+
+    def test_try_exec_failure(self):
+        from src.util.system import try_exec
+        self.assertFalse(try_exec([["false"]]))
+        self.assertFalse(try_exec([["true"], ["false"]]))
+
+    def test_try_exec_with_input(self):
+        from src.util.system import try_exec
+        self.assertTrue(try_exec([["cat"]], input="data_line"))
+
+    def test_execution_params_from_dict(self):
+        from src.util.data import ExecutionParams
+        d = {"N_THREADS": 3, "CLK": 1, "PLACES": 0, "BINDING": 1, "BOOST": 0, "NUMA": 1}
+        params = ExecutionParams.from_dict(self.machine, d)
+        self.assertEqual(params.n_threads, 3)
+        self.assertEqual(params.freq_level, 1)
+        self.assertEqual(params.place_wideness, 0)
+        self.assertEqual(params.binding, 1)
+        self.assertEqual(params.boost, 0)
+        self.assertEqual(params.numa, 1)
+
+        # Fallback keys (THREADS, CLK_LEVEL)
+        d_alt = {"THREADS": 2, "CLK_LEVEL": 0}
+        params_alt = ExecutionParams.from_dict(self.machine, d_alt)
+        self.assertEqual(params_alt.n_threads, 2)
+        self.assertEqual(params_alt.freq_level, 0)
+
+    def test_execution_params_from_args(self):
+        from src.util.data import ExecutionParams
+        args = ["2", "1", "0", "1", "0", "1", "extra_arg"]
+        params = ExecutionParams.from_args(self.machine, args)
+        self.assertEqual(params.n_threads, 2)
+        self.assertEqual(params.freq_level, 1)
+        self.assertEqual(params.place_wideness, 0)
+        self.assertEqual(params.binding, 1)
+        self.assertEqual(params.boost, 0)
+        self.assertEqual(params.numa, 1)
+
+    def test_compute_edp(self):
+        from src.util.data import compute_edp
+        edp = compute_edp(2_000_000.0, 1.5)
+        self.assertAlmostEqual(edp, 3.0)
+
+    def test_to_serializable_primitive(self):
+        from src.util.data import to_serializable_primitive
+        import numpy as np
+        data = {
+            "int": np.int64(42),
+            "float": np.float64(3.14),
+            "arr": np.array([1, 2, 3]),
+            "path": Path("/test/path"),
+            "tuple": (1, 2),
+        }
+        res = to_serializable_primitive(data)
+        self.assertEqual(res["int"], 42)
+        self.assertIsInstance(res["int"], int)
+        self.assertEqual(res["float"], 3.14)
+        self.assertIsInstance(res["float"], float)
+        self.assertEqual(res["arr"], [1, 2, 3])
+        self.assertEqual(res["path"], "/test/path")
+        self.assertEqual(res["tuple"], [1, 2])
+
+    def test_save_and_load_machine(self):
+        from src.machines.machine import save_machine, load_machine
+        with tempfile.TemporaryDirectory() as tmpdir:
+            p = Path(tmpdir)
+            save_machine(self.machine, p)
+            self.assertTrue((p / "machine.msgpack").exists())
+
+            loaded = load_machine(p)
+            self.assertIsNotNone(loaded)
+            self.assertEqual(loaded.name, self.machine.name)
+            self.assertEqual(loaded.freq, self.machine.freq)
+            self.assertEqual(loaded.max_threads, self.machine.max_threads)
+
+    def test_load_machine_pkl_fallback(self):
+        import pickle
+        from src.machines.machine import load_machine
+        with tempfile.TemporaryDirectory() as tmpdir:
+            p = Path(tmpdir)
+            with open(p / "machine.pkl", "wb") as f:
+                pickle.dump(self.machine, f)
+
+            loaded = load_machine(p)
+            self.assertIsNotNone(loaded)
+            self.assertEqual(loaded.name, self.machine.name)
+
+    def test_multi_run_derived_qois_edp_only(self):
+        import pandas as pd
+        from src.util.multi_run import _compute_derived_qois
+        df = pd.DataFrame({
+            "energy_uj": [1_000_000.0, 2_000_000.0],
+            "time": [2.0, 3.0],
+        })
+        computed = _compute_derived_qois(df)
+        self.assertIn("EDP", computed.columns)
+        self.assertNotIn("edp_j_s", computed.columns)
+        self.assertAlmostEqual(computed["EDP"].iloc[0], 2.0)
+        self.assertAlmostEqual(computed["EDP"].iloc[1], 6.0)
+
+
 if __name__ == "__main__":
     unittest.main()
+
 

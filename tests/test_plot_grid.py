@@ -293,6 +293,66 @@ class TestPlotGrid(unittest.TestCase):
         with self.assertRaises(ValueError):
             get_sobols_up_to_order("not_an_analysis")
 
+        # 7. Test plot_sobols stacked into a single column adding up to 1
+        fig_stacked = plot_sobols(easy_res, "energy_uj", k=1.0, stacked=True)
+        self.assertIsNotNone(fig_stacked)
+        ax_stacked = fig_stacked.axes[0]
+        # Single column
+        self.assertEqual(len(ax_stacked.get_xticks()), 1)
+        self.assertEqual(ax_stacked.get_ylim(), (0.0, 1.0))
+        # Total height of all stacked bars adds up to 1.0
+        patches = ax_stacked.patches
+        total_height = sum(p.get_height() for p in patches)
+        self.assertAlmostEqual(total_height, 1.0, places=5)
+        # Check visually distinct colors assigned
+        facecolors = [p.get_facecolor() for p in patches]
+        self.assertEqual(len(facecolors), len(set(facecolors)))
+        # Legend present and has corresponding items
+        legend = ax_stacked.get_legend()
+        self.assertIsNotNone(legend)
+        self.assertEqual(len(legend.get_texts()), len(patches))
+        plt.close(fig_stacked)
+
+        # 8. Test plotter.plot_sobols with stacked=True and order=1
+        fig_stacked_order1 = self.plotter.plot_sobols(easy_res, "energy_uj", order=1, stacked=True)
+        ax_s1 = fig_stacked_order1.axes[0]
+        self.assertEqual(len(ax_s1.get_xticks()), 1)
+        self.assertAlmostEqual(sum(p.get_height() for p in ax_s1.patches), 1.0, places=5)
+        plt.close(fig_stacked_order1)
+
+    def test_get_distinct_colors(self):
+        from src.plotting.colors import get_distinct_colors, distinct_colors, get_n_distinct_colors
+
+        # Edge cases
+        self.assertEqual(get_distinct_colors(0), [])
+        self.assertEqual(len(get_distinct_colors(1)), 1)
+        self.assertEqual(len(get_distinct_colors(5)), 5)
+        self.assertEqual(len(get_distinct_colors(10)), 10)
+        self.assertEqual(len(get_distinct_colors(20)), 20)
+        self.assertEqual(len(get_distinct_colors(35)), 35)
+
+        # Distinctness: all generated colors must be unique
+        for count in [5, 12, 25]:
+            cols = get_distinct_colors(count)
+            self.assertEqual(len(cols), count)
+            self.assertEqual(len(set(cols)), count)
+
+        # RGB tuple mode
+        rgb_cols = get_distinct_colors(4, as_hex=False)
+        self.assertEqual(len(rgb_cols), 4)
+        for c in rgb_cols:
+            self.assertIsInstance(c, tuple)
+            self.assertEqual(len(c), 3)
+
+        # Colormap sampling
+        palette_cols = get_distinct_colors(6, palette="Set1")
+        self.assertEqual(len(palette_cols), 6)
+        self.assertEqual(len(set(palette_cols)), 6)
+
+        # Aliases
+        self.assertEqual(distinct_colors(5), get_distinct_colors(5))
+        self.assertEqual(get_n_distinct_colors(5), get_distinct_colors(5))
+
 
 if __name__ == "__main__":
     unittest.main()
