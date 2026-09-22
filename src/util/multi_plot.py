@@ -70,7 +70,7 @@ def plot_multi_sobols(
             empty_ax.set_title("No runs provided")
         return fig
 
-    from .plot import get_axis_label
+    from ..plotting.plot import get_axis_label
     single_bench = len({r.benchmark_name for r in run_list}) == 1
     # Collect Sobol data
     records = []
@@ -457,7 +457,7 @@ def plot_multi_best_configurations(
             empty_ax.set_title("No runs provided")
         return fig
 
-    from .plot import to_real_clk, get_unit_converter
+    from ..plotting.plot import to_real_clk, get_unit_converter
     rows = []
     has_real_clk = False
     for r in run_list:
@@ -708,10 +708,10 @@ def plot_multi_parameter_effects(
                 target_col = qoi
 
             if str(param).upper() in ("CLK", "CLK_LEVEL") and r.machine and hasattr(r.machine, "freq") and r.machine.freq:
-                from .plot import to_real_clk
+                from ..plotting.plot import to_real_clk
                 r_df[param] = r_df[param].map(lambda v: to_real_clk(v, r.machine, units))
             else:
-                from .plot import get_unit_converter
+                from ..plotting.plot import get_unit_converter
                 _, p_conv = get_unit_converter(param, units)
                 if p_conv is not None:
                     r_df[param] = r_df[param].map(lambda v: p_conv(float(v)) if not pd.isna(v) else v) # type: ignore
@@ -731,7 +731,7 @@ def plot_multi_parameter_effects(
             )
 
         cur_ax.set_title(f"{group_col.title()}: {g_val}")
-        from .plot import get_axis_label
+        from ..plotting.plot import get_axis_label
         param_label = get_axis_label(param, units)
         cur_ax.set_xlabel(param_label)
 
@@ -759,7 +759,7 @@ def plot_multi_parameter_effects(
 
     axes[0, 0].set_ylabel(y_label, fontsize=11)
     if show_title:
-        from .plot import get_axis_label
+        from ..plotting.plot import get_axis_label
         param_label = get_axis_label(param, units)
         fig.suptitle(f"Effect of {param_label} on {y_label} across {facet_by.title()}s", fontsize=13)
 

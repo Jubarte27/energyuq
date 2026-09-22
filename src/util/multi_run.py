@@ -235,7 +235,7 @@ class RunData:
         -------
         dict with run metadata, metrics, and figure objects.
         """
-        from . import plot
+        from ..plotting import plot
 
         out_path = Path(output_dir) if output_dir is not None else None
         plots_dir = (out_path / "plots") if (out_path and save_plots) else None

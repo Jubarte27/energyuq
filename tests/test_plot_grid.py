@@ -6,7 +6,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 from src.machines.machine import Machine
-from src.util.plot import Plotter, pad_to_even_and_split
+from src.plotting.plot import Plotter, pad_to_even_and_split
 from src.util.data import Result, EasyResult
 
 
@@ -190,6 +190,110 @@ class TestPlotGrid(unittest.TestCase):
         self.assertEqual(len(ax.get_xticks()), 3)
         plt.close(fig)
 
+    def test_get_sobols_up_to_order_and_plot_sobols(self):
+        from src.plotting.plot import get_sobols_up_to_order, sobols_up_to_order, plot_sobols, SobolOrderResult
+
+        # Mock sampler and analysis
+        class MockSamplerVary:
+            def __init__(self, keys):
+                self._keys = keys
+            def get_keys(self):
+                return self._keys
+
+        class MockSampler:
+            def __init__(self, keys):
+                self.vary = MockSamplerVary(keys)
+                self.N = len(keys)
+
+        class MockSCAnalysis:
+            def __init__(self, sobol_indices_dict, param_names):
+                self.sampler = MockSampler(param_names)
+                self.N = len(param_names)
+                self.qoi_cols = ["energy_uj"]
+                self._sobol_indices = sobol_indices_dict
+
+            def get_pce_sobol_indices(self, qoi, typ="first_order", **kwargs):
+                if typ == "first_order":
+                    s_u = {u: v for u, v in self._sobol_indices.items() if len(u) == 1}
+                else:
+                    s_u = self._sobol_indices
+                d_u = {u: np.array([float(np.asarray(v).ravel()[0]) * 100.0]) for u, v in s_u.items()}
+                return np.array([50.0]), np.array([100.0]), d_u, s_u
+
+        # Order 1: 0.70 + 0.25 + 0.02 = 0.97 (97%)
+        # Order 2: (0, 1) = 0.025, (0, 2) = 0.003, (1, 2) = 0.001 -> 0.029 (2.9%)
+        # Order 3: (0, 1, 2) = 0.001 -> 0.001 (0.1%)
+        sobol_dict = {
+            (0,): np.array([0.70]),
+            (1,): np.array([0.25]),
+            (2,): np.array([0.02]),
+            (0, 1): np.array([0.025]),
+            (0, 2): np.array([0.003]),
+            (1, 2): np.array([0.001]),
+            (0, 1, 2): np.array([0.001]),
+        }
+        param_names = ["CLK", "N_THREADS", "PLACES"]
+        mock_analysis = MockSCAnalysis(sobol_dict, param_names)
+
+        # 1. With k = 5.0% -> higher orders (2.9% + 0.1% = 3.0%) < 5.0%, so n = 1
+        res_k5 = get_sobols_up_to_order(mock_analysis, "energy_uj", k=5.0)
+        self.assertIsInstance(res_k5, SobolOrderResult)
+        self.assertEqual(res_k5.n, 1)
+        self.assertEqual(res_k5.order, 1)
+        self.assertAlmostEqual(res_k5.higher_order_pct, 3.0, places=2)
+        self.assertAlmostEqual(res_k5.total_influence, 0.97, places=2)
+        # Should only contain 3 terms (first order)
+        self.assertEqual(len(res_k5), 3)
+        self.assertIn("CLK", res_k5)
+        self.assertIn("N_THREADS", res_k5)
+        self.assertIn("PLACES", res_k5)
+
+        # 2. With k = 1.0% -> higher orders for n=1 is 3.0% >= 1.0%; for n=2 is 0.1% < 1.0%, so n = 2
+        res_k1 = sobols_up_to_order(mock_analysis, "energy_uj", k=1.0)
+        self.assertEqual(res_k1.n, 2)
+        self.assertAlmostEqual(res_k1.higher_order_pct, 0.1, places=2)
+        # Included terms: 3 first-order + 3 second-order = 6 terms
+        self.assertEqual(len(res_k1), 6)
+        self.assertIn("CLK × N_THREADS", res_k1)
+
+        # 3. With k = 0.05% -> higher orders for n=2 is 0.1% >= 0.05%; for n=3 is 0.0% < 0.05%, so n = 3
+        res_k005 = self.plotter.get_sobols_up_to_order(mock_analysis, "energy_uj", k=0.05)
+        self.assertEqual(res_k005.n, 3)
+        self.assertAlmostEqual(res_k005.higher_order_pct, 0.0, places=2)
+        self.assertEqual(len(res_k005), 7)
+        self.assertIn("CLK × N_THREADS × PLACES", res_k005)
+
+        # 4. Test plot_sobols with EasyResult container
+        easy_res = EasyResult(
+            df=pd.DataFrame({"CLK": [1000], "N_THREADS": [4], "PLACES": [0], "energy_uj": [1.0]}),
+            qois=["energy_uj"],
+            analysis=mock_analysis,
+            campaign=None,
+            sampler=mock_analysis.sampler,
+            results=None,
+        )
+        fig = plot_sobols(easy_res, "energy_uj", k=1.0)
+        self.assertIsNotNone(fig)
+        ax = fig.axes[0]
+        # Total bar + 6 terms + higher orders bar = 8 bars
+        self.assertEqual(len(ax.get_xticks()), 8)
+        self.assertTrue(hasattr(fig, "_sobol_result"))
+        self.assertEqual(fig._sobol_result.n, 2)
+        plt.close(fig)
+
+        # 5. Test plot_sobols with manual order override
+        fig_manual = self.plotter.plot_sobols(easy_res, "energy_uj", order=1, include_higher_orders=False)
+        self.assertEqual(fig_manual._sobol_result.n, 1)
+        ax_manual = fig_manual.axes[0]
+        # Total bar + 3 order-1 terms = 4 bars
+        self.assertEqual(len(ax_manual.get_xticks()), 4)
+        plt.close(fig_manual)
+
+        # 6. Test invalid object without get_pce_sobol_indices
+        with self.assertRaises(ValueError):
+            get_sobols_up_to_order("not_an_analysis")
+
 
 if __name__ == "__main__":
     unittest.main()
+
