@@ -39,6 +39,10 @@ def set_boost(machine: Machine, value: int):
         boost = "0" if machine.turbo_boost[value] == "false" else "1"
         if try_exec([["tee", "/sys/devices/system/cpu/cpufreq/boost"]], input=boost):
             return machine.boost_setter
+    if machine.boost_setter == "intel_pstate":
+        boost = "1" if machine.turbo_boost[value] == "false" else "0"
+        if try_exec([["tee", "/sys/devices/system/cpu/intel_pstate/no_turbo"]], input=boost):
+            return machine.boost_setter
 
     raise Exception(f"Unable to use {machine.boost_setter} for setting turbo boost, do i have permission?")
 

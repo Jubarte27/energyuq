@@ -695,15 +695,14 @@ class Plotter:
                     xs = dataframe[col_x].to_numpy().flatten()
                     if i * 2 + 1 < len(cur_labels):
                         col_y = cur_labels[i * 2 + 1]
-                        ys = dataframe[col_y].to_numpy().flatten()
-                        y_low = cur_nd_values[1, i].lower
-                        y_high = cur_nd_values[1, i].upper
-                        ylim = self.get_axis_bounds(y_low, y_high, ys)
                         ylabel_text = cur_nd_labels[1, i]
                     else:
-                        ys = np.zeros_like(xs)
-                        ylim = (-0.5, 0.5)
-                        ylabel_text = ""
+                        col_y = cur_labels[0]
+                        ylabel_text = cur_nd_labels[0, 0]
+                    ys = dataframe[col_y].to_numpy().flatten()
+                    y_low = cur_nd_values[1, i].lower
+                    y_high = cur_nd_values[1, i].upper
+                    ylim = self.get_axis_bounds(y_low, y_high, ys)
 
                     xlim = self.get_axis_bounds(cur_nd_values[0, i].lower, cur_nd_values[0, i].upper, xs)
 
@@ -962,7 +961,10 @@ class Plotter:
 
         sobol_dict = results.sobols_first(qoi)
         param_names = list(sobol_dict.keys())
-        sobols_first = np.array([float(v) for v in sobol_dict.values()])
+        sobols_first = np.array([
+            float(np.asarray(v).ravel()[0]) if np.asarray(v).size > 0 else 0.0
+            for v in sobol_dict.values()
+        ])
         d = len(param_names)
 
         fig = subfig if subfig is not None else plt.figure(layout="constrained")

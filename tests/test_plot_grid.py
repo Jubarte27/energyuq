@@ -168,6 +168,28 @@ class TestPlotGrid(unittest.TestCase):
         self.assertEqual(len(ax.get_xticks()), 3)
         plt.close(fig)
 
+    def test_plot_sobols1_array_values(self):
+        """Test plot_sobols1 when sobols_first returns 1D numpy arrays (standard EasyVVUQ behavior)."""
+        df = pd.DataFrame({
+            "N_THREADS": [4, 12, 24],
+            "CLK": [800000, 1000000, 2000000],
+            "energy_uj": [1e9, 2e9, 1.5e9],
+        })
+        mock_results = MockAnalysisResults({"N_THREADS": np.array([0.45]), "CLK": np.array([0.55])})
+        res = EasyResult(
+            df=df,
+            qois=["energy_uj"],
+            analysis=None,
+            campaign=None,
+            sampler=None,
+            results=mock_results,
+        )
+        fig = self.plotter.plot_sobols1(res, "energy_uj")
+        self.assertIsNotNone(fig)
+        ax = fig.axes[0]
+        self.assertEqual(len(ax.get_xticks()), 3)
+        plt.close(fig)
+
 
 if __name__ == "__main__":
     unittest.main()

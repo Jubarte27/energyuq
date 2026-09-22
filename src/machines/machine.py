@@ -115,6 +115,7 @@ def _system_rapl_domains() -> tuple[list[int], list[int]] | None:
 def _available_programs(machine: Machine, slurm: bool=True) -> Machine:
     freq_tool = None
     energy_tool = None
+    boost_tool = None
     if slurm:
         freq_tool="slurm"
     elif which("cpufreq-set"):
@@ -131,14 +132,22 @@ def _available_programs(machine: Machine, slurm: bool=True) -> Machine:
     if _check_cray():
         energy_tool = "cray"
 
+    if _check_cpufreq_boost():
+        boost_tool = "cpufreq"
+    elif _check_intel_pstate_boost():
+        boost_tool = "intel_pstate"
+    else:
+        raise RuntimeError("Couldn't find a way to set boost, do i have permission?")
+
     if energy_tool is None:
         raise Exception("Couldn't find a way to read energy counters, do i have permission?")
-        exit(42)
+
     return replace(machine,
         freq_getter=freq_tool,
         freq_setter=freq_tool,
         energy_reader=energy_tool,
         energy_accum=energy_tool,
+        boost_setter=boost_tool
     )
 
 def try_exec(cmds: list[list[str]]) -> bool:
@@ -147,6 +156,15 @@ def try_exec(cmds: list[list[str]]) -> bool:
         if result.returncode != 0:
             return False
     return True
+
+def _check_intel_pstate_boost() -> bool:
+    p = Path("/sys/devices/system/cpu/intel_pstate/no_turbo")
+    return p.exists() and os.access(p, os.W_OK)
+
+
+def _check_cpufreq_boost() -> bool:
+    p = Path("/sys/devices/system/cpu/cpufreq/boost")
+    return p.exists() and os.access(p, os.W_OK)
 
 def _check_rapl(machine: Machine) -> bool:
     commands = [
