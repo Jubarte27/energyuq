@@ -213,27 +213,29 @@ class PlotterGridMixin:
             custom_handles = []
             legend_labels = []
 
+            def marker_line(markerfacecolor):
+                return Line2D([], [], color='w', marker='o', markerfacecolor=markerfacecolor, markersize=8)
+            def pretty_colormap(key):
+                return mcolors.LinearSegmentedColormap.from_list("ba", list(pretty_colors[key][::2]))
+
             if order_focus:
-                cmap = mcolors.LinearSegmentedColormap.from_list("ba", list(pretty_colors['highest_lowest'][::2]))
-                c_low, c_high = cmap(0.0), cmap(1.0)
-                custom_handles.append(Line2D([], [], color='w', marker='o', markerfacecolor=c_low, markersize=8))
                 legend_labels.append("Lower ranked")
-                custom_handles.append(Line2D([], [], color='w', marker='o', markerfacecolor=c_high, markersize=8))
                 legend_labels.append("Higher ranked")
+                cmap = pretty_colormap('highest_lowest')
             else:
-                cmap = mcolors.LinearSegmentedColormap.from_list("ba", list(pretty_colors['high_low'][::2]))
-                c_low, c_high = cmap(0.0), cmap(1.0)
-                custom_handles.append(Line2D([], [], color='w', marker='o', markerfacecolor=c_low, markersize=8))
                 legend_labels.append(f"Lesser {qoi}")
-                custom_handles.append(Line2D([], [], color='w', marker='o', markerfacecolor=c_high, markersize=8))
                 legend_labels.append(f"Higher {qoi}")
+                cmap = pretty_colormap('high_low')
+            c_low, c_high = cmap(0.0), cmap(1.0)
+            custom_handles.append(marker_line(c_low))
+            custom_handles.append(marker_line(c_high))
 
             if high_outlier_mask.any():
-                custom_handles.append(Line2D([], [], color='w', marker='o', markerfacecolor='magenta', markersize=8))
+                custom_handles.append(marker_line('magenta'))
                 legend_labels.append("High outlier")
 
             if low_outlier_mask.any():
-                custom_handles.append(Line2D([], [], color='w', marker='o', markerfacecolor='cyan', markersize=8))
+                custom_handles.append(marker_line('cyan'))
                 legend_labels.append("Low outlier")
 
             colors = []
@@ -296,10 +298,9 @@ class PlotterGridMixin:
                     i += 1
 
             return fig
-        except Exception:
+        finally:
             if subfig is None:
                 plt.close(fig)
-            raise
 
     def plot_sorted(
         self,
@@ -332,10 +333,9 @@ class PlotterGridMixin:
             if not subfig and title:
                 ax.set_title(title)
             return fig
-        except Exception:
-            if not subfig:
+        finally:
+            if subfig is None:
                 plt.close(fig)
-            raise
 
     def plot_2D_single_dimension(
         self,
@@ -387,10 +387,9 @@ class PlotterGridMixin:
                 fig.delaxes(ax[j])
 
             return fig
-        except Exception:
-            if not subfig:
+        finally:
+            if subfig is None:
                 plt.close(fig)
-            raise
 
     def plot_boxplot(
         self,
@@ -459,9 +458,8 @@ class PlotterGridMixin:
                 )
 
             return fig
-        except Exception:
+        finally:
             plt.close(fig)
-            raise
 
 
 # Standalone module-level functions delegating via Plotter.from_result
