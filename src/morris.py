@@ -121,6 +121,8 @@ class MorrisScreeningResult:
             "mu_star_lower": self.mu_star_lower,
             "dummy_stats": self.dummy_stats,
             "threshold_ratio": self.threshold_ratio,
+            "sample_points": self.sample_points,
+            "outputs": self.outputs,
             "num_samples": len(self.outputs),
             "output_dicts": self.output_dicts,
         }

@@ -443,7 +443,9 @@ def create(
     morris_seed: int | None = None,
     resume: bool = False,
     numa: bool = False,
-) -> tuple[EnergyUQCampaign, uq.analysis.SCAnalysis]:
+    morris_only: bool = False,
+    from_morris: str | Path | None = None,
+) -> tuple[EnergyUQCampaign, uq.analysis.SCAnalysis] | tuple[None, None]:
     if resume:
         target_dir = Path(dir) if dir else latest_dir(RESULTS_DIR, "energy")
         if target_dir is not None and (
@@ -468,7 +470,12 @@ def create(
     use_numa = (numa or (active_params is not None and "NUMA" in active_params)) and machine.has_numa
 
     screening_result = None
-    if screen_morris:
+    if from_morris:
+        screening_result = MorrisScreeningResult.load(from_morris)
+        active_params = screening_result.active_params
+        screening_result.save(root)
+        screening_result.plot(root / "morris_screening.png")
+    elif screen_morris:
         screening_result = morris_screen(
             program,
             machine,
@@ -483,6 +490,9 @@ def create(
         active_params = screening_result.active_params
         screening_result.save(root)
         screening_result.plot(root / "morris_screening.png")
+
+    if morris_only:
+        return None, None
 
     campaign = prepare_campaign(
         program,

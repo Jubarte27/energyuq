@@ -400,6 +400,99 @@ class TestMorrisScreening(unittest.TestCase):
             noisy_result.plot(plot_file)
             self.assertTrue(plot_file.exists())
 
+    def test_morris_only_creates_screening_files_and_stops(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+
+            def mock_eval(pt):
+                return {"energy_uj": float(pt["N_THREADS"] * 100.0 + pt["CLK"] * 20.0), "EDP": 1.0, "time": 1.0}
+
+            c, a = energyuq.create(
+                NONE,
+                self.machine,
+                dir=root.as_posix(),
+                morris_only=True,
+                morris_r=2,
+                evaluate_fn=mock_eval,
+            )
+
+            self.assertIsNone(c)
+            self.assertIsNone(a)
+            self.assertTrue((root / "morris_screening.msgpack").exists())
+            self.assertTrue((root / "morris_screening.png").exists())
+            self.assertFalse((root / "campaign" / "campaign.db").exists())
+
+    def test_create_from_morris_bypasses_screening_and_registers_runs(self):
+        with tempfile.TemporaryDirectory() as tmpdir1, tempfile.TemporaryDirectory() as tmpdir2:
+            root1 = Path(tmpdir1)
+            root2 = Path(tmpdir2)
+
+            call_count = 0
+
+            def mock_eval(pt):
+                nonlocal call_count
+                call_count += 1
+                return {"energy_uj": float(pt["N_THREADS"] * 100.0 + pt["CLK"] * 20.0), "EDP": 1.0, "time": 1.0}
+
+            # Phase 1: generate morris screening only
+            energyuq.create(
+                NONE,
+                self.machine,
+                dir=root1.as_posix(),
+                morris_only=True,
+                morris_r=2,
+                evaluate_fn=mock_eval,
+            )
+            initial_calls = call_count
+            self.assertGreater(initial_calls, 0)
+
+            # Phase 2: run campaign from morris path
+            def mock_easy_wrapper(program, machine, input_file="input.csv", output_file="output.csv"):
+                with open(input_file, "r") as f:
+                    vals = [float(x) for x in f.readline().split(",") if x.strip()]
+                energy = float(vals[0] * 100.0 + vals[1] * 20.0)
+                with open(output_file, "w") as f:
+                    f.write(f"energy_uj,EDP,time\n{energy},1.0,1.0\n")
+
+            import unittest.mock as mock
+
+            with mock.patch("src.wrappers.easy_wrapper.main", side_effect=mock_easy_wrapper):
+                campaign, analysis = energyuq.create(
+                    NONE,
+                    self.machine,
+                    dir=root2.as_posix(),
+                    from_morris=root1.as_posix(),
+                    evaluate_fn=mock_eval,
+                )
+
+                # evaluate_fn (morris_screen) should NOT have been called during from_morris
+                self.assertEqual(call_count, initial_calls)
+
+                # Active parameters should match the screening result
+                self.assertEqual(campaign.active_params, ["N_THREADS", "CLK"])
+
+                # Screening files should be saved in the new campaign dir
+                self.assertTrue((root2 / "morris_screening.msgpack").exists())
+                self.assertTrue((root2 / "morris_screening.png").exists())
+
+                # Screening runs should be registered as external runs in campaign DB
+                collated = list(campaign.campaign_db.runs(status=energyuq.uq.constants.Status.COLLATED))
+                morris_runs = [r for r in collated if r[1]["run_name"].startswith("morris_run_")]
+                self.assertGreater(len(morris_runs), 0)
+
+    def test_run_py_parse_args(self):
+        import run
+
+        with unittest.mock.patch("sys.argv", ["run.py", "--morris-only"]):
+            args = run.parse_args()
+            self.assertTrue(args.morris_only)
+            self.assertIsNone(args.from_morris)
+
+        with unittest.mock.patch("sys.argv", ["run.py", "--from-morris", "path/to/morris"]):
+            args = run.parse_args()
+            self.assertFalse(args.morris_only)
+            self.assertEqual(args.from_morris, "path/to/morris")
+
 
 if __name__ == "__main__":
     unittest.main()
