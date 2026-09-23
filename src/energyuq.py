@@ -212,8 +212,7 @@ def prepare_campaign(
     numa: bool = False,
 ) -> EnergyUQCampaign:
     """
-    Creates a campaign, optionally adds Morris screening runs to the database,
-    and runs the first execution.
+    Creates a campaign and runs the first execution, optionally adds Morris screening runs to the database.
     """
     campaign = create_campaign(
         program, machine, root, active_params=active_params, numa=numa, screening_result=screening_result

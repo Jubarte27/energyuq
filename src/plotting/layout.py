@@ -21,7 +21,7 @@ def pad_to_even_and_split(arr: np.ndarray, value=None) -> np.ndarray:
 
 
 def mostly_square_grid(blocks: int, total_width: float, min_block_width: float):
-    max_col = floor(total_width / min_block_width)
+    max_col = max(1, floor(total_width / min_block_width))
     cols = min(ceil(sqrt(blocks)), max_col)
     rows = ceil(blocks / cols)
 

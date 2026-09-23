@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools==81.0.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,7 +7,7 @@ name = "energyuq"
 version = "0.1.0"
 description = "Uncertainty Quantification for Energy & Performance in HPC"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
     "chaospy",
     "dill",
@@ -18,8 +18,11 @@ dependencies = [
     "python-dotenv",
     "SALib",
     "scipy",
-    "setuptools==81.0.0",
+    "easyvvuq",
 ]
+
+[tool.uv.sources]
+easyvvuq = { path = "easy/EasyVVUQ", editable = true }
 
 [project.optional-dependencies]
 jupyter = [

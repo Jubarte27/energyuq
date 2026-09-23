@@ -75,16 +75,17 @@ def _dist_bounds(dist: cp.Distribution) -> list[int]:
 def _format_param_value(machine: Machine, param_name: str, def_idx: int) -> str:
     if param_name == "N_THREADS":
         return f"{def_idx} threads"
-    if param_name == "CLK" and 0 <= def_idx < len(machine.freq):
-        return f"{machine.freq[def_idx]} Hz (idx {def_idx})"
-    if param_name == "PLACES" and 0 <= def_idx < len(machine.places):
-        return f"{machine.places[def_idx]} (idx {def_idx})"
-    if param_name == "BINDING" and 0 <= def_idx < len(machine.proc_bind):
-        return f"{machine.proc_bind[def_idx]} (idx {def_idx})"
-    if param_name == "BOOST" and 0 <= def_idx < len(machine.turbo_boost):
-        return f"{machine.turbo_boost[def_idx]} (idx {def_idx})"
-    if param_name == "NUMA" and 0 <= def_idx < len(machine.numactl):
-        return f"{machine.numactl[def_idx]} (idx {def_idx})"
+    param_map = {
+        "CLK": (machine.freq, " Hz"),
+        "PLACES": (machine.places, ""),
+        "BINDING": (machine.proc_bind, ""),
+        "BOOST": (machine.turbo_boost, ""),
+        "NUMA": (machine.numactl, ""),
+    }
+    if param_name in param_map:
+        vals, suffix = param_map[param_name]
+        if 0 <= def_idx < len(vals):
+            return f"{vals[def_idx]}{suffix} (idx {def_idx})"
     return str(def_idx)
 
 
@@ -383,7 +384,7 @@ def morris_screen(
     ignored_params: list[str] = []
     for name in param_names:
         m_lower = mu_star_lower.get(name, 0.0)
-        if max_mu > 0 and (m_lower / max_mu) < threshold_ratio or max_mu == 0.0 and name in const_names:
+        if (max_mu > 0 and ((m_lower / max_mu) < threshold_ratio)) or (max_mu == 0.0 and name in const_names):
             ignored_params.append(name)
         else:
             active_params.append(name)

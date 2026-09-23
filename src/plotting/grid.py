@@ -20,7 +20,7 @@ from .layout import (
     mostly_square_grid,
     pad_to_even_and_split,
 )
-from .units import _is_integer_range
+from .units import is_integer_range
 
 
 class PlotterGridMixin:
@@ -138,8 +138,8 @@ class PlotterGridMixin:
                         ylabel=cur_nd_labels[1, i],
                     )
                 )
-                x_is_int = _is_integer_range(cur_nd_values[0, i].lower, cur_nd_values[0, i].upper)
-                y_is_int = _is_integer_range(cur_nd_values[1, i].lower, cur_nd_values[1, i].upper)
+                x_is_int = is_integer_range(cur_nd_values[0, i].lower, cur_nd_values[0, i].upper)
+                y_is_int = is_integer_range(cur_nd_values[1, i].lower, cur_nd_values[1, i].upper)
                 ax[-1].xaxis.set_major_locator(MaxNLocator(integer=x_is_int))
                 ax[-1].yaxis.set_major_locator(MaxNLocator(integer=y_is_int))
                 ax[-1].set_box_aspect(1)
@@ -276,8 +276,8 @@ class PlotterGridMixin:
                             ylabel=ylabel_text,
                         )
                     )
-                    x_is_int = _is_integer_range(cur_nd_values[0, i].lower, cur_nd_values[0, i].upper)
-                    y_is_int = _is_integer_range(cur_nd_values[1, i].lower, cur_nd_values[1, i].upper)
+                    x_is_int = is_integer_range(cur_nd_values[0, i].lower, cur_nd_values[0, i].upper)
+                    y_is_int = is_integer_range(cur_nd_values[1, i].lower, cur_nd_values[1, i].upper)
                     ax[-1].xaxis.set_major_locator(MaxNLocator(integer=x_is_int))
                     ax[-1].yaxis.set_major_locator(MaxNLocator(integer=y_is_int))
                     ax[-1].set_box_aspect(1)
@@ -376,7 +376,7 @@ class PlotterGridMixin:
                 ax[i].set_xlim(xlim)
                 ax[i].set_xlabel(xlabel=self.get_axis_label(lbl, units))
                 ax[i].set_ylabel(qoi)
-                is_int = _is_integer_range(val_low, val_high)
+                is_int = is_integer_range(val_low, val_high)
                 ax[i].xaxis.set_major_locator(MaxNLocator(integer=is_int))
                 ax[i].yaxis.set_major_locator(MaxNLocator(integer=True))
                 ax[i].set_box_aspect(1)
@@ -428,7 +428,7 @@ class PlotterGridMixin:
                         ylabel=qoi,
                     )
                 )
-                is_int = _is_integer_range(val_low, val_high)
+                is_int = is_integer_range(val_low, val_high)
                 ax[-1].xaxis.set_major_locator(MaxNLocator(integer=is_int))
                 ax[-1].yaxis.set_major_locator(MaxNLocator(integer=True))
 

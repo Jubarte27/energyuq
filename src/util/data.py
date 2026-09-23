@@ -25,22 +25,22 @@ def to_serializable_primitive(obj: Any) -> Any:
     """Convert numpy, pandas, dataclass, and path types to standard JSON/msgpack serializable types."""
     if is_dataclass(obj) and not isinstance(obj, type):
         return asdict(obj)
-    if isinstance(obj, (np.integer, int)):
-        return int(obj)
-    if isinstance(obj, (np.floating, float)):
-        return float(obj)
-    if isinstance(obj, np.ndarray):
-        return obj.tolist()
-    if isinstance(obj, (set, tuple)):
-        return [to_serializable_primitive(x) for x in obj]
-    if isinstance(obj, list):
-        return [to_serializable_primitive(x) for x in obj]
-    if isinstance(obj, dict):
-        return {str(k): to_serializable_primitive(v) for k, v in obj.items()}
-    if isinstance(obj, Path):
-        return str(obj)
-    if pd.isna(cast(Any,obj)):
-        return None
+    TYPE_HANDLERS = {
+        (np.integer, int): int,
+        (np.floating, float): float,
+        np.ndarray: lambda o: o.tolist(),
+        (set, tuple, list): lambda o: [to_serializable_primitive(x) for x in o],
+        dict: lambda o: {str(k): to_serializable_primitive(v) for k, v in o.items()},
+        Path: str,
+    }
+    for types, handler in TYPE_HANDLERS.items():
+        if isinstance(obj, types):
+            return handler(obj)
+    try:
+        if pd.isna(cast(Any,obj)):
+            return None
+    except ValueError:
+        pass
     return obj
 
 

@@ -5,7 +5,7 @@ main() {
     ensure create_venv
     ensure install_jupyter
     ensure fetch_repos
-    ensure install_local_easyvvuq
+    # ensure install_local_easyvvuq
 }
 _setConfigArgs() {
     while [ "${1:-}" != '' ]; do

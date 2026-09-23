@@ -81,7 +81,7 @@ def parse_unit_spec(spec: Any) -> tuple[str | None, str | None, float | Callable
     return None, str(spec).strip(), None
 
 
-def _is_integer_range(lower: Any, upper: Any) -> bool:
+def is_integer_range(lower: Any, upper: Any) -> bool:
     try:
         f_low = float(lower)
         f_up = float(upper)
@@ -157,20 +157,19 @@ class PlotterUnitsMixin:
         if target_unit is None or target_unit.lower() in ("none", ""):
             return None, None
 
-        if param.upper() in ("CLK", "CLK_LEVEL"):
-            target_lower = target_unit.lower()
-            if target_lower == "ghz":
-                return target_unit, (lambda v: v * 1e-6)
-            elif target_lower == "mhz":
-                return target_unit, (lambda v: v * 1e-3)
-            elif target_lower == "khz":
-                return target_unit, (lambda v: v * 1.0)
-            elif target_lower == "hz":
-                if from_u and from_u.lower() == "khz":
-                    return target_unit, (lambda v: v * 1e3)
+
+        if param.upper() == "CLK":
+            unit_to_hertz = {"ghz": 1e9, "mhz": 1e6, "khz": 1e3, "hz": 1}
+            from_unit = from_u.lower() if from_u else "hz"
+            to_unit = target_unit.lower()
+            if to_unit not in unit_to_hertz or from_unit == to_unit:
                 return target_unit, None
-            else:
-                return target_unit, None
+
+            from_scale = unit_to_hertz.get(from_unit, 1)
+            to_scale = unit_to_hertz.get(to_unit, 1)
+
+            scale = from_scale * to_scale
+            return target_unit, (lambda v: v * scale)
 
         if from_u and to_u and from_u != to_u:
             for p_from, f_from in SI_PREFIX_FACTORS.items():
@@ -217,7 +216,6 @@ class PlotterUnitsMixin:
             real_val = mach.freq[i_val]
             return scale_fn(real_val)
 
-        return val
         return val
 
     def convert_clk_series(
