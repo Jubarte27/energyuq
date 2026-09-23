@@ -30,7 +30,7 @@ main() {
         EXTRA_ARGS+=(--cpus-per-task="$SLURM_CPUS_PER_TASK")
     fi
 
-    echo sbatch "${EXTRA_ARGS[@]}" "$PROJECT_DIR/slurm_pcad/$SCRIPT.slurm" "${EXTRA_SCRIPT_ARGS[@]}"
+    sbatch "${EXTRA_ARGS[@]}" "$PROJECT_DIR/slurm_pcad/$SCRIPT.slurm" "${EXTRA_SCRIPT_ARGS[@]}"
 }
 
 _setConfigArgs() {
