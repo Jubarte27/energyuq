@@ -295,7 +295,7 @@ class TestMorrisScreening(unittest.TestCase):
                 self.assertGreater(len(morris_runs), 0)
                 self.assertEqual(len(morris_runs), len(campaign.morris_screening.sample_points))
 
-    def test_morris_screening_lower_ci_borderline_rule(self):
+    def test_morris_screening_mean_threshold_rule(self):
         # Machine with 2 levels per parameter
         test_machine = Machine(
             name="BorderlineTestMachine",
@@ -307,7 +307,7 @@ class TestMorrisScreening(unittest.TestCase):
         )
 
         # N_THREADS is dominant: max_mu ~ 3000
-        # CLK has borderline mean effect around ~5.25% (157.5), but with variance / interaction
+        # CLK has mean effect around ~5.25% (157.5), but with variance / interaction
         # such that its lower 95% CI is ~4.3% (< 5.0% threshold).
         def mock_eval(pt):
             y = pt["N_THREADS"] * 1000.0
@@ -332,21 +332,21 @@ class TestMorrisScreening(unittest.TestCase):
         clk_conf = result.mu_star_conf["CLK"]
         clk_lower = result.mu_star_lower["CLK"]
 
-        # Verify CLK's mean is borderline above 5% threshold
+        # Verify CLK's mean is above 5% threshold
         self.assertGreaterEqual(clk_mu / max_mu, 0.05)
         # Verify confidence interval is non-zero
         self.assertGreater(clk_conf, 0.0)
         # Verify lower CI bound drops below 5% threshold
         self.assertLess(clk_lower / max_mu, 0.05)
-        # Under the Lower CI rule, CLK should be frozen (in ignored_params)
-        self.assertIn("CLK", result.ignored_params)
-        self.assertNotIn("CLK", result.active_params)
-        # Verify frozen details explanation
-        clk_details = result.frozen_details["CLK"]
-        self.assertIn("borderline mean", clk_details["reason"])
-        self.assertIn("lower 95% CI", clk_details["reason"])
-        self.assertEqual(clk_details["mu_star_lower"], clk_lower)
-        self.assertEqual(clk_details["mu_star_conf"], clk_conf)
+        # Under the mean-based screening rule, CLK is active despite lower CI < threshold
+        self.assertIn("CLK", result.active_params)
+        self.assertNotIn("CLK", result.ignored_params)
+
+        # Unimportant parameters (e.g. PLACES, BINDING) should be frozen
+        self.assertIn("PLACES", result.ignored_params)
+        places_details = result.frozen_details["PLACES"]
+        self.assertIn("mean", places_details["reason"])
+        self.assertIn("< threshold", places_details["reason"])
 
     def test_morris_screening_dummy_variable_system_variation(self):
         # 1. Deterministic system: dummy variable should have mu* = 0, sigma = 0

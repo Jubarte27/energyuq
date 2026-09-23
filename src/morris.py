@@ -136,7 +136,7 @@ class MorrisScreeningResult:
         max_mu = max(self.mu_star.values()) if self.mu_star else 0.0
         dominant = max(self.mu_star.keys(), key=lambda k: self.mu_star[k]) if self.mu_star else "None"
         total_dims = len(self.active_params) + len(self.ignored_params)
-        lines.append(f"Screening Threshold: {self.threshold_ratio:.1%} of max(mu*) [Lower 95% CI rule] | Dominant: {dominant} (mu*={max_mu:.2e})")
+        lines.append(f"Screening Threshold: {self.threshold_ratio:.1%} of max(mu*) | Dominant: {dominant} (mu*={max_mu:.2e})")
         lines.append(f"Dimension Reduction: {total_dims}D -> {len(self.active_params)}D ({len(self.ignored_params)} dimensions frozen)")
         lines.append("")
         lines.append("ACTIVE PARAMETERS (included in Stochastic Collocation sparse grid):")
@@ -164,9 +164,9 @@ class MorrisScreeningResult:
                 rel = (m / max_mu * 100) if max_mu > 0 else 0.0
                 rel_lower = (m_lower / max_mu * 100) if max_mu > 0 else 0.0
                 fixed_val = d.get("fixed_default_repr", str(d.get("fixed_default_index", "default")))
-                reason = d.get("reason", "lower CI below threshold")
+                reason = d.get("reason", "below threshold")
                 lines.append(
-                    f"  * {name:<15s}: mu* = {m:.2e} +/- {conf:.2e} (lower: {rel_lower:5.1f}%) | fixed to: {fixed_val:<22s} | reason: {reason}"
+                    f"  * {name:<15s}: mu* = {m:.2e} +/- {conf:.2e} (lower: {rel_lower:5.1f}%, mean: {rel:5.1f}%) | fixed to: {fixed_val:<22s} | reason: {reason}"
                 )
         if self.dummy_stats:
             d_name = self.dummy_stats.get("name", "DUMMY")
@@ -385,8 +385,8 @@ def morris_screen(
     active_params: list[str] = []
     ignored_params: list[str] = []
     for name in param_names:
-        m_lower = mu_star_lower.get(name, 0.0)
-        if (max_mu > 0 and ((m_lower / max_mu) < threshold_ratio)) or (max_mu == 0.0 and name in const_names):
+        m = mu_star.get(name, 0.0)
+        if (max_mu > 0 and ((m / max_mu) < threshold_ratio)) or (max_mu == 0.0 and name in const_names):
             ignored_params.append(name)
         else:
             active_params.append(name)
@@ -408,14 +408,7 @@ def morris_screen(
             reason = f"constant bound on machine ({all_bounds[param_names.index(name)]})"
         else:
             rel_pct = (m / max_mu * 100) if max_mu > 0 else 0.0
-            rel_lower_pct = (m_lower / max_mu * 100) if max_mu > 0 else 0.0
-            if rel_pct >= threshold_ratio * 100:
-                reason = (
-                    f"borderline mean ({rel_pct:.1f}%) but lower 95% CI "
-                    f"({rel_lower_pct:.1f}%) < threshold {threshold_ratio * 100:.1f}%"
-                )
-            else:
-                reason = f"lower 95% CI {rel_lower_pct:.1f}% (mean {rel_pct:.1f}%) < threshold {threshold_ratio * 100:.1f}%"
+            reason = f"mean {rel_pct:.1f}% < threshold {threshold_ratio * 100:.1f}%"
 
         frozen_details[name] = {
             "param": name,
