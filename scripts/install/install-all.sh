@@ -1,16 +1,22 @@
 #!/bin/bash
+set -e
+
 main() {
     set_log_depth 0
+    ensure fetch_repos
     ensure ensure_uv
     ensure create_venv
     ensure install_jupyter
-    ensure fetch_repos
     # ensure install_local_easyvvuq
 }
 _setConfigArgs() {
     while [ "${1:-}" != '' ]; do
         case "$1" in
             ## Options
+            --clean)
+                clean_all
+                exit 0
+                ;;
             
             ## end of Options
             [!-]*)
@@ -24,6 +30,13 @@ _setConfigArgs() {
     done
     EasyVVUQ_DIR="$PROJECT_DIR/easy/EasyVVUQ"
     BENCHMARKS_DIR="$PROJECT_DIR/hpc-benchmarks"
+}
+
+#clean, not purge
+clean_all() {
+    enter_new_func "Removing venv"
+
+    rm -fr "$PROJECT_DIR/.venv"
 }
 
 fetch_repos() {
