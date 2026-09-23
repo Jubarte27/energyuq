@@ -1,5 +1,4 @@
 SLURM_CPUS_PER_TASK=32
 SBATCH_PARTITION=sirius
-SBATCH_OPTS="--nodelist=sirius"
 
 ENERGYUQ_SLURM=false
