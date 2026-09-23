@@ -111,8 +111,8 @@ class EnergyReading:
 
 @dataclass
 class limit:
-    lower: int # | float
-    upper: int # | float
+    lower: int | float
+    upper: int | float
 
 @dataclass
 class Result:

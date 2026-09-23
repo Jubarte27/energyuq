@@ -45,12 +45,12 @@ from .units import (
     DEFAULT_PARAM_UNITS,
     SI_PREFIX_FACTORS,
     PlotterUnitsMixin,
-    is_integer_range,
     convert_clk_df,
     convert_clk_series,
     get_axis_label,
     get_unit,
     get_unit_converter,
+    is_integer_range,
     parse_unit_spec,
     to_real_clk,
 )

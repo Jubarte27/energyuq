@@ -22,6 +22,7 @@ from .layout import (
 )
 from .units import is_integer_range
 
+SQUARE_GRID_BLOCK_SIZE = 8
 
 class PlotterGridMixin:
     """Mixin providing 2D and 1D projection and distribution plots for Plotter."""
@@ -64,22 +65,26 @@ class PlotterGridMixin:
         return 0.0, 1.0
 
     def _setup_pairwise_grid_layout(
-        self, cur_labels: Sequence[str], units: dict[str, Any] | None = None
+        self, param_labels: Sequence[str], units: dict[str, Any] | None = None, width: int | None = None
     ) -> tuple[int, int, tuple[float, float], list[int], np.ndarray, np.ndarray]:
-        cur_values = np.array(
-            [limit(*self._get_param_bounds(lbl)) for lbl in cur_labels],
+        """Compute grid dimensions and paired bounds/labels for pairwise 2D plots."""
+        bounds = np.array(
+            [limit(*self._get_param_bounds(lbl)) for lbl in param_labels],
             dtype=limit,
         )
-        cur_L = (len(cur_labels) + 1) // 2
-        (cur_C, cur_R), cur_fig_size = mostly_square_grid(cur_L, 6, 2)
-        cur_full_rows = cur_L // cur_C if cur_C > 0 else 0
-        rem = cur_L % cur_C if cur_C > 0 else 0
-        row_col_counts = [cur_C] * cur_full_rows + ([rem] if rem > 0 else [])
+        if width is None:
+            width = 16
+        num_pairs = (len(param_labels) + 1) // 2
+        (grid_cols, grid_rows), fig_size = mostly_square_grid(num_pairs, width, SQUARE_GRID_BLOCK_SIZE)
 
-        cur_nd_values = pad_to_even_and_split(cur_values, value=limit(lower=0, upper=1))
-        axis_labels = np.array([self.get_axis_label(lbl, units) for lbl in cur_labels], dtype=str)
-        cur_nd_labels = pad_to_even_and_split(axis_labels, value="")
-        return cur_L, cur_R, cur_fig_size, row_col_counts, cur_nd_values, cur_nd_labels
+        full_rows = num_pairs // grid_cols if grid_cols > 0 else 0
+        remainder = num_pairs % grid_cols if grid_cols > 0 else 0
+        cols_per_row = [grid_cols] * full_rows + ([remainder] if remainder > 0 else [])
+
+        paired_bounds = pad_to_even_and_split(bounds, value=limit(lower=0, upper=1))
+        axis_labels = np.array([self.get_axis_label(lbl, units) for lbl in param_labels], dtype=str)
+        paired_labels = pad_to_even_and_split(axis_labels, value="")
+        return num_pairs, grid_rows, fig_size, cols_per_row, paired_bounds, paired_labels
 
     def _setup_subgrid_dims(self, L: int) -> tuple[int, int]:
         if L <= 1:
@@ -95,61 +100,106 @@ class PlotterGridMixin:
 
         mach, _, _, _ = self._prepare_context(result, units=units)
 
-        cur_labels = self.get_result_params(result)
-        cur_L, cur_R, cur_fig_size, row_col_counts, cur_nd_values, cur_nd_labels = self._setup_pairwise_grid_layout(
-            cur_labels, units
+        param_names = self.get_result_params(result)
+        num_pairs, grid_rows, fig_size, cols_per_row, paired_bounds, paired_labels = (
+            self._setup_pairwise_grid_layout(param_names, units)
         )
 
         raw_grid = sampler.generate_grid(analysis.l_norm).astype(object)
         if raw_grid.ndim == 2:
-            if raw_grid.shape[1] == len(cur_labels):
-                for col_idx, lbl in enumerate(cur_labels):
+            if raw_grid.shape[1] == len(param_names):
+                for col_idx, lbl in enumerate(param_names):
                     if str(lbl).upper() in ("CLK", "CLK_LEVEL") and mach is not None and hasattr(mach, "freq"):
                         raw_grid[:, col_idx] = [self.to_real_clk(v, mach, units) for v in raw_grid[:, col_idx]]
-            elif raw_grid.shape[0] == len(cur_labels):
-                for row_idx, lbl in enumerate(cur_labels):
+            elif raw_grid.shape[0] == len(param_names):
+                for row_idx, lbl in enumerate(param_names):
                     if str(lbl).upper() in ("CLK", "CLK_LEVEL") and mach is not None and hasattr(mach, "freq"):
                         raw_grid[row_idx, :] = [self.to_real_clk(v, mach, units) for v in raw_grid[row_idx, :]]
 
-        accepted_grid = pad_to_even_and_split(raw_grid, value=0)
+        split_grid = pad_to_even_and_split(raw_grid, value=0)
 
-        fig = plt.figure(figsize=cur_fig_size, layout="constrained")
+        fig = plt.figure(figsize=fig_size, layout="constrained")
         fig.supylabel("Configurations chosen")
 
-        ax: list[Axes] = []
-        i = 0
-        for r, cols in enumerate(row_col_counts):
-            for c in range(cols):
-                subplot_num = r * cols + c + 1
-                xs_data = accepted_grid[:, 0, i] if accepted_grid.ndim == 3 and i < accepted_grid.shape[2] else None
-                ys_data = accepted_grid[:, 1, i] if accepted_grid.ndim == 3 and i < accepted_grid.shape[2] else None
+        axes: list[Axes] = []
+        pair_idx = 0
+        for row, n_cols in enumerate(cols_per_row):
+            for col in range(n_cols):
+                subplot_pos = row * n_cols + col + 1
+                xs = split_grid[:, 0, pair_idx] if split_grid.ndim == 3 and pair_idx < split_grid.shape[2] else None
+                ys = split_grid[:, 1, pair_idx] if split_grid.ndim == 3 and pair_idx < split_grid.shape[2] else None
 
-                xlim = self.get_axis_bounds(cur_nd_values[0, i].lower, cur_nd_values[0, i].upper, xs_data)
-                ylim = self.get_axis_bounds(cur_nd_values[1, i].lower, cur_nd_values[1, i].upper, ys_data)
+                x_bounds = paired_bounds[0, pair_idx]
+                y_bounds = paired_bounds[1, pair_idx]
+                xlim = self.get_axis_bounds(x_bounds.lower, x_bounds.upper, xs)
+                ylim = self.get_axis_bounds(y_bounds.lower, y_bounds.upper, ys)
 
-                ax.append(
-                    fig.add_subplot(
-                        cur_R,
-                        cols,
-                        subplot_num,
-                        xlim=list(xlim),
-                        ylim=list(ylim),
-                        xlabel=cur_nd_labels[0, i],
-                        ylabel=cur_nd_labels[1, i],
-                    )
+                ax = fig.add_subplot(
+                    grid_rows, n_cols, subplot_pos,
+                    xlim=list(xlim), ylim=list(ylim),
+                    xlabel=paired_labels[0, pair_idx], ylabel=paired_labels[1, pair_idx],
                 )
-                x_is_int = is_integer_range(cur_nd_values[0, i].lower, cur_nd_values[0, i].upper)
-                y_is_int = is_integer_range(cur_nd_values[1, i].lower, cur_nd_values[1, i].upper)
-                ax[-1].xaxis.set_major_locator(MaxNLocator(integer=x_is_int))
-                ax[-1].yaxis.set_major_locator(MaxNLocator(integer=y_is_int))
-                ax[-1].set_box_aspect(1)
-                ax[-1].set_anchor('N')
-                i += 1
+                ax.xaxis.set_major_locator(MaxNLocator(integer=is_integer_range(x_bounds.lower, x_bounds.upper)))
+                ax.yaxis.set_major_locator(MaxNLocator(integer=is_integer_range(y_bounds.lower, y_bounds.upper)))
+                ax.set_box_aspect(1)
+                ax.set_anchor('N')
+                axes.append(ax)
+                pair_idx += 1
 
-        for ic in range(cur_L):
-            ax[ic].plot(accepted_grid[:, 0, ic], accepted_grid[:, 1, ic], 'o', alpha=0.25)
+        for pair_idx in range(num_pairs):
+            axes[pair_idx].plot(split_grid[:, 0, pair_idx], split_grid[:, 1, pair_idx], 'o', alpha=0.25)
 
         return fig
+
+    def _classify_outliers(self, series: pd.Series) -> tuple[pd.Series, pd.Series]:
+        """Return (high_outlier_mask, low_outlier_mask) using the IQR method."""
+        q1, q3 = series.quantile(0.25), series.quantile(0.75)
+        iqr = q3 - q1
+        return series > (q3 + 1.5 * iqr), series < (q1 - 1.5 * iqr)
+
+    def _normalize_to_inliers(self, series: pd.Series, is_outlier: pd.Series) -> pd.Series:
+        """Normalize *series* to [0, 1] based on inlier min/max, clamping outliers."""
+        inliers = series[~is_outlier]
+        lo = (inliers.min() if not inliers.empty else series.min())
+        hi = (inliers.max() if not inliers.empty else series.max())
+        lo = lo.item() if hasattr(lo, "item") else lo
+        hi = hi.item() if hasattr(hi, "item") else hi
+        if hi == lo:
+            return pd.Series(0.5, index=series.index)
+        return ((series - lo) / (hi - lo)).clip(0, 1)
+
+    def _build_legend_and_colors(
+        self, qoi: str, order_focus: bool, high_mask: pd.Series, low_mask: pd.Series,
+        normalized: pd.Series,
+    ) -> tuple[list[Line2D], list[str], list]:
+        """Build legend handles and per-point colors from outlier masks and normalized values."""
+        pretty = self.colors_for(qoi)
+
+        def _marker(facecolor):
+            return Line2D([], [], color='w', marker='o', markerfacecolor=facecolor, markersize=8)
+
+        style_key = 'highest_lowest' if order_focus else 'high_low'
+        cmap = mcolors.LinearSegmentedColormap.from_list("ba", list(pretty[style_key][::2]))
+
+        labels_low, labels_high = (
+            ("Lower ranked", "Higher ranked") if order_focus
+            else (f"Lesser {qoi}", f"Higher {qoi}")
+        )
+        handles = [_marker(cmap(0.0)), _marker(cmap(1.0))]
+        labels = [labels_low, labels_high]
+
+        if high_mask.any():
+            handles.append(_marker('magenta'))
+            labels.append("High outlier")
+        if low_mask.any():
+            handles.append(_marker('cyan'))
+            labels.append("Low outlier")
+
+        point_colors = [
+            "magenta" if high_mask[i] else "cyan" if low_mask[i] else cmap(normalized[i])
+            for i in normalized.index
+        ]
+        return handles, labels, point_colors
 
     def plot_grid_2D_best(
         self,
@@ -161,141 +211,67 @@ class PlotterGridMixin:
     ) -> Figure | SubFigure:
         """Plot pairwise 2D parameter evaluations colored by QoI cost."""
         _, qoi, key, df = self._prepare_context(result, units=units, qoi=qoi)
-        pretty_colors = self.colors_for(qoi)
-
-        cur_labels = self.get_result_params(result, df)
-        _, cur_R, cur_fig_size, row_col_counts, cur_nd_values, cur_nd_labels = self._setup_pairwise_grid_layout(
-            cur_labels, units
+        param_names = self.get_result_params(result, df)
+        width = subfig.bbox_relative.width * subfig.figure.get_size_inches()[0] if subfig else None
+        _, grid_rows, fig_size, row_col_counts, paired_bounds, paired_labels = (
+            self._setup_pairwise_grid_layout(param_names, units, width=width)
         )
 
+        fig = subfig or plt.figure(figsize=fig_size, layout="constrained")
         if subfig is None:
-            fig = plt.figure(figsize=cur_fig_size, layout="constrained")
             fig.supylabel(f"Configurations evaluated by {qoi}")
-        else:
-            fig = subfig
 
         try:
             if df.empty:
                 ax_empty = fig.add_subplot(1, 1, 1)
-                ax_empty.text(0.5, 0.5, "No evaluation data available", ha="center", va="center", transform=ax_empty.transAxes)
+                ax_empty.text(0.5, 0.5, "No evaluation data available",
+                              ha="center", va="center", transform=ax_empty.transAxes)
                 return fig
 
-            dataframe: DataFrame = df.sort_values(by=key, ascending=False)
-            column = dataframe[qoi]
-            if isinstance(column, pd.DataFrame):
-                column = column.iloc[:, 0]
+            sorted_df: DataFrame = df.sort_values(by=key, ascending=False)
+            qoi_series = sorted_df[qoi]
+            if isinstance(qoi_series, pd.DataFrame):
+                qoi_series = qoi_series.iloc[:, 0]
 
-            Q1 = column.quantile(0.25)
-            Q3 = column.quantile(0.75)
-            IQR = Q3 - Q1
+            high_mask, low_mask = self._classify_outliers(qoi_series)
+            normalized = self._normalize_to_inliers(qoi_series, high_mask | low_mask)
+            handles, labels, point_colors = self._build_legend_and_colors(
+                qoi, order_focus, high_mask, low_mask, normalized,
+            )
 
-            high_outlier_mask = column > (Q3 + 1.5 * IQR)
-            low_outlier_mask = column < (Q1 - 1.5 * IQR)
-            outlier_mask = high_outlier_mask | low_outlier_mask
-            inlier_mask = ~outlier_mask
-
-            inlier_column = column[inlier_mask]
-            inlier_min = inlier_column.min() if not inlier_column.empty else column.min()
-            inlier_max = inlier_column.max() if not inlier_column.empty else column.max()
-
-            if hasattr(inlier_min, "item"):
-                inlier_min = inlier_min.item()
-            if hasattr(inlier_max, "item"):
-                inlier_max = inlier_max.item()
-
-            if inlier_max == inlier_min:
-                norm_vals = pd.Series(0.5, index=dataframe.index)
-            else:
-                norm_vals = (column - inlier_min) / (inlier_max - inlier_min)
-
-            dataframe[f"{qoi}_norm"] = norm_vals.clip(0, 1)
-
-            custom_handles = []
-            legend_labels = []
-
-            def marker_line(markerfacecolor):
-                return Line2D([], [], color='w', marker='o', markerfacecolor=markerfacecolor, markersize=8)
-            def pretty_colormap(key):
-                return mcolors.LinearSegmentedColormap.from_list("ba", list(pretty_colors[key][::2]))
-
-            if order_focus:
-                legend_labels.append("Lower ranked")
-                legend_labels.append("Higher ranked")
-                cmap = pretty_colormap('highest_lowest')
-            else:
-                legend_labels.append(f"Lesser {qoi}")
-                legend_labels.append(f"Higher {qoi}")
-                cmap = pretty_colormap('high_low')
-            c_low, c_high = cmap(0.0), cmap(1.0)
-            custom_handles.append(marker_line(c_low))
-            custom_handles.append(marker_line(c_high))
-
-            if high_outlier_mask.any():
-                custom_handles.append(marker_line('magenta'))
-                legend_labels.append("High outlier")
-
-            if low_outlier_mask.any():
-                custom_handles.append(marker_line('cyan'))
-                legend_labels.append("Low outlier")
-
-            colors = []
-            for idx in dataframe.index:
-                if high_outlier_mask[idx]:
-                    colors.append("magenta")
-                elif low_outlier_mask[idx]:
-                    colors.append("cyan")
-                else:
-                    colors.append(cmap(dataframe.loc[idx, f"{qoi}_norm"]))
-
-            ax: list[Axes] = []
-            i = 0
-            for r, cols in enumerate(row_col_counts):
-                for c in range(cols):
-                    subplot_num = r * cols + c + 1
-                    col_x = cur_labels[i * 2]
-                    xs = dataframe[col_x].to_numpy().flatten()
-                    if i * 2 + 1 < len(cur_labels):
-                        col_y = cur_labels[i * 2 + 1]
-                        ylabel_text = cur_nd_labels[1, i]
+            pair_idx = 0
+            for row, n_cols in enumerate(row_col_counts):
+                for col in range(n_cols):
+                    x_param = param_names[pair_idx * 2]
+                    if pair_idx * 2 + 1 < len(param_names):
+                        y_param = param_names[pair_idx * 2 + 1]
+                        y_label = paired_labels[1, pair_idx]
                     else:
-                        col_y = cur_labels[0]
-                        ylabel_text = cur_nd_labels[0, 0]
-                    ys = dataframe[col_y].to_numpy().flatten()
-                    y_low = cur_nd_values[1, i].lower
-                    y_high = cur_nd_values[1, i].upper
-                    ylim = self.get_axis_bounds(y_low, y_high, ys)
+                        y_param = param_names[0]
+                        y_label = paired_labels[0, 0]
 
-                    xlim = self.get_axis_bounds(cur_nd_values[0, i].lower, cur_nd_values[0, i].upper, xs)
+                    xs = sorted_df[x_param].to_numpy().flatten()
+                    ys = sorted_df[y_param].to_numpy().flatten()
 
-                    ax.append(
-                        fig.add_subplot(
-                            cur_R,
-                            cols,
-                            subplot_num,
-                            xlim=list(xlim),
-                            ylim=list(ylim),
-                            xlabel=cur_nd_labels[0, i],
-                            ylabel=ylabel_text,
-                        )
+                    x_bounds = paired_bounds[0, pair_idx]
+                    y_bounds = paired_bounds[1, pair_idx]
+                    xlim = self.get_axis_bounds(x_bounds.lower, x_bounds.upper, xs)
+                    ylim = self.get_axis_bounds(y_bounds.lower, y_bounds.upper, ys)
+
+                    subplot_pos = row * n_cols + col + 1
+                    ax = fig.add_subplot(
+                        grid_rows, n_cols, subplot_pos,
+                        xlim=list(xlim), ylim=list(ylim),
+                        xlabel=paired_labels[0, pair_idx], ylabel=y_label,
                     )
-                    x_is_int = is_integer_range(cur_nd_values[0, i].lower, cur_nd_values[0, i].upper)
-                    y_is_int = is_integer_range(cur_nd_values[1, i].lower, cur_nd_values[1, i].upper)
-                    ax[-1].xaxis.set_major_locator(MaxNLocator(integer=x_is_int))
-                    ax[-1].yaxis.set_major_locator(MaxNLocator(integer=y_is_int))
-                    ax[-1].set_box_aspect(1)
-                    ax[-1].set_anchor('N')
-
-                    ax[-1].legend(
-                        handles=custom_handles,
-                        labels=legend_labels,
-                        draggable=True,
-                        fontsize='x-small',
-                        ncols=2,
-                        bbox_to_anchor=(1, 1.1),
-                        loc='upper right',
-                    )
-                    ax[-1].scatter(xs, ys, c=colors)
-                    i += 1
+                    ax.xaxis.set_major_locator(MaxNLocator(integer=is_integer_range(x_bounds.lower, x_bounds.upper)))
+                    ax.yaxis.set_major_locator(MaxNLocator(integer=is_integer_range(y_bounds.lower, y_bounds.upper)))
+                    ax.set_box_aspect(1)
+                    ax.set_anchor('N')
+                    ax.legend(handles=handles, labels=labels, draggable=True,
+                              fontsize='x-small', ncols=2, bbox_to_anchor=(1, 1.1), loc='upper right')
+                    ax.scatter(xs, ys, c=point_colors)
+                    pair_idx += 1
 
             return fig
         finally:
