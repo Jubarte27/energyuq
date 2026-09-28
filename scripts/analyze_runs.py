@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 CLI script to analyze and plot multiple experimental runs at once.
-Discovers EasyVVUQ campaigns, Dakota outputs, and compilation CSVs across machines and benchmarks.
+Discovers EasyVVUQ campaigns and compilation CSVs across machines and benchmarks.
 Generates comparative summary tables (CSV) and publication-quality plots.
 """
 

@@ -22,8 +22,9 @@ main() {
         files=()
         for env_file in "${env_files[@]}"; do
             for node in "${ONLY[@]}"; do
-                if [[ "$(basename "$env_file")" == "$node" ]]; then
-                    files+=("$env_file")
+                name="$(basename "$env_file")"
+                if [[ "$node" == "$name" || "$node" == "$name"[0-9]* || "$node" == "$name"\[* ]]; then
+                    files+=("$(dirname "$env_file")/$node")
                     break
                 fi
             done
