@@ -1,25 +1,24 @@
 #!/usr/bin/env python3
+from ..machines import Machine, guess_machine
+from ..programs import NONE, Program
 from ..util.data import ExecutionParams
-
 from . import base_wrapper
 
-from ..programs import *
-from ..machines import *
 
-def main(program: type[Program], machine: Machine, input_file: str = "input.csv", output_file: str = "output.csv"):
-    with open(input_file, "r") as f:
+def main(
+        program: type[Program],
+        machine: Machine,
+        input_file: str = "input.csv",
+        output_file: str = "output.csv"
+    ):
+    with open(input_file) as f:
         args = f.readline().split(",")
-    def arg(i, default=0):
-        return int(args[i]) if len(args) > i else default
-    params = ExecutionParams(
-        machine=machine,
-        n_threads=arg(0),
-        freq_level=arg(1),
-        place_wideness=arg(2),
-        affinity_distance=arg(3),
-        boost=arg(4))
-
-    result = base_wrapper.prepare_and_execute(machine, program, params, args[5:])
+    params = ExecutionParams.from_args(machine, args)
+    program_args = (
+        args[6:] if has_arg(args, 5) and params.numa is not None
+        else args[5:]
+    )
+    result = base_wrapper.prepare_and_execute(machine, program, params, program_args)
 
     ks, vs = zip(*result.items())
     header = ",".join(ks)
@@ -27,6 +26,9 @@ def main(program: type[Program], machine: Machine, input_file: str = "input.csv"
 
     with open(output_file, "w") as f:
         f.write(f"{header}\n{content}\n")
+
+def has_arg(args, n):
+    return len(args) > n and str(args[n]).strip() != ""
 
 if __name__ == "__main__":
     program = NONE

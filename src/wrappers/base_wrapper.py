@@ -1,70 +1,73 @@
-from dataclasses import replace
+from __future__ import annotations
+
 import subprocess
-from sys import stderr
-from typing import Iterable, Union
-from ..programs import *
-from ..machines import *
-from ..util.data import ExecutionParams, EnergyReading
-from time import perf_counter
 from abc import ABC, abstractmethod
-
+from collections.abc import Iterable
+from dataclasses import replace
+from pathlib import Path
 from textwrap import indent
+from time import perf_counter
+
+from ..machines import Machine
+from ..programs import Program
+from ..util.data import EnergyReading, ExecutionParams, compute_edp
+from ..util.system import try_exec
 
 
-def prepare_and_execute(machine: Machine, program: type[Program], params: ExecutionParams, args: Union[None, Iterable[str]]):
+def prepare_and_execute(machine: Machine, program: type[Program], params: ExecutionParams, args: None | Iterable[str]):
     if not args:
         args = []
 
     cpu_set(machine, params.freq_level)
     set_boost(machine, params.boost)
+    if params.numa is not None and machine.has_numa:
+        set_numa(machine, params.numa)
     
     accum, t = run(machine, program, params, args)
     return report(accum, t)
 
-def try_exec(cmds: list[list[str]], err_msg: str = "", input: str | None = None) -> bool:
-    for cmd in cmds:
-        result = subprocess.run(cmd, capture_output=True, text=True, input=input)
-        if result.returncode != 0:
-            if err_msg:
-                print(err_msg, file=stderr)
-            output_CompletedProcess(" ".join(cmd), result)
-            return False
-    return True
 
 def set_boost(machine: Machine, value: int):
     if machine.boost_setter == "cpufreq":
         boost = "0" if machine.turbo_boost[value] == "false" else "1"
         if try_exec([["tee", "/sys/devices/system/cpu/cpufreq/boost"]], input=boost):
             return machine.boost_setter
+    if machine.boost_setter == "intel_pstate":
+        boost = "1" if machine.turbo_boost[value] == "false" else "0"
+        if try_exec([["tee", "/sys/devices/system/cpu/intel_pstate/no_turbo"]], input=boost):
+            return machine.boost_setter
 
-    raise Exception(f"Unable to use {machine.boost_setter} for setting turbo boost, do i have permission?")
+    raise RuntimeError(f"Unable to use {machine.boost_setter} for setting turbo boost, do i have permission?")
+
+def set_numa(machine: Machine, value: int):
+    if machine.numa_setter == "sysctl":
+        numa = "0" if machine.numactl[value] == "false" else "1"
+        if try_exec([["sudo", "/sbin/sysctl", f"kernel.numa_balancing={numa}"]]):
+            return machine.numa_setter
+
+    raise RuntimeError(f"Unable to use {machine.numa_setter} for setting numa balancing, do i have permission?")
+    
 
 def set_freq(machine: Machine, frequency):
-    if machine.freq_setter == "cpufreq-set":
-        if try_exec([
-            *(["cpufreq-set", "--cpu", f"{cpu}", "--governor", "userspace"] for cpu in range(machine.max_threads)),
-            *(["cpufreq-set", "--cpu", f"{cpu}", "--freq", f"{frequency}"] for cpu in range(machine.max_threads))
-        ]):
-            return machine.freq_setter
-        if try_exec([
-            *(["sudo", "-n", "cpufreq-set", f"--cpu", f"{cpu}", "--governor", "userspace"] for cpu in range(machine.max_threads)),
-            *(["sudo", "-n", "cpufreq-set", f"--cpu", f"{cpu}", "--freq", f"{frequency}"] for cpu in range(machine.max_threads))
-        ]):
-            return machine.freq_setter
+    if machine.freq_setter == "cpufreq-set" and try_exec([
+        *(["cpufreq-set", "--cpu", f"{cpu}", "--governor", "userspace"] for cpu in range(machine.max_threads)),
+        *(["cpufreq-set", "--cpu", f"{cpu}", "--freq", f"{frequency}"] for cpu in range(machine.max_threads))
+    ]):
+        return machine.freq_setter
 
-    if machine.freq_setter == "cpupower":
-        if try_exec([
-            ["cpupower", "frequency-set", "--governor", "userspace"],
-            ["cpupower", "frequency-set", "--freq", f"{frequency}"]
-        ]):
-            return machine.freq_setter
-        if try_exec([
-            ["sudo", "-n", "cpupower", "frequency-set", "--governor", "userspace"],
-            ["sudo", "-n", "cpupower", "frequency-set", "--freq", f"{frequency}"]
-        ]):
-            return machine.freq_setter
+    if machine.freq_setter == "cpupower" and try_exec([
+        ["cpupower", "frequency-set", "--governor", "userspace"],
+        ["cpupower", "frequency-set", "--freq", f"{frequency}"]
+    ]):
+        return machine.freq_setter
 
-    raise Exception(f"Unable to use {machine.freq_setter} for setting cpu frequency, do i have permission?")
+    if machine.freq_getter == "slurm":
+        return machine.freq_setter
+
+    raise RuntimeError(
+        f"Unable to use {machine.freq_setter} for setting cpu frequency, "
+        "do i have permission?"
+    )
 
 def cpu_set(machine: Machine, freq_level: int):
 
@@ -81,11 +84,15 @@ def pick_reader(machine: Machine):
     elif machine.energy_reader == "cray":
         reader: EnergyReader = cray()
     else:
-        print("Couldn't find a way to read energy counters, do i have permission?")
-        exit(42)
+        raise RuntimeError("Couldn't find a way to read energy counters, do i have permission?")
     return reader
 
-def run(machine: Machine,program: type[Program], params: ExecutionParams, parameter_list: Iterable[str]):
+def run(
+        machine: Machine,
+        program: type[Program],
+        params: ExecutionParams,
+        parameter_list: Iterable[str]
+    ):
     reading = (reader := pick_reader(machine)).all_energy()
     t = perf_counter()
 
@@ -108,7 +115,7 @@ def report(used_energy: int, elapsed: float):
 
     return {
         "energy_uj": used_energy,
-        "energy_scaled": used_energy, #arrumar
+        "EDP": float(compute_edp(used_energy, elapsed)),
         "time": elapsed
     }
 class EnergyReader(ABC):
@@ -117,7 +124,10 @@ class EnergyReader(ABC):
     @abstractmethod
     def energy(self, counter) -> int: pass
     @abstractmethod
-    def all_energy(self, start: None | list[EnergyReading] = None) -> list[EnergyReading]: pass
+    def all_energy(
+        self,
+        start: None | list[EnergyReading] = None
+    ) -> list[EnergyReading]: pass
 
 def set_sysfs(full_path: str, value: object, name=None):
     result = subprocess.run(
@@ -125,12 +135,15 @@ def set_sysfs(full_path: str, value: object, name=None):
         input=str(value),
         capture_output=True,
         text=True,
+        check=False,
     )
 
     output_CompletedProcess(full_path if name is None else name, result)
 
     if result.returncode != 0:
-        exit(result.returncode)
+        raise RuntimeError(
+            f"\"tee {full_path}\" failed with exit code:{result.returncode}"
+        )
 
 class intel_rapl(EnergyReader):
     def __init__(self, machine: Machine) -> None:
@@ -140,14 +153,21 @@ class intel_rapl(EnergyReader):
         
     def accumulate(self, readings: list[EnergyReading]):
         # If package-level readings (sub_package < 0) are present, accumulate only those
-        # to avoid double-counting sub-domains (e.g. core, dram) which are already included in package energy.
+        # to avoid double-counting sub-domains (e.g. core, dram)
+        # which are already included in package energy.
         has_package_level = any(reading.sub_package < 0 for reading in readings)
-        target_readings = [r for r in readings if r.sub_package < 0] if has_package_level else readings
+        target_readings = (
+            [r for r in readings if r.sub_package < 0]
+            if has_package_level
+            else readings
+        )
 
         used_energy = 0
         for reading in target_readings:
-            max_energy = self.max_energy_range_uj(f"{reading.package}{self.sub_package_sufix(reading.sub_package)}")
-            # it can technically wrap around twice or more, so we shouldn't run it for longer than a whole day or something
+            socket = f"{reading.package}{self.sub_package_sufix(reading.sub_package)}"
+            max_energy = self.max_energy_range_uj(socket)
+            # it can technically wrap around twice or more,
+            # so we shouldn't run it for longer than a whole day or something
             if reading.start > reading.end:
                 used_energy += (reading.end + max_energy) - reading.start
             else:  
@@ -155,37 +175,41 @@ class intel_rapl(EnergyReader):
         return used_energy
 
     def max_energy_range_uj(self, socket) -> int:
-        result = subprocess.run(
-            ["cat", f"/sys/class/powercap/intel-rapl:{socket}/max_energy_range_uj"],
-            capture_output=True,
-            text=True,
+        result = (
+            Path(f"/sys/class/powercap/intel-rapl:{socket}/max_energy_range_uj").read_text()
         )
-        output_CompletedProcess(f"max_energy_range_uj:{socket}", result)
-        if result.returncode != 0:
-            exit(result.returncode)
-        return int(result.stdout)
+        return int(result)
 
     def energy(self, counter) -> int:
-        result = subprocess.run(
-            ["cat", f"/sys/class/powercap/intel-rapl:{counter}/energy_uj"],
-            capture_output=True,
-            text=True,
-        )
-        output_CompletedProcess(f"energy_uj:{counter}", result)
-        if result.returncode != 0:
-            exit(result.returncode)
-        return int(result.stdout)
+        result = Path(f"/sys/class/powercap/intel-rapl:{counter}/energy_uj").read_text()
+        return int(result)
     
-    def all_energy(self, start: None | list[EnergyReading] = None) -> list[EnergyReading]:
+    def all_energy(
+            self,
+            start: None | list[EnergyReading] = None
+        ) -> list[EnergyReading]:
         if start is not None:
-            return [replace(reading, end=self.get_energy(reading=reading)) for reading in start]
+            return [
+                replace(reading, end=self.get_energy(reading=reading))
+                for reading in start
+            ]
         return [
-            EnergyReading(self.get_energy(package=package, sub_package=sub_package), -1, package, sub_package)
+            EnergyReading(
+                self.get_energy(package=package, sub_package=sub_package),
+                -1,
+                package,
+                sub_package
+            )
             for package in self.packages
             for sub_package in self.sub_packages
         ]
     
-    def get_energy(self, package: int = -1, sub_package: int= -1, reading: EnergyReading | None = None):
+    def get_energy(
+            self,
+            package: int = -1,
+            sub_package: int= -1,
+            reading: EnergyReading | None = None
+        ):
         if reading:
             package = int(reading.package)
             sub_package = reading.sub_package
@@ -202,25 +226,27 @@ class cray(EnergyReader):
         return int(sum(reading.end - reading.start for reading in readings))
 
     def energy(self, counter) -> int:
-        result = subprocess.run(
-            ["cat", f"/sys/cray/pm_counters/{counter}"],
-            capture_output=True,
-            text=True,
-        )
-        output_CompletedProcess(f"energy_j:{counter}", result)
-        if result.returncode != 0: exit(result.returncode)
+        result = Path(f"/sys/cray/pm_counters/{counter}").read_text()
         
-        return int(result.stdout.split()[0])  * 1_000_000
+        return int(result.split()[0]) * 1_000_000
     
-    def all_energy(self, start: None | list[EnergyReading] = None) -> list[EnergyReading]:
+    def all_energy(
+            self,
+            start: None | list[EnergyReading] = None
+        ) -> list[EnergyReading]:
         if start is not None:
-            return [replace(reading, end=self.energy(reading.package)) for reading in start]
+            return [replace(reading, end=self.energy(reading.package))
+                    for reading in start]
         return [
             EnergyReading(self.energy(package), -1, package, -1)
             for package in ("cpu_energy", "memory_energy")
         ]
 
-def output_CompletedProcess(name: str, result: subprocess.CompletedProcess, quiet_success = False):
+def output_CompletedProcess(
+        name: str,
+        result: subprocess.CompletedProcess,
+        quiet_success = False
+    ):
     success = result.returncode == 0
     if quiet_success and success:
         pretty_str = pretty_out(f"{name}", "Done")
@@ -243,8 +269,5 @@ def pretty_out(name: str, *args):
 
     out = "\n".join(str(arg) for arg in args)
     out = out.rstrip("\n")
-    if "\n" in out:
-        out = f"{name}\n{indent(out, INDENTATION)}"
-    else:
-        out = f"{name}: {out}"
+    out = f"{name}\n{indent(out, INDENTATION)}" if "\n" in out else f"{name}: {out}"
     return out

@@ -1,15 +1,18 @@
-from subprocess import CompletedProcess, run
 import os
-from typing import ClassVar, Iterable
+from collections.abc import Iterable
+from subprocess import CompletedProcess, run
+from typing import ClassVar
+
 from ..util.data import ExecutionParams
 from .program import Program
+
 
 class ExecuteSH(Program):
     @classmethod
     def run(cls, params: ExecutionParams, args: Iterable[str]) -> CompletedProcess[str]:
         execute = f"{os.path.dirname(__file__)}/../../scripts/run/execute-hpc-benchmarks.sh"
         print(f"Running {cls.name} with {params.n_threads} threads")
-        proc_bind = params.machine.proc_bind[params.affinity_distance]
+        proc_bind = params.machine.proc_bind[params.binding]
         places = params.machine.places[params.place_wideness]
         freq = params.machine.freq[params.freq_level]
         boost = params.machine.turbo_boost[params.boost]
@@ -18,6 +21,7 @@ class ExecuteSH(Program):
             env=os.environ | {"OMP_PLACES": places, "OMP_PROC_BIND": proc_bind},
             capture_output=True,
             text=True,
+            check=False
         )
     @classmethod
     def report(cls):

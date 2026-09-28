@@ -1,8 +1,8 @@
-from pathlib import Path
-from typing import Union
+from __future__ import annotations
 
-from collections.abc import Callable
 import re
+from collections.abc import Callable
+from pathlib import Path
 
 
 def compile_name_pattern(
@@ -13,11 +13,11 @@ def compile_name_pattern(
 
 
 def latest_path(
-    dir: Union[str, Path],
+    dir: str | Path,
     prefix: str = "",
     suffix="",
     restriction: Callable[[Path], bool] = lambda _: True,
-) -> Union[Path, None]:
+) -> Path | None:
     name_pattern = compile_name_pattern(prefix, suffix)
 
     parent = Path(dir)
@@ -34,16 +34,16 @@ def latest_path(
     return latest
 
 
-def latest_dir(dir: Union[str, Path], base_name: str) -> Union[Path, None]:
+def latest_dir(dir: str | Path, base_name: str) -> Path | None:
     return latest_path(dir, prefix=base_name + "_", restriction=Path.is_dir)
 
 
-def latest_file(dir: Union[str, Path], base_name: str) -> Union[Path, None]:
+def latest_file(dir: str | Path, base_name: str) -> Path | None:
     return latest_path(dir, prefix=base_name + "_", restriction=Path.is_file)
 
 
 def next_path(
-    dir: Union[str, Path],
+    dir: str | Path,
     prefix: str = "",
     suffix="",
     restriction: Callable[[Path], bool] = lambda _: True,
@@ -64,11 +64,11 @@ def next_path(
     return Path(parent, f"{prefix}{last + 1}{suffix}")
 
 
-def next_dir(dir: Union[str, Path], base_name: str) -> Path:
+def next_dir(dir: str | Path, base_name: str) -> Path:
     return next_path(dir, prefix=base_name + "_", restriction=Path.is_dir)
 
 
-def next_file(dir: Union[str, Path], base_name: str) -> Path:
+def next_file(dir: str | Path, base_name: str) -> Path:
     return next_path(dir, prefix=base_name + "_", restriction=Path.is_file)
 
 

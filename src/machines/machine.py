@@ -1,9 +1,10 @@
+from __future__ import annotations
+
 import os
 import socket
-from dataclasses import dataclass, field, replace
-from shutil import which
+from dataclasses import asdict, dataclass, field, fields, replace
 from pathlib import Path
-import subprocess
+from shutil import which
 
 
 @dataclass
@@ -17,11 +18,12 @@ class Machine:
     proc_bind: list[str] = field(default_factory=lambda: ["true", "close", "spread", "false"])
     
     turbo_boost: list[str] = field(default_factory=lambda: ["false", "true"])
+    has_numa: bool = False
     numactl: list[str] = field(default_factory=lambda: ["false", "true"])
     # uncore: list[int] = field(default_factory=lambda: [])
 
-
     boost_setter: str | None = "cpufreq"
+    numa_setter: str | None = "sysctl"
     
     freq_getter: str | None = None
     freq_setter: str | None = None
@@ -30,6 +32,8 @@ class Machine:
 
 
 NONE = Machine(name="NONE", freq=[0], max_threads=0)
+
+from ..util.system import try_exec
 
 
 def _environment_list(name: str, parser):
@@ -113,15 +117,16 @@ def _system_rapl_domains() -> tuple[list[int], list[int]] | None:
 def _available_programs(machine: Machine, slurm: bool=True) -> Machine:
     freq_tool = None
     energy_tool = None
+    boost_tool = None
     if slurm:
         freq_tool="slurm"
-    if which("cpufreq-set"):
+    elif which("cpufreq-set"):
         freq_tool = "cpufreq-set"
     elif which("cpupower"):
         freq_tool = "cpupower"
 
     if freq_tool is None:
-        raise Exception("Unable to use cpufreq-set or cpupower, do i have permission?")
+        raise RuntimeError("Unable to use cpufreq-set or cpupower, do i have permission?")
 
     if _check_rapl(machine):
         energy_tool = "intel-rapl"
@@ -129,30 +134,42 @@ def _available_programs(machine: Machine, slurm: bool=True) -> Machine:
     if _check_cray():
         energy_tool = "cray"
 
+    if _check_cpufreq_boost():
+        boost_tool = "cpufreq"
+    elif _check_intel_pstate_boost():
+        boost_tool = "intel_pstate"
+    else:
+        raise RuntimeError("Couldn't find a way to set boost, do i have permission?")
+
     if energy_tool is None:
-        raise Exception("Couldn't find a way to read energy counters, do i have permission?")
-        exit(42)
+        raise RuntimeError("Couldn't find a way to read energy counters, do i have permission?")
+
     return replace(machine,
         freq_getter=freq_tool,
         freq_setter=freq_tool,
         energy_reader=energy_tool,
         energy_accum=energy_tool,
+        boost_setter=boost_tool
     )
 
-def try_exec(cmds: list[list[str]]) -> bool:
-    for cmd in cmds:
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode != 0:
-            return False
-    return True
+
+def _check_intel_pstate_boost() -> bool:
+    p = Path("/sys/devices/system/cpu/intel_pstate/no_turbo")
+    return p.exists() and os.access(p, os.W_OK)
+
+
+def _check_cpufreq_boost() -> bool:
+    p = Path("/sys/devices/system/cpu/cpufreq/boost")
+    return p.exists() and os.access(p, os.W_OK)
 
 def _check_rapl(machine: Machine) -> bool:
     commands = [
         [
-            "cat",
-            f"/sys/class/powercap/intel-rapl:{package}"
-            f"{f':{sub_package}' if sub_package >= 0 else ''}"
-            "/energy_uj",
+            "cat",(
+                f"/sys/class/powercap/intel-rapl:{package}"
+                f"{f':{sub_package}' if sub_package >= 0 else ''}"
+                "/energy_uj"
+            ),
         ]
         for package in machine.package
         for sub_package in machine.sub_package
@@ -165,6 +182,19 @@ def _check_cray() -> bool:
         ["cat", f"/sys/cray/pm_counters/{package}"]
         for package in ("cpu_energy", "memory_energy")
     ])
+
+def _has_multiple_numa_nodes() -> bool:
+    node_path = Path("/sys/devices/system/node")
+    if not node_path.is_dir():
+        # UMA system or kernel compiled without CONFIG_NUMA
+        return False
+
+    nodes = [
+        entry
+        for entry in node_path.iterdir()
+        if entry.is_dir() and entry.name.startswith("node") and entry.name[4:].isdigit()
+    ]
+    return len(nodes) > 1
 
 def guess_machine() -> Machine:
     """Build a Machine from environment settings, system discovery, and safe defaults.
@@ -182,8 +212,7 @@ def guess_machine() -> Machine:
 
     env_max_threads = _environment_list("ENERGYUQ_MACHINE_MAX_THREADS", int)
     max_threads = env_max_threads[0] if env_max_threads else (os.cpu_count() or 1)
-    if max_threads < 1:
-        max_threads = 1
+    max_threads = max(max_threads, 1)
 
     packages = (
         _environment_list("ENERGYUQ_MACHINE_PACKAGE", int)
@@ -206,10 +235,64 @@ def guess_machine() -> Machine:
         sub_package=sub_packages,
         places=places,
         proc_bind=proc_bind,
+        has_numa=_has_multiple_numa_nodes(),
     ), slurm)
 
-@dataclass
-class MachineParams():
-    machine: Machine = field(default_factory=lambda: NONE)
-    n_threads: int = 1
-    freq_level: int = 0
+
+def save_machine(machine: Machine, dir_path: Path | str) -> Path:
+    """Save machine configuration to machine.msgpack in the given directory."""
+    import msgpack
+
+    p = Path(dir_path)
+    p.mkdir(parents=True, exist_ok=True)
+    target = p / "machine.msgpack"
+    with target.open("wb") as f:
+        msgpack.pack(asdict(machine), f)
+    return target
+
+
+def load_machine(dir_path: Path | str) -> Machine | None:
+    """
+    Load Machine configuration from a run directory.
+    Checks machine.msgpack first, then falls back to legacy machine.pkl.
+    Raises RuntimeError if the file is corrupted or has an invalid structure.
+    """
+    p = Path(dir_path)
+
+    msgpack_file = p / "machine.msgpack"
+    if msgpack_file.exists():
+        try:
+            import msgpack
+
+            with msgpack_file.open("rb") as f:
+                data = msgpack.unpack(f)
+        except Exception as e:
+            raise RuntimeError(f"machine at {msgpack_file.as_posix()} is invalid: {e}") from e
+
+        if isinstance(data, dict):
+            valid_fields = {f.name for f in fields(Machine)}
+            return Machine(**{k: v for k, v in data.items() if k in valid_fields})
+        elif isinstance(data, Machine):
+            return data
+        else:
+            raise RuntimeError(f"machine at {msgpack_file.as_posix()} is invalid")
+
+    pkl_file = p / "machine.pkl"
+    if pkl_file.exists():
+        try:
+            import pickle
+
+            with pkl_file.open("rb") as f:
+                data = pickle.load(f)
+        except Exception as e:
+            raise RuntimeError(f"machine at {pkl_file.as_posix()} is invalid: {e}") from e
+
+        if isinstance(data, Machine):
+            return data
+        elif isinstance(data, dict):
+            valid_fields = {f.name for f in fields(Machine)}
+            return Machine(**{k: v for k, v in data.items() if k in valid_fields})
+        else:
+            raise RuntimeError(f"machine at {pkl_file.as_posix()} is invalid")
+
+    return None
