@@ -1,14 +1,22 @@
 #!/bin/bash
+set -e
+
 main() {
     set_log_depth 0
-    ensure python_install
+    ensure fetch_repos
+    ensure ensure_uv
     ensure create_venv
     ensure install_jupyter
+    # ensure install_local_easyvvuq
 }
 _setConfigArgs() {
     while [ "${1:-}" != '' ]; do
         case "$1" in
             ## Options
+            --clean)
+                clean_all
+                exit 0
+                ;;
             
             ## end of Options
             [!-]*)
@@ -20,38 +28,47 @@ _setConfigArgs() {
         esac
         shift
     done
+    EasyVVUQ_DIR="$PROJECT_DIR/easy/EasyVVUQ"
+    BENCHMARKS_DIR="$PROJECT_DIR/hpc-benchmarks"
+}
+
+#clean, not purge
+clean_all() {
+    enter_new_func "Removing venv"
+
+    rm -fr "$PROJECT_DIR/.venv"
+}
+
+fetch_repos() {
+    enter_new_func "Fetching submodules"
+
+    git submodule update --init "$EasyVVUQ_DIR" "$BENCHMARKS_DIR"
+    (cd "$BENCHMARKS_DIR" && git submodule update --init MW)
 }
 
 create_venv() {
     enter_new_func "Creating python venv"
     
     if [ ! -f "$PROJECT_DIR/.venv/bin/activate" ]; then
-        python3 -m venv "$PROJECT_DIR/.venv"
+        uv venv --python 3.12 "$PROJECT_DIR/.venv"
     fi
     
     # shellcheck disable=SC1091
     source "$PROJECT_DIR/.venv/bin/activate"
 
-    pip install --upgrade pip
-    pip install -r "$PROJECT_DIR/requirements.txt"
+    uv pip install -e "$PROJECT_DIR"
 }
 
 install_jupyter() {
     enter_new_func "Installing jupyter"
 
-    pip install jupyter notebook
+    uv pip install -e "${PROJECT_DIR}[jupyter]"
 }
 
-python_install() {
-    enter_new_func "Installing python"
-    eval "$(pyenv init - bash)"
+install_local_easyvvuq() {
+    enter_new_func "Installing easyvvuq"
 
-    local ver
-    ver="$(cat "$PROJECT_DIR/.python-version")"
-    ver="${ver#"${ver%%[![:space:]]*}"}" # leading
-    ver="${ver%"${ver##*[![:space:]]}"}" # trailing
-
-    pyenv install --skip-existing "$ver"
+    uv pip install -e "$EasyVVUQ_DIR"
 }
 
 SCRIPT_DIR=$(dirname "$(readlink -e "${BASH_SOURCE[0]}")") && source "$SCRIPT_DIR/util.bash"

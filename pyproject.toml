@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools==81.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "energyuq"
+version = "0.1.0"
+description = "Uncertainty Quantification for Energy & Performance in HPC"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "chaospy",
+    "dill",
+    "matplotlib",
+    "msgpack",
+    "numpy>=2",
+    "pandas",
+    "python-dotenv",
+    "SALib",
+    "scipy",
+    "easyvvuq",
+]
+
+[tool.uv.sources]
+easyvvuq = { path = "easy/EasyVVUQ", editable = true }
+
+[project.optional-dependencies]
+jupyter = [
+    "jupyter",
+    "notebook",
+]
+dev = [
+    "pytest",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+
+[tool.ruff.lint]
+select = [
+    # Pyflakes
+    "F",
+    # pyupgrade
+    "UP",
+    # flake8-bugbear
+    "B",
+    # flake8-simplify
+    "SIM",
+    # isort
+    "I",
+]
+ignore = ["DTZ005"]
