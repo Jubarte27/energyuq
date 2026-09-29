@@ -15,7 +15,7 @@ def parse_args():
         "benchmark",
         nargs="?",
         default="FAKEWORK",
-        help="Benchmark name (e.g. HPCG, JA, PO, FAKEWORK). Default: FAKEWORK",
+        help="Benchmark name (HPCG, JA, PO, etc). Default: FAKEWORK",
     )
     parser.add_argument(
         "--resume",
@@ -60,8 +60,6 @@ if __name__ == "__main__":
         raise ValueError(f"Unknown benchmark {args.benchmark}") from e
 
     mach = guess_machine()
-    if mach is None:
-        raise RuntimeError("I don't know where I am at")
 
     campaign, analysis = energyuq.create(
         benchmark,
@@ -71,13 +69,12 @@ if __name__ == "__main__":
         numa=args.numa,
     )
 
-    if campaign and analysis:
-        energyuq.refine_and_analyse(
-            campaign,
-            analysis,
-            max_number_of_refinements=args.max_refinements,
-            save_every=args.save_every,
-            save_dir=args.dir,
-        )
+    energyuq.refine_and_analyse(
+        campaign,
+        analysis,
+        max_number_of_refinements=args.max_refinements,
+        save_every=args.save_every,
+        save_dir=args.dir,
+    )
 
-        energyuq.save(campaign, analysis, dir=args.dir, status="completed")
+    energyuq.save(campaign, analysis, dir=args.dir, status="completed")

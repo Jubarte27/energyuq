@@ -64,10 +64,12 @@ class EnergyUQCampaign:
         campaign: uq.Campaign,
         root_path: Path | str,
         machine: Machine,
+        numa: bool = False
     ):
         self.campaign: uq.Campaign = campaign
         self.root_path = Path(root_path)
         self.machine: Machine = machine
+        self.numa = numa
 
     @property
     def sampler(self) -> SCSampler:
@@ -81,6 +83,7 @@ class EnergyUQCampaign:
         return (
             f"EnergyUQCampaign(name={camp_name!r}, "
             f"root_path={self.root_path}, machine={self.machine.name}, "
+            f"numa={self.numa}, "
         )
 
 
@@ -184,6 +187,7 @@ def create_campaign(
         campaign=campaign,
         root_path=root,
         machine=machine,
+        numa=numa,
     )
 
 
@@ -207,16 +211,9 @@ def prepare_campaign(
 def prepare_analysis(campaign: EnergyUQCampaign) -> uq.analysis.SCAnalysis:
     sampler: SCSampler = cast(SCSampler, campaign.get_active_sampler())
     analysis = uq.analysis.SCAnalysis(sampler=sampler, qoi_cols=[QOI])
-    if not hasattr(analysis, "l_norm"):
-        analysis.l_norm = sampler.l_norm
+    # if not hasattr(analysis, "l_norm"):
+    #     analysis.l_norm = sampler.l_norm
     return analysis
-
-
-def plot_new_points(new_points: list[tuple[float, float]]) -> None:
-    pts = np.asarray(new_points)
-    plt.figure()
-    plt.plot(pts[:, 0], pts[:, 1], "o")
-    plt.show()
 
 
 def _ordinal(n: int) -> str:
@@ -237,19 +234,49 @@ def refine_sampling_plan(
     var_tol: float = 0.1,
     patience: int = 2,
     epsilon: float = 1e-12,
-    sobol_thresh: float = 1e-3,
-    ignored_dims: set[int] | list[int] | None = None,
+    sobol_thresh: float = 0,
     save_every: int = 2,
     save_dir: Path | str | None = None,
 ) -> None:
     sampler = campaign.sampler
-    ignored = set(ignored_dims) if ignored_dims is not None else set()
-
-    for d in ignored:
-        if d < sampler.N:
-            sampler.max_level[d] = 1
 
     effective_start = len(analysis.adaptation_errors) if start_index is None else (start_index - 1)
+
+    def ensure_order_two():
+        print("Ensuring at least order 2")
+        adm = np.array(sampler.admissible_idx)
+        if adm.size == 0:
+            return
+
+        sobols = analysis.get_sobol_indices(QOI)
+        max_orders = np.max(analysis.l_norm, 0)
+        dims = []
+        for dim, order in enumerate(max_orders):
+            if order < 2:
+                dims.append(dim)
+        if len(dims) < 1:
+            return
+
+        print(f"Dimensions {dims} still not at two")
+        force = adm[adm[:, np.array(dims)].max(axis=1) == 2]
+        print(f"{force} will be added to l_norm")
+
+        analysis.l_norm = np.unique(np.concatenate((np.asarray(analysis.l_norm), force)), axis=0)
+        campaign.apply_analysis(analysis)
+        max_orders = np.max(analysis.l_norm, 0)
+        dims = []
+        for dim, order in enumerate(max_orders):
+            is_significant = any(
+                sobol > sobol_thresh
+                for perm, sobol in sobols.items()
+                if dim in perm
+            )
+            if is_significant and order < 2:
+                dims.append(dim)
+        if len(dims) < 1:
+            return
+        print(f"Dimensions {dims} still not two")
+        raise
 
     def single_iteration(idx: int) -> bool:
         sampler.look_ahead(analysis.l_norm)
@@ -296,21 +323,6 @@ def refine_sampling_plan(
             "var_ok": var_ok,
         }
 
-    def explored_enough(thresh: float = sobol_thresh) -> bool:
-        sobols = analysis.get_sobol_indices(QOI)
-        max_orders = np.max(analysis.l_norm, 0)
-        for dim, order in enumerate(max_orders):
-            if dim in ignored:
-                continue
-            is_significant = any(
-                sobol > thresh
-                for perm, sobol in sobols.items()
-                if dim in perm
-            )
-            if is_significant and order <= 1:
-                return False
-        return True
-
     def advance() -> bool:
         nonlocal i
         if not single_iteration(i):
@@ -353,10 +365,7 @@ def refine_sampling_plan(
         if not advance_and_save():
             return
 
-    while not explored_enough():
-        print("Adapt because something was not properly explored")
-        if not advance_and_save():
-            return
+    ensure_order_two()
 
     while not is_converged():
         print(f"Adapt because it has not converged yet {analysis.adaptation_errors[-3:]}")
@@ -415,7 +424,7 @@ def create(
     dir: str | None = None,
     resume: bool = False,
     numa: bool = False,
-) -> tuple[EnergyUQCampaign, uq.analysis.SCAnalysis] | tuple[None, None]:
+) -> tuple[EnergyUQCampaign, uq.analysis.SCAnalysis]:
     if resume:
         target_dir = Path(dir) if dir else latest_dir(RESULTS_DIR, "energy")
         if target_dir is not None and (
@@ -470,6 +479,8 @@ def save(
     elif not (path / "machine.msgpack").exists() and not (path / "machine.pkl").exists():
         raise ValueError("No machine information available to save for this campaign")
 
+    (path / "numa").write_text("1" if campaign.numa else "0")
+
     analysis.save_state((path / "analysis").as_posix())
 
     sampler = campaign.sampler
@@ -518,8 +529,11 @@ def load(
     loaded_machine = load_machine(path)
     machine = loaded_machine if loaded_machine is not None else default_machine
 
+    numa_path = (path / "numa")
+    numa = numa_path.read_text() == "1"
+
     campaign = create_campaign(
-        program, machine, path
+        program, machine, path, numa=numa
     )
 
     sampler_path = path / "sampler"

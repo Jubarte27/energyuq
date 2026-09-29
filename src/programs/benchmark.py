@@ -16,8 +16,9 @@ class ExecuteSH(Program):
         places = params.machine.places[params.place_wideness]
         freq = params.machine.freq[params.freq_level]
         boost = params.machine.turbo_boost[params.boost]
+        numa = params.machine.numactl[params.numa] if params.numa is not None else "false"
         return run(
-            [execute, cls.name, str(params.n_threads), str(freq), str(boost)],
+            [execute, cls.name, str(params.n_threads), str(freq), str(boost), str(numa)],
             env=os.environ | {"OMP_PLACES": places, "OMP_PROC_BIND": proc_bind},
             capture_output=True,
             text=True,

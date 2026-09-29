@@ -20,12 +20,7 @@ def compute_edp(energy_uj: Any, time: Any) -> Any:
     """Calculate Energy-Delay Product from energy in μJ and time in seconds."""
     return (energy_uj * 1e-6) * time
 
-
-def to_serializable_primitive(obj: Any) -> Any:
-    """Convert numpy, pandas, dataclass, and path types to standard JSON/msgpack serializable types."""
-    if is_dataclass(obj) and not isinstance(obj, type):
-        return asdict(obj)
-    TYPE_HANDLERS = {
+_TYPE_HANDLERS = {
         (np.integer, int): int,
         (np.floating, float): float,
         np.ndarray: lambda o: o.tolist(),
@@ -33,7 +28,13 @@ def to_serializable_primitive(obj: Any) -> Any:
         dict: lambda o: {str(k): to_serializable_primitive(v) for k, v in o.items()},
         Path: str,
     }
-    for types, handler in TYPE_HANDLERS.items():
+
+def to_serializable_primitive(obj: Any) -> Any:
+    """Convert numpy, pandas, dataclass, and path types to standard JSON/msgpack serializable types."""
+    if is_dataclass(obj) and not isinstance(obj, type):
+        return asdict(obj)
+    
+    for types, handler in _TYPE_HANDLERS.items():
         if isinstance(obj, types):
             return handler(obj)
     try:

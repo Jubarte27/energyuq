@@ -136,11 +136,11 @@ parboil_lbm() { cd "$BENCHMARK_DIR/parboil" && execute ./parboil run lbm omp_cpu
 rodinia_hotspot() { cd "$BENCHMARK_DIR/RODINIA/hotspot" && execute ./hotspot 1024 1024 100000 "$NT" ../data/hotspot/temp_1024 ../data/hotspot/power_1024 output.out ;}
 
 fake_work() {
-    local iters=${1:-30}
+    local iters=${1:-500}
 
-    echo "Fake work: $iters per thread"
+    echo "Fake work: $iters"
 
-    for ((thread_i = 0; thread_i < NT; thread_i++)); do
+    for ((thread_i = 0; thread_i < iters; thread_i++)); do
         (
             local acc=0
             local i
@@ -187,6 +187,8 @@ _setConfigArgs() {
 	NT=$2
 
     FREQHZ=$3
+    BOOST=$4
+    NUMA=$5
 }
 
 

@@ -444,14 +444,6 @@ class TestCampaignCreationAndResumption(unittest.TestCase):
         self.assertTrue(path.name.startswith("custom_app_"))
 
 
-class TestPlotNewPoints(unittest.TestCase):
-    @patch("matplotlib.pyplot.show")
-    def test_plot_new_points(self, mock_show):
-        pts = [(1.0, 2.0), (3.0, 4.0)]
-        energyuq.plot_new_points(pts)
-        mock_show.assert_called_once()
-
-
 class TestNumaBalancing(unittest.TestCase):
     def setUp(self):
         self.numa_machine = Machine(

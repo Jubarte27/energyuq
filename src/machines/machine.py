@@ -6,6 +6,8 @@ from dataclasses import asdict, dataclass, field, fields, replace
 from pathlib import Path
 from shutil import which
 
+from ..util.system import try_exec
+
 
 @dataclass
 class Machine:
@@ -32,9 +34,6 @@ class Machine:
 
 
 NONE = Machine(name="NONE", freq=[0], max_threads=0)
-
-from ..util.system import try_exec
-
 
 def _environment_list(name: str, parser):
     value = os.environ.get(name)
@@ -205,7 +204,6 @@ def guess_machine() -> Machine:
     """
     system_domains = _system_rapl_domains()
     slurm = os.environ.get("ENERGYUQ_SLURM", "") in ("true", "TRUE", "True", "")
-    print(slurm)
 
     name = os.environ.get("ENERGYUQ_MACHINE_NAME") or socket.gethostname() or "unknown"
     frequencies = _environment_list("ENERGYUQ_MACHINE_FREQ", int) or _system_frequencies() or [0]

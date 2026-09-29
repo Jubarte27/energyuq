@@ -4,5 +4,7 @@ from .benchmark import HPCG as HPCG
 from .benchmark import JA as JA
 from .benchmark import LULESH as LULESH
 from .benchmark import NONE as NONE
+from .benchmark import PO as PO
+from .benchmark import ST as ST
 from .fletcher import Fletcher as Fletcher
 from .program import Program as Program

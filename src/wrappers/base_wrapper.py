@@ -11,7 +11,7 @@ from time import perf_counter
 from ..machines import Machine
 from ..programs import Program
 from ..util.data import EnergyReading, ExecutionParams, compute_edp
-from ..util.system import try_exec
+from ..util.system import try_exec, try_exec_shell
 
 
 def prepare_and_execute(machine: Machine, program: type[Program], params: ExecutionParams, args: None | Iterable[str]):
@@ -30,12 +30,12 @@ def prepare_and_execute(machine: Machine, program: type[Program], params: Execut
 def set_boost(machine: Machine, value: int):
     if machine.boost_setter == "cpufreq":
         boost = "0" if machine.turbo_boost[value] == "false" else "1"
-        if try_exec([["tee", "/sys/devices/system/cpu/cpufreq/boost"]], input=boost):
-            return machine.boost_setter
+        Path("/sys/devices/system/cpu/cpufreq/boost").write_text(boost)
+        return machine.boost_setter
     if machine.boost_setter == "intel_pstate":
         boost = "1" if machine.turbo_boost[value] == "false" else "0"
-        if try_exec([["tee", "/sys/devices/system/cpu/intel_pstate/no_turbo"]], input=boost):
-            return machine.boost_setter
+        Path("/sys/devices/system/cpu/intel_pstate/no_turbo").write_text(boost)
+        return machine.boost_setter
 
     raise RuntimeError(f"Unable to use {machine.boost_setter} for setting turbo boost, do i have permission?")
 
@@ -49,15 +49,14 @@ def set_numa(machine: Machine, value: int):
     
 
 def set_freq(machine: Machine, frequency):
-    if machine.freq_setter == "cpufreq-set" and try_exec([
-        *(["cpufreq-set", "--cpu", f"{cpu}", "--governor", "userspace"] for cpu in range(machine.max_threads)),
-        *(["cpufreq-set", "--cpu", f"{cpu}", "--freq", f"{frequency}"] for cpu in range(machine.max_threads))
+    if machine.freq_setter == "cpufreq-set" and try_exec_shell([
+        "; ".join(f"cpufreq-set --cpu {cpu} --governor userspace" for cpu in range(machine.max_threads)),
+        "; ".join(f"cpufreq-set --cpu {cpu} --freq {frequency}" for cpu in range(machine.max_threads))
     ]):
         return machine.freq_setter
 
-    if machine.freq_setter == "cpupower" and try_exec([
-        ["cpupower", "frequency-set", "--governor", "userspace"],
-        ["cpupower", "frequency-set", "--freq", f"{frequency}"]
+    if machine.freq_setter == "cpupower" and try_exec_shell([
+        "cpupower frequency-set --governor userspace; cpupower frequency-set --freq {frequency}"
     ]):
         return machine.freq_setter
 
@@ -70,12 +69,7 @@ def set_freq(machine: Machine, frequency):
     )
 
 def cpu_set(machine: Machine, freq_level: int):
-
     set_freq(machine, machine.freq[freq_level])
-    
-    # power_cap = x[POWER_CAP_POS]
-    # power_cap *= 10**6
-    # set_sysfs("/sys/class/powercap/intel-rapl:0/?????", power_cap, "Power cap")
 
 
 def pick_reader(machine: Machine):
@@ -129,21 +123,6 @@ class EnergyReader(ABC):
         start: None | list[EnergyReading] = None
     ) -> list[EnergyReading]: pass
 
-def set_sysfs(full_path: str, value: object, name=None):
-    result = subprocess.run(
-        ["tee", full_path],
-        input=str(value),
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-
-    output_CompletedProcess(full_path if name is None else name, result)
-
-    if result.returncode != 0:
-        raise RuntimeError(
-            f"\"tee {full_path}\" failed with exit code:{result.returncode}"
-        )
 
 class intel_rapl(EnergyReader):
     def __init__(self, machine: Machine) -> None:
