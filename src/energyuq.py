@@ -230,13 +230,13 @@ def refine_sampling_plan(
     min_number_of_refinements: int = -1,
     max_number_of_refinements: int = 100,
     surplus_tol: float = 0.1,
-    mean_tol: float = 0.1,
-    var_tol: float = 0.1,
-    patience: int = 2,
+    mean_tol: float = 0.05,
+    var_tol: float = 0.05,
+    patience: int = 3,
     epsilon: float = 1e-12,
-    sobol_thresh: float = 0,
     save_every: int = 2,
     save_dir: Path | str | None = None,
+    force_two: bool = False
 ) -> None:
     sampler = campaign.sampler
 
@@ -266,17 +266,19 @@ def refine_sampling_plan(
         max_orders = np.max(analysis.l_norm, 0)
         dims = []
         for dim, order in enumerate(max_orders):
-            is_significant = any(
-                sobol > sobol_thresh
-                for perm, sobol in sobols.items()
-                if dim in perm
-            )
-            if is_significant and order < 2:
+            if order < 2:
                 dims.append(dim)
         if len(dims) < 1:
             return
         print(f"Dimensions {dims} still not two")
         raise
+
+    def explored_enough() -> bool:
+        max_orders = np.max(analysis.l_norm, 0)
+        for dim, order in enumerate(max_orders):
+            if order <= 1:
+                return False
+        return True
 
     def single_iteration(idx: int) -> bool:
         sampler.look_ahead(analysis.l_norm)
@@ -365,11 +367,18 @@ def refine_sampling_plan(
         if not advance_and_save():
             return
 
-    ensure_order_two()
+    if force_two:
+        ensure_order_two()
+    else:
+        while not explored_enough():
+            print(f"Adapt because there are things to explore")
+            if not advance_and_save():
+                return
 
     while not is_converged():
         print(f"Adapt because it has not converged yet {analysis.adaptation_errors[-3:]}")
         if not advance_and_save():
+            print(f"Ran out of space to explore")
             return
 
     print(f"Converged [{analysis.std_history[-1]}]: {analysis.adaptation_errors[-3:]}")

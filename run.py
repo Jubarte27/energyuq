@@ -45,6 +45,11 @@ def parse_args():
         action="store_true",
         help="Include kernel numa balancing, if available",
     )
+    parser.add_argument(
+        "--force-two",
+        action="store_true",
+        help="Enforces at least order 2 for every dimension at the beginning",
+    )
     return parser.parse_args()
 
 
@@ -75,6 +80,7 @@ if __name__ == "__main__":
         max_number_of_refinements=args.max_refinements,
         save_every=args.save_every,
         save_dir=args.dir,
+        force_two=args.force_two
     )
 
     energyuq.save(campaign, analysis, dir=args.dir, status="completed")
