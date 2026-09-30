@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from collections.abc import Sequence
 from typing import Any
 
@@ -151,8 +149,10 @@ class PlotterGridMixin:
 
         return fig
 
-    def _classify_outliers(self, series: pd.Series) -> tuple[pd.Series, pd.Series]:
+    def _classify_outliers(self, series: pd.Series, enabled: bool = True) -> tuple[pd.Series, pd.Series]:
         """Return (high_outlier_mask, low_outlier_mask) using the IQR method."""
+        if not enabled:
+            return pd.Series(False, index=series.index), pd.Series(False, index=series.index)
         q1, q3 = series.quantile(0.25), series.quantile(0.75)
         iqr = q3 - q1
         return series > (q3 + 1.5 * iqr), series < (q1 - 1.5 * iqr)
@@ -206,6 +206,7 @@ class PlotterGridMixin:
         result: Result,
         qoi: str | None = None,
         order_focus: bool = False,
+        classify_outliers: bool = True,
         subfig: SubFigure | None = None,
         units: dict[str, str | None] | None = None,
     ) -> Figure | SubFigure:
@@ -233,7 +234,7 @@ class PlotterGridMixin:
             if isinstance(qoi_series, pd.DataFrame):
                 qoi_series = qoi_series.iloc[:, 0]
 
-            high_mask, low_mask = self._classify_outliers(qoi_series)
+            high_mask, low_mask = self._classify_outliers(qoi_series, enabled=classify_outliers)
             normalized = self._normalize_to_inliers(qoi_series, high_mask | low_mask)
             handles, labels, point_colors = self._build_legend_and_colors(
                 qoi, order_focus, high_mask, low_mask, normalized,
@@ -274,9 +275,10 @@ class PlotterGridMixin:
                     pair_idx += 1
 
             return fig
-        finally:
-            if subfig is None:
+        except:
+            if isinstance(fig, Figure):
                 plt.close(fig)
+            raise
 
     def plot_sorted(
         self,
@@ -309,9 +311,10 @@ class PlotterGridMixin:
             if not subfig and title:
                 ax.set_title(title)
             return fig
-        finally:
-            if subfig is None:
+        except:
+            if isinstance(fig, Figure):
                 plt.close(fig)
+            raise
 
     def plot_2D_single_dimension(
         self,
@@ -363,15 +366,17 @@ class PlotterGridMixin:
                 fig.delaxes(ax[j])
 
             return fig
-        finally:
-            if subfig is None:
+        except:
+            if isinstance(fig, Figure):
                 plt.close(fig)
+            raise
 
     def plot_boxplot(
         self,
         result: Result,
         qoi: str | None = None,
         units: dict[str, str | None] | None = None,
+        classify_outliers: bool = True,
     ) -> Figure:
         """Plot boxplots per discrete parameter level against the QoI."""
         _, qoi, key, df = self._prepare_context(result, units=units, qoi=qoi)
@@ -426,6 +431,7 @@ class PlotterGridMixin:
                     box_frame.to_numpy(),
                     positions=positions,
                     widths=width,
+                    showfliers=classify_outliers,
                     patch_artist=True,
                     boxprops={"facecolor": "lightblue", "edgecolor": "C0", "linewidth": 1.5},
                     medianprops={"color": "darkblue", "linewidth": 2},
@@ -434,9 +440,9 @@ class PlotterGridMixin:
                 )
 
             return fig
-        finally:
+        except Exception:
             plt.close(fig)
-
+            raise
 
 # Standalone module-level functions delegating via Plotter.from_result
 def plot_grid_2D(result: EasyResult, units: dict[str, str | None] | None = None) -> Figure:

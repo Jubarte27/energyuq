@@ -1,10 +1,10 @@
-from __future__ import annotations
-
-from collections.abc import Sequence
+import os
+from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass, is_dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any, cast
 
+import dill
 import numpy as np
 import pandas as pd
 from easyvvuq.analysis.sc_analysis import SCAnalysis, SCAnalysisResults
@@ -12,8 +12,7 @@ from easyvvuq.campaign import Campaign
 from easyvvuq.sampling.stochastic_collocation import SCSampler
 from pandas import DataFrame
 
-if TYPE_CHECKING:
-    from ..machines.machine import Machine
+from ..machines.machine import Machine
 
 
 def compute_edp(energy_uj: Any, time: Any) -> Any:
@@ -56,7 +55,7 @@ class ExecutionParams:
     numa: int | None = None
 
     @classmethod
-    def from_dict(cls, machine: Machine, data: dict[str, Any]) -> ExecutionParams:
+    def from_dict(cls, machine: Machine, data: dict[str, Any]) -> "ExecutionParams":
         n_threads = int(data.get("N_THREADS", data.get("THREADS", machine.max_threads)))
         freq_level = int(data.get("CLK", data.get("CLK_LEVEL", len(machine.freq) - 1)))
         place_wideness = int(data.get("PLACES", len(machine.places) - 1))
@@ -75,7 +74,7 @@ class ExecutionParams:
         )
 
     @classmethod
-    def from_args(cls, machine: Machine, args: Sequence[Any]) -> ExecutionParams:
+    def from_args(cls, machine: Machine, args: Sequence[Any]) -> "ExecutionParams":
         def arg(i: int, default: int = 0) -> int:
             if len(args) > i and str(args[i]).strip() != "":
                 try:
@@ -101,6 +100,65 @@ class ExecutionParams:
             numa=numa,
         )
 
+class ExecuteWrapper:
+    def __init__(self, function: Callable[[dict[str, Any]], Any]):
+        self.function = dill.dumps(function)
+
+    def start(self, previous: dict[str, Any] | None = None) -> dict[str, Any] | None:
+        if not previous:
+            return None
+        rundir = previous.get("rundir")
+        old_dir = os.getcwd() if rundir else None
+        try:
+            if rundir:
+                os.chdir(rundir)
+            dill.loads(self.function)(previous["run_info"]["params"])
+        finally:
+            if old_dir:
+                os.chdir(old_dir)
+        return previous
+
+    def finished(self) -> bool:
+        return True
+
+    def finalise(self) -> None:
+        pass
+
+    def succeeded(self) -> bool:
+        return True
+
+
+class EnergyUQCampaign:
+    """Encapsulates an EasyVVUQ Campaign along with EnergyUQ metadata:
+    root directory, machine profile.
+    """
+
+    def __init__(
+        self,
+        campaign: Campaign,
+        root_path: Path | str,
+        machine: Machine,
+        numa: bool = False
+    ):
+        self.campaign: Campaign = campaign
+        self.root_path = Path(root_path)
+        self.machine: Machine = machine
+        self.numa = numa
+
+    @property
+    def sampler(self) -> SCSampler:
+        return cast(SCSampler, self.campaign.get_active_sampler())
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self.campaign, name)
+
+    def __repr__(self) -> str:
+        camp_name = getattr(self.campaign, "campaign_name", None)
+        return (
+            f"EnergyUQCampaign(name={camp_name!r}, "
+            f"root_path={self.root_path}, machine={self.machine.name}, "
+            f"numa={self.numa}, "
+        )
 
 @dataclass
 class EnergyReading:
@@ -123,6 +181,6 @@ class Result:
 @dataclass
 class EasyResult(Result):
     analysis: SCAnalysis
-    campaign: Campaign
+    campaign: EnergyUQCampaign
     sampler: SCSampler
     results: SCAnalysisResults

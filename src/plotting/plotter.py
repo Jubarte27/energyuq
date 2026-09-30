@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import Any
 
 import numpy as np
@@ -13,7 +11,6 @@ from .grid import PlotterGridMixin
 from .layout import (
     PlotterLayoutMixin,
     get_machine,
-    get_sampler_params,
     mostly_square_grid,
     pad_to_even_and_split,
 )
@@ -60,7 +57,7 @@ class Plotter(
             self.init(machine, units=units)
 
     @classmethod
-    def from_result(cls, result: Any, units: dict[str, Any] | None = None) -> Plotter:
+    def from_result(cls, result: Any, units: dict[str, Any] | None = None) -> "Plotter":
         """Create a Plotter configured from the machine and parameters inside result."""
         mach = get_machine(result)
         return cls(machine=mach, units=units)

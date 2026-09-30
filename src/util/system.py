@@ -1,8 +1,6 @@
 """
 Operating system interface utilities for EnergyUQ.
 """
-from __future__ import annotations
-
 import subprocess
 import sys
 from collections.abc import Sequence

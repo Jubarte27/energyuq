@@ -1,15 +1,11 @@
 import datetime
 import json
-import os
-from collections.abc import Callable
 from contextlib import redirect_stdout
 from pathlib import Path
 from typing import Any, cast
 
 import chaospy as cp
-import dill
 import easyvvuq as uq
-import matplotlib.pyplot as plt
 import numpy as np
 from easyvvuq.actions import Actions, CreateRunDirectory, Decode, Encode
 from easyvvuq.sampling.stochastic_collocation import SCSampler
@@ -17,6 +13,7 @@ from easyvvuq.sampling.stochastic_collocation import SCSampler
 from .machines.machine import Machine, load_machine, save_machine
 from .programs.program import Program
 from .util.constants import QOI, QOIS, RESULTS_DIR, params_type, vary_type
+from .util.data import EnergyUQCampaign, ExecuteWrapper
 from .util.path import change_dir_permissions, latest_dir, next_dir, next_file
 from .wrappers import easy_wrapper
 
@@ -25,66 +22,6 @@ def create_dir(path: Path | str) -> Path:
     p = Path(path)
     p.mkdir(parents=True, exist_ok=True)
     return p
-
-class ExecuteWrapper:
-    def __init__(self, function: Callable[[dict[str, Any]], Any]):
-        self.function = dill.dumps(function)
-
-    def start(self, previous: dict[str, Any] | None = None) -> dict[str, Any] | None:
-        if not previous:
-            return None
-        rundir = previous.get("rundir")
-        old_dir = os.getcwd() if rundir else None
-        try:
-            if rundir:
-                os.chdir(rundir)
-            dill.loads(self.function)(previous["run_info"]["params"])
-        finally:
-            if old_dir:
-                os.chdir(old_dir)
-        return previous
-
-    def finished(self) -> bool:
-        return True
-
-    def finalise(self) -> None:
-        pass
-
-    def succeeded(self) -> bool:
-        return True
-
-
-class EnergyUQCampaign:
-    """Encapsulates an EasyVVUQ Campaign along with EnergyUQ metadata:
-    root directory, machine profile.
-    """
-
-    def __init__(
-        self,
-        campaign: uq.Campaign,
-        root_path: Path | str,
-        machine: Machine,
-        numa: bool = False
-    ):
-        self.campaign: uq.Campaign = campaign
-        self.root_path = Path(root_path)
-        self.machine: Machine = machine
-        self.numa = numa
-
-    @property
-    def sampler(self) -> SCSampler:
-        return cast(SCSampler, self.campaign.get_active_sampler())
-
-    def __getattr__(self, name: str) -> Any:
-        return getattr(self.campaign, name)
-
-    def __repr__(self) -> str:
-        camp_name = getattr(self.campaign, "campaign_name", None)
-        return (
-            f"EnergyUQCampaign(name={camp_name!r}, "
-            f"root_path={self.root_path}, machine={self.machine.name}, "
-            f"numa={self.numa}, "
-        )
 
 
 def default_params(
@@ -210,7 +147,7 @@ def prepare_campaign(
 
 def prepare_analysis(campaign: EnergyUQCampaign) -> uq.analysis.SCAnalysis:
     sampler: SCSampler = cast(SCSampler, campaign.get_active_sampler())
-    analysis = uq.analysis.SCAnalysis(sampler=sampler, qoi_cols=[QOI])
+    analysis = uq.analysis.SCAnalysis(sampler=sampler, qoi_cols=QOIS)
     # if not hasattr(analysis, "l_norm"):
     #     analysis.l_norm = sampler.l_norm
     return analysis
@@ -228,8 +165,8 @@ def refine_sampling_plan(
     analysis: uq.analysis.SCAnalysis,
     start_index: int | None = None,
     min_number_of_refinements: int = -1,
-    max_number_of_refinements: int = 100,
-    surplus_tol: float = 0.1,
+    max_number_of_refinements: int = 200,
+    surplus_tol: float = 0.05,
     mean_tol: float = 0.05,
     var_tol: float = 0.05,
     patience: int = 3,
@@ -248,7 +185,6 @@ def refine_sampling_plan(
         if adm.size == 0:
             return
 
-        sobols = analysis.get_sobol_indices(QOI)
         max_orders = np.max(analysis.l_norm, 0)
         dims = []
         for dim, order in enumerate(max_orders):
@@ -275,10 +211,7 @@ def refine_sampling_plan(
 
     def explored_enough() -> bool:
         max_orders = np.max(analysis.l_norm, 0)
-        for dim, order in enumerate(max_orders):
-            if order <= 1:
-                return False
-        return True
+        return all(order > 1 for _, order in enumerate(max_orders))
 
     def single_iteration(idx: int) -> bool:
         sampler.look_ahead(analysis.l_norm)
@@ -371,14 +304,14 @@ def refine_sampling_plan(
         ensure_order_two()
     else:
         while not explored_enough():
-            print(f"Adapt because there are things to explore")
+            print("Adapt because there are things to explore")
             if not advance_and_save():
                 return
 
     while not is_converged():
         print(f"Adapt because it has not converged yet {analysis.adaptation_errors[-3:]}")
         if not advance_and_save():
-            print(f"Ran out of space to explore")
+            print("Ran out of space to explore")
             return
 
     print(f"Converged [{analysis.std_history[-1]}]: {analysis.adaptation_errors[-3:]}")

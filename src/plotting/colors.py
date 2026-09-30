@@ -5,8 +5,6 @@ Provides functions to generate visually distinct color palettes for plots,
 categorical data, and stacked sensitivity indices.
 """
 
-from __future__ import annotations
-
 import colorsys
 
 import matplotlib.colors as mcolors

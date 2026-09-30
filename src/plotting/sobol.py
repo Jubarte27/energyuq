@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import Any
 
 import matplotlib.pyplot as plt
@@ -7,7 +5,7 @@ import numpy as np
 from matplotlib.figure import Figure, SubFigure
 from matplotlib.patches import Patch
 
-from ..util.data import Result
+from ..util.data import EasyResult, Result
 from .layout import get_sampler_params
 
 
@@ -119,22 +117,18 @@ class PlotterSobolMixin:
     """Mixin providing Sobol sensitivity calculations and bar charts for Plotter."""
 
     def get_axis_label(self, param: str, units: dict[str, Any] | None = None) -> str: ...
-    def get_result_params(self, result: Any, df: Any = None) -> list[str]: ...
+    def get_result_params(self, result: EasyResult, df: Any = None) -> list[str]: ...
 
     def plot_sobols1(
         self,
-        result: Result,
-        qoi: str | None = None,
+        result: EasyResult,
+        qoi: str,
         subfig: SubFigure | None = None,
         title: str | None = None,
         units: dict[str, str | None] | None = None,
     ) -> Figure | SubFigure:
         """Plot first-order Sobol sensitivity indices."""
-        results = getattr(result, "results", None)
-        if results is None:
-            raise ValueError("No analysis results available for Sobol indices.")
-        if qoi is None:
-            qoi = result.qois[0]
+        results = result.results
 
         sobol_dict = results.sobols_first(qoi)
         param_names = list(sobol_dict.keys())
@@ -160,14 +154,14 @@ class PlotterSobolMixin:
             ax.set_xticklabels(['Total first order', *formatted_labels], rotation=90)
             return fig
         except Exception:
-            if subfig is None:
+            if isinstance(fig, Figure):
                 plt.close(fig)
             raise
 
     def get_sobols_up_to_order(
         self,
-        result: Any,
-        qoi: str | None = None,
+        result: EasyResult,
+        qoi: str,
         k: float = 5.0,
         order: int | None = None,
         units: dict[str, Any] | None = None,
@@ -179,35 +173,8 @@ class PlotterSobolMixin:
 
         Uses SCAnalysis.get_pce_sobol_indices.
         """
-        # Resolve QoI
-        if qoi is None:
-            if hasattr(result, "qois") and result.qois:
-                qoi = result.qois[0]
-            elif hasattr(result, "qoi_cols") and result.qoi_cols:
-                qoi = result.qoi_cols[0]
-            else:
-                analysis_obj = getattr(result, "analysis", None)
-                if analysis_obj is not None and hasattr(analysis_obj, "qoi_cols") and analysis_obj.qoi_cols:
-                    qoi = analysis_obj.qoi_cols[0]
-                else:
-                    qoi = "energy_uj"
+        analysis = result.analysis
 
-        # Resolve analysis object
-        analysis = None
-        if hasattr(result, "analysis") and result.analysis is not None:
-            analysis = result.analysis
-        elif hasattr(result, "get_pce_sobol_indices"):
-            analysis = result
-        elif hasattr(result, "results") and hasattr(result.results, "analysis"):
-            analysis = result.results.analysis
-
-        if analysis is None or not hasattr(analysis, "get_pce_sobol_indices"):
-            raise ValueError(
-                "SCAnalysis object with 'get_pce_sobol_indices' is required. "
-                "Pass an EasyResult, RunData, or SCAnalysis instance."
-            )
-
-        # Call SCAnalysis.get_pce_sobol_indices
         ret = analysis.get_pce_sobol_indices(qoi, typ="all", **kwargs)
         if isinstance(ret, tuple) and len(ret) == 4:
             mean, D, _, S_u = ret
@@ -317,8 +284,8 @@ class PlotterSobolMixin:
 
     def plot_sobols(
         self,
-        result: Any,
-        qoi: str | None = None,
+        result: EasyResult,
+        qoi: str,
         k: float = 5.0,
         order: int | None = None,
         subfig: SubFigure | None = None,
@@ -404,12 +371,9 @@ class PlotterSobolMixin:
                     legend_loc = kwargs.get("legend_loc", "upper left")
                     bbox = kwargs.get("bbox_to_anchor", (1.02, 1.0))
                     ax.legend(handles=legend_handles, loc=legend_loc, bbox_to_anchor=bbox, framealpha=0.9, fontsize=9)
-
-                fig._sobol_result = res
-                ax._sobol_result = res
                 return fig
             except Exception:
-                if subfig is None:
+                if isinstance(fig, Figure):
                     plt.close(fig)
                 raise
 
@@ -470,7 +434,11 @@ class PlotterSobolMixin:
                 ax = fig.add_subplot(title=default_title)
 
             x_pos = np.arange(n_bars)
-            ax.bar(x_pos, heights, color=colors, edgecolor="none", width=0.65)
+            ax.bar_label(
+                ax.bar(x_pos, heights, color=colors, edgecolor="none", width=0.65),
+                [f"{h:.2f}" for h in heights],
+                padding=1
+            )
             ax.set_ylabel(r"$S_u$", fontsize=14)
 
             max_h = max(heights) if heights else 1.0
@@ -484,26 +452,16 @@ class PlotterSobolMixin:
 
             if legend_handles:
                 ax.legend(handles=legend_handles, loc="upper right", framealpha=0.9, fontsize=9)
-
-            fig._sobol_result = res
-            ax._sobol_result = res
             return fig
         except Exception:
-            if subfig is None:
+            if isinstance(fig, Figure):
                 plt.close(fig)
             raise
 
-    # Aliases on Plotter
-    sobols_up_to_order = get_sobols_up_to_order
-    sobols_of_up_to_order_n = get_sobols_up_to_order
-    plot_sobols_up_to_order = plot_sobols
-    plot_sobols_order_n = plot_sobols
-    plot_sobols_n = plot_sobols
-
 
 def get_sobols_up_to_order(
-    result: Any,
-    qoi: str | None = None,
+    result: EasyResult,
+    qoi: str,
     k: float = 5.0,
     order: int | None = None,
     units: dict[str, Any] | None = None,
@@ -521,8 +479,8 @@ def get_sobols_up_to_order(
 
 
 def plot_sobols(
-    result: Any,
-    qoi: str | None = None,
+    result: EasyResult,
+    qoi: str,
     k: float = 5.0,
     order: int | None = None,
     subfig: SubFigure | None = None,
@@ -560,7 +518,7 @@ def plot_sobols(
 
 def plot_sobols1(
     result: Result,
-    qoi: str | None = None,
+    qoi: str,
     subfig: SubFigure | None = None,
     title: str | None = None,
     units: dict[str, str | None] | None = None,
@@ -569,12 +527,3 @@ def plot_sobols1(
     from .plotter import Plotter
     plotter = Plotter.from_result(result, units=units)
     return plotter.plot_sobols1(result, qoi=qoi, subfig=subfig, title=title, units=units)
-
-
-# Aliases
-sobols_up_to_order = get_sobols_up_to_order
-sobols_of_up_to_order_n = get_sobols_up_to_order
-plot_sobols_up_to_order = plot_sobols
-plot_sobols_order_n = plot_sobols
-plot_sobols_n = plot_sobols
-
