@@ -163,10 +163,8 @@ def _ordinal(n: int) -> str:
 def refine_sampling_plan(
     campaign: EnergyUQCampaign,
     analysis: uq.analysis.SCAnalysis,
-    start_index: int | None = None,
     min_number_of_refinements: int = -1,
     max_number_of_refinements: int = 200,
-    surplus_tol: float = 0.05,
     mean_tol: float = 0.05,
     var_tol: float = 0.05,
     patience: int = 3,
@@ -176,8 +174,6 @@ def refine_sampling_plan(
     force_two: bool = False
 ) -> None:
     sampler = campaign.sampler
-
-    effective_start = len(analysis.adaptation_errors) if start_index is None else (start_index - 1)
 
     def ensure_order_two():
         print("Ensuring at least order 2")
@@ -209,21 +205,18 @@ def refine_sampling_plan(
         print(f"Dimensions {dims} still not two")
         raise
 
-    def explored_enough() -> bool:
-        max_orders = np.max(analysis.l_norm, 0)
-        return all(order > 1 for _, order in enumerate(max_orders))
-
     def single_iteration(idx: int) -> bool:
+        anouce_run(idx)
         sampler.look_ahead(analysis.l_norm)
         if len(sampler.admissible_idx) == 0:
             return False
-
-        iter_num = idx + effective_start + 2
-        print(f"-------{_ordinal(iter_num)} iteration-------")
-        print(f"-------{sampler.n_new_points[-1]} new points------")
-        print(f"-------Executed {np.sum(sampler.n_new_points)} in total-------")
         campaign.execute(sequential=True).collate(progress_bar=True)
         analysis.adapt_dimension(QOI, campaign.get_collation_result(), method="var")
+
+        nonlocal stable_steps
+        stable_steps = stable_steps + 1 if settling() else 0
+        anouce_end_run()
+        report()
         return True
 
     i = 0
@@ -234,29 +227,44 @@ def refine_sampling_plan(
         norm_prev = np.linalg.norm(history[-2], np.inf)
         return float(delta / (norm_prev + epsilon))
 
-    def convergence_check() -> dict[str, Any]:
-        nonlocal stable_steps
-        latest_surplus = analysis.adaptation_errors[-1]
-        surplus_ok = latest_surplus < (surplus_tol * analysis.std_history[-1])
+    def anouce_run(idx):
+        why = (
+            "too few runs"
+            if len(analysis.adaptation_errors) < 3
+            else "min refinements"
+            if idx < min_number_of_refinements
+            else "not converged"
+        )
+        print(f"\n{_ordinal(len(analysis.adaptation_errors) + 1)} iteration, {why}\n")
 
-        rel_diff_mean = _rel_change(analysis.mean_history)
-        rel_diff_var = _rel_change(analysis.std_history)
+    def anouce_end_run():
+        print(f"\n{_ordinal(len(analysis.adaptation_errors))} iteration, ended\n")
 
-        mean_ok = rel_diff_mean < mean_tol
-        var_ok = rel_diff_var < var_tol
+    def deltas():
+        d_mean = _rel_change(analysis.mean_history)
+        d_var = _rel_change(analysis.std_history)
+        return d_mean, d_var
+        
 
-        stable_steps = (stable_steps + 1) if (mean_ok and var_ok) else 0
+    def settling() -> bool:
+        if len(analysis.adaptation_errors) < 3: return False
+        d_mean, d_var = deltas()
+        settling = d_mean < mean_tol and d_var < var_tol
+        return settling
 
-        return {
-            "converged": stable_steps >= patience,
-            "consecutive_passed": stable_steps,
-            "latest_surplus": latest_surplus,
-            "surplus_ok": surplus_ok,
-            "rel_diff_mean": rel_diff_mean,
-            "mean_ok": mean_ok,
-            "rel_diff_var": rel_diff_var,
-            "var_ok": var_ok,
-        }
+    def report():
+        if len(analysis.adaptation_errors) < 3: return
+        d_mean, d_var = deltas()
+
+        mark = "ok" if settling() else "--"
+        print(
+            f"  samples   {len(campaign.get_collation_result()):,} run, "
+            f"+{sampler.n_new_points[-1]} planned, {np.sum(sampler.n_new_points):,} total\n"
+            f"  changes   mean {d_mean:.2e}, var {d_var:.2e}  [{mark}]\n"
+            f"  progress  stable {stable_steps}/{patience}, "
+            f"{len(analysis.l_norm)} PCE terms at level {sampler.L}, "
+            f"orders [{' '.join(str(o) for o in np.max(analysis.l_norm, 0))}]"
+        )
 
     def advance() -> bool:
         nonlocal i
@@ -277,44 +285,26 @@ def refine_sampling_plan(
         return True
 
     def is_converged() -> bool:
-        check = convergence_check()
-        if check["converged"]:
-            return True
-        thresh = surplus_tol * analysis.std_history[-1]
-        print(
-            f"Iteration {i:02d} | "
-            f"Surplus: {check['latest_surplus']:.3e} (Pass[{thresh}]: {check['surplus_ok']}) | "
-            f"Rel Mean Δ: {check['rel_diff_mean']:.3e} | "
-            f"Rel Var Δ: {check['rel_diff_var']:.3e} | "
-            f"Consecutive Stable: {check['consecutive_passed']}/{patience}"
-        )
-        return False
+        return stable_steps >= patience
 
     while len(analysis.adaptation_errors) < 3:
-        print("Adapt because too few runs")
         if not advance_and_save():
             return
 
     while i < min_number_of_refinements:
-        print("Adapt because min_number_of_refinements")
         if not advance_and_save():
             return
 
     if force_two:
         ensure_order_two()
-    else:
-        while not explored_enough():
-            print("Adapt because there are things to explore")
-            if not advance_and_save():
-                return
 
     while not is_converged():
-        print(f"Adapt because it has not converged yet {analysis.adaptation_errors[-3:]}")
         if not advance_and_save():
             print("Ran out of space to explore")
             return
 
-    print(f"Converged [{analysis.std_history[-1]}]: {analysis.adaptation_errors[-3:]}")
+    print("Converged!!!")
+    report()
     save(campaign, analysis, dir=save_dir, status="converged", converged=True)
 
 
