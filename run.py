@@ -50,6 +50,11 @@ def parse_args():
         action="store_true",
         help="Enforces at least order 2 for every dimension at the beginning",
     )
+    parser.add_argument(
+        "--pack",
+        action="store_true",
+        help="Compress into tar.gz at the end",
+    )
     return parser.parse_args()
 
 
@@ -83,4 +88,4 @@ if __name__ == "__main__":
         force_two=args.force_two
     )
 
-    energyuq.save(campaign, analysis, dir=args.dir, status="completed")
+    energyuq.save(campaign, analysis, name=benchmark.name, dir=args.dir, status="completed", pack=args.pack)

@@ -4,7 +4,17 @@ Operating system interface utilities for EnergyUQ.
 import subprocess
 import sys
 from collections.abc import Sequence
+from pathlib import Path
+from shutil import make_archive
 
+
+def pack_dir(run_dir: str | Path, out: str | Path | None = None) -> Path:
+    """Archive a run directory into a single .tar.gz. Returns the archive path."""
+    run = Path(run_dir).resolve()
+    if not run.is_dir():
+        raise NotADirectoryError(run)
+    target = Path(out) if out else run
+    return Path(make_archive(str(target.with_suffix("")), "gztar", root_dir=run.parent, base_dir=run.name))
 
 def try_exec(
     cmds: Sequence[Sequence[str]],

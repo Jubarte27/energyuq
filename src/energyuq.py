@@ -10,6 +10,8 @@ import numpy as np
 from easyvvuq.actions import Actions, CreateRunDirectory, Decode, Encode
 from easyvvuq.sampling.stochastic_collocation import SCSampler
 
+from src.util.system import pack_dir
+
 from .machines.machine import Machine, load_machine, save_machine
 from .programs.program import Program
 from .util.constants import QOI, QOIS, RESULTS_DIR, params_type, vary_type
@@ -397,12 +399,14 @@ def save(
     campaign: EnergyUQCampaign,
     analysis: uq.analysis.SCAnalysis,
     /,
+    name: str | None = None,
     dir: str | Path | None = None,
     machine: Machine | None = None,
+    pack: bool = False,
     status: str = "in_progress",
     converged: bool = False,
 ) -> Path:
-    path = run_dir(dir=str(dir) if dir is not None else None, campaign=campaign)
+    path = run_dir(name="energy" if name is None else name, dir=str(dir) if dir is not None else None, campaign=campaign)
     create_dir(path)
 
     machine_to_save = machine if machine is not None else getattr(campaign, "machine", None)
@@ -438,6 +442,10 @@ def save(
     }
     with open(path / "checkpoint.json", "w", encoding="utf-8") as f:
         json.dump(checkpoint_data, f, indent=2)
+
+
+    if pack:
+        pack_dir(path)
 
     return path
 
