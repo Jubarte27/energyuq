@@ -25,10 +25,11 @@ DESTINATION="$(pwd)"
 if ! [ -z "$SCRATCH" ]; then cd "$SCRATCH/energyuq"; fi
 
 NEWEST_DIR=$(find run_results -mindepth 1 -maxdepth 1 -type d -exec stat --printf="%Y\t%n\n" {} + | sort -n -r | head -1 | cut -f2-)
+NEWEST_DIR=${NEWEST_DIR%/}
 TARGET_DIR="$DESTINATION/run_results/$(hostname)/$(basename "${NEWEST_DIR:?}")"
 
 if [ -d "$TARGET_DIR" ]; then rm -fr "$TARGET_DIR"; fi
 
 mkdir -p "$TARGET_DIR"
 
-cp -r -t "$(dirname "$TARGET_DIR")" "$NEWEST_DIR"
+cp -r -t "$(dirname "$TARGET_DIR")" "$NEWEST_DIR"*
