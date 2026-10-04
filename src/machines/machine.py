@@ -201,7 +201,7 @@ def guess_machine() -> Machine:
     ``PLACES``, and ``PROC_BIND``. List values are comma-separated.
     """
     system_domains = _system_rapl_domains()
-    slurm = os.environ.get("ENERGYUQ_SLURM", "") in ("true", "TRUE", "True", "")
+    slurm = os.environ.get("ENERGYUQ_SLURM", "") == "true"
 
     name = os.environ.get("ENERGYUQ_MACHINE_NAME") or socket.gethostname() or "unknown"
     frequencies = _environment_list("ENERGYUQ_MACHINE_FREQ", int) or _system_frequencies() or [0]

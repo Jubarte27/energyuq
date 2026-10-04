@@ -46,8 +46,62 @@ class ST(ExecuteSH):
 class LULESH(ExecuteSH):
      name: ClassVar[str] = "LULESH"
 
+class MW(ExecuteSH):
+     name: ClassVar[str] = "MW"
+
 class NONE(ExecuteSH):
      name: ClassVar[str] = "NONE"
 
 class FAKEWORK(ExecuteSH):
      name: ClassVar[str] = "FAKE_WORK"
+
+
+class NAS_BT(ExecuteSH):
+     name: ClassVar[str] = "NAS_BT"
+
+class NAS_CG(ExecuteSH):
+     name: ClassVar[str] = "NAS_CG"
+
+class NAS_EP(ExecuteSH):
+     name: ClassVar[str] = "NAS_EP"
+
+class NAS_FT(ExecuteSH):
+     name: ClassVar[str] = "NAS_FT"
+
+class NAS_IS(ExecuteSH):
+     name: ClassVar[str] = "NAS_IS"
+
+class NAS_LU(ExecuteSH):
+     name: ClassVar[str] = "NAS_LU"
+
+class NAS_MG(ExecuteSH):
+     name: ClassVar[str] = "NAS_MG"
+
+class NAS_SP(ExecuteSH):
+     name: ClassVar[str] = "NAS_SP"
+
+class NAS_UA(ExecuteSH):
+     name: ClassVar[str] = "NAS_UA"
+
+
+class RODINIA_BFS(ExecuteSH):
+     name: ClassVar[str] = "RODINIA_BFS"
+
+class RODINIA_HOTSPOT(ExecuteSH):
+     name: ClassVar[str] = "RODINIA_HOTSPOT"
+
+class RODINIA_HOTSPOT3D(ExecuteSH):
+     name: ClassVar[str] = "RODINIA_HOTSPOT3D"
+
+class RODINIA_SRAD_V1(ExecuteSH):
+     name: ClassVar[str] = "RODINIA_SRAD_V1"
+
+class RODINIA_SRAD_V2(ExecuteSH):
+     name: ClassVar[str] = "RODINIA_SRAD_V2"
+
+class RODINIA_STREAMCLUSTER(ExecuteSH):
+     name: ClassVar[str] = "RODINIA_STREAMCLUSTER"
+
+
+class PARBOIL_SPMV(ExecuteSH):
+     name: ClassVar[str] = "PARBOIL_SPMV"

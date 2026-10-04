@@ -54,7 +54,7 @@ def set_freq(machine: Machine, frequency):
         return machine.freq_setter
 
     if machine.freq_setter == "cpupower" and try_exec_shell([
-        "cpupower frequency-set --governor userspace; cpupower frequency-set --freq {frequency}"
+        f"cpupower frequency-set --governor userspace; cpupower frequency-set --freq {frequency}"
     ]):
         return machine.freq_setter
 

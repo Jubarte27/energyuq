@@ -4,8 +4,10 @@ from typing import Any
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
+from numpy.typing import NDArray
 import pandas as pd
 from matplotlib.axes import Axes
+from matplotlib.colors import to_rgba_array
 from matplotlib.figure import Figure, SubFigure
 from matplotlib.lines import Line2D
 from matplotlib.ticker import MaxNLocator
@@ -239,6 +241,7 @@ class PlotterGridMixin:
             handles, labels, point_colors = self._build_legend_and_colors(
                 qoi, order_focus, high_mask, low_mask, normalized,
             )
+            rgba = to_rgba_array(point_colors)
 
             pair_idx = 0
             for row, n_cols in enumerate(row_col_counts):
@@ -269,9 +272,26 @@ class PlotterGridMixin:
                     ax.yaxis.set_major_locator(MaxNLocator(integer=is_integer_range(y_bounds.lower, y_bounds.upper)))
                     ax.set_box_aspect(1)
                     ax.set_anchor('N')
-                    ax.legend(handles=handles, labels=labels, draggable=True,
-                              fontsize='x-small', ncols=2, bbox_to_anchor=(1, 1.1), loc='upper right')
-                    ax.scatter(xs, ys, c=point_colors)
+                    uniq_xy, inverse = np.unique(np.column_stack((xs, ys)), axis=0, return_inverse=True)
+                    inverse = inverse.ravel()
+                    counts = np.bincount(inverse)
+
+                    avg_colors = np.column_stack([
+                        np.bincount(inverse, weights=rgba[:, i]) / counts for i in range(4)
+                    ])
+
+                    linewidths = list(np.where(
+                        counts > 1,
+                        0.25,
+                        0,
+                    ))
+
+                    ax.scatter(
+                        uniq_xy[:, 0], uniq_xy[:, 1],
+                        c=avg_colors,
+                        # edgecolors='magenta',
+                        # linewidths=linewidths,
+                    )
                     pair_idx += 1
 
             return fig

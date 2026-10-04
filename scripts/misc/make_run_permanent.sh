@@ -1,7 +1,19 @@
 #!/usr/bin/bash
 set -e
-
 main() {
+    for dir in "${RUN_PATHS[@]}"; do
+        if [ -d "$dir" ]; then
+            echo moving "$dir"
+
+            export RUN_PATH=$dir
+            move
+        else
+            echo ignoring "$dir"
+        fi 
+    done
+    move
+}
+move() {
     local temporary_run_path="$PROJECT_DIR/run_results"
     local relative
     relative=$(realpath --relative-to="$temporary_run_path" "$RUN_PATH")
@@ -60,8 +72,9 @@ _setConfigArgs() {
             ;;
         esac
     done
-    RUN_PATH=$1
-    RUN_TYPE=$2
+    RUN_TYPE=$1
+    shift
+    RUN_PATHS=("$@")
 }
 
 SCRIPT_DIR=$(dirname "$(readlink -e "${BASH_SOURCE[0]}")") && source "$SCRIPT_DIR/util.bash"
