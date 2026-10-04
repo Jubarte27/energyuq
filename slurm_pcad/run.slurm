@@ -13,28 +13,58 @@ set -e
 
 report_end() {
     local exit_code=$? 
-    echo "Something made me finnish running. Last exit code was: $exit_code"
+    echo "Something made me finish running. Last exit code was: $exit_code"
 }
 trap report_end EXIT
 
-DESTINATION="$(pwd)"
+main() {
+    DESTINATION="$(pwd)"
 
-if ! [ -z "$SCRATCH" ]; then cd "$SCRATCH/energyuq"; fi
-SCRIPT_DIR=$(pwd)
+    if ! [ -z "$SCRATCH" ]; then cd "$SCRATCH/energyuq"; fi
+    SCRIPT_DIR=$(pwd)
 
-git pull --rebase
-git submodule update --init
+    git pull --rebase
+    git submodule update --init
 
-VENV=.venv/bin/activate
-ROOTV="$SCRIPT_DIR/$VENV"
-EASYV="$SCRIPT_DIR/easy/$VENV"
+    VENV=.venv/bin/activate
+    ROOTV="$SCRIPT_DIR/$VENV"
+    EASYV="$SCRIPT_DIR/easy/$VENV"
 
-if [ -f "$ROOTV" ]; then source "$ROOTV"
-elif [ -f "$EASYV" ]; then source "$EASYV"
-else echo I have not been properly initialized; exit 2; fi
+    if [ -f "$ROOTV" ]; then source "$ROOTV"
+    elif [ -f "$EASYV" ]; then source "$EASYV"
+    else echo I have not been properly initialized; exit 2; fi
 
-export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}$SCRIPT_DIR"
+    export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}$SCRIPT_DIR"
 
-python3 "$SCRIPT_DIR/run.py" "$@"
+    python3 "$SCRIPT_DIR/run.py" "$@"
 
-cd "$DESTINATION" && "$SCRIPT_DIR/slurm_pcad/copy_back.slurm" "$@"
+    cd "$DESTINATION" && "$SCRIPT_DIR/slurm_pcad/copy_back.slurm"
+}
+
+_setConfigArgs() {
+    while [ "${1:-}" != '' ]; do
+        case "$1" in
+            --dir)
+                RUN_DIR="$2"
+                export RUN_DIR
+                shift
+                ;;
+            --save-every|--max-refinements)
+                shift
+                ;;
+            --resume|--numa|--force-two|--pack)
+                :
+                ;;
+            [!-]*)
+                break
+                ;;
+            *)
+                log "$WARN" "Unknown option \"$1\", ignoring" 0 
+            ;;
+        esac
+        shift
+    done
+}
+
+_setConfigArgs "$@"
+main "$@"

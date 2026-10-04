@@ -20,18 +20,19 @@ report_end() {
 }
 trap report_end EXIT
 
-DESTINATION="$(pwd)"
+main() {
+    DESTINATION="${DESTINATION:-$(pwd)/run_results}"
 
-if ! [ -z "$SCRATCH" ]; then cd "$SCRATCH/energyuq"; fi
+    if ! [ -z "$SCRATCH" ]; then cd "$SCRATCH/energyuq"; fi
 
-NEWEST_DIR=$(find run_results -mindepth 1 -maxdepth 1 -type d -exec stat --printf="%Y\t%n\n" {} + | sort -n -r | head -1 | cut -f2-)
-NEWEST_DIR=${NEWEST_DIR%/}
+    NEWEST_DIR=$(find run_results -mindepth 1 -maxdepth 1 -type d -exec stat --printf="%Y\t%n\n" {} + | sort -n -r | head -1 | cut -f2-)
+    NEWEST_DIR=${RUN_DIR:-$NEWEST_DIR}
+    NEWEST_DIR=${NEWEST_DIR%/}
+    TARGET_DIR="$DESTINATION/$(hostname)/$(basename "${NEWEST_DIR:?}")"
 
-UUID=$(python3 -c 'import uuid; print(uuid.uuid4().hex)')
-TARGET_DIR="$DESTINATION/run_results/$(hostname)${1:+/$1}/$(basename "${NEWEST_DIR:?}")_$UUID"
+    if [ -d "$TARGET_DIR" ] && [ -n "$(ls -A "$TARGET_DIR")" ]; then echo "$TARGET_DIR already exists"; exit 42 ; fi
 
-if [ -d "$TARGET_DIR" ]; then echo "$TARGET_DIR already exists"; exit 42 ; fi
+    mkdir -p "$TARGET_DIR"
 
-mkdir -p "$TARGET_DIR"
-
-cp -r -t "$(dirname "$TARGET_DIR")" "$NEWEST_DIR"*
+    cp -r -t "$(dirname "$TARGET_DIR")" "$NEWEST_DIR"*
+}

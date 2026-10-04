@@ -6,12 +6,15 @@ main() {
             echo moving "$dir"
 
             export RUN_PATH=$dir
-            move
+            if move; then
+                :
+            else
+                echo skipping
+            fi
         else
             echo ignoring "$dir"
         fi 
     done
-    move
 }
 move() {
     local temporary_run_path="$PROJECT_DIR/run_results"
@@ -53,7 +56,7 @@ move() {
 
     if [ -d "$target_dir" ]; then
         echo \""$target_dir"\" already exists
-        exit 42
+        return 42
     fi
 
     cp -r "$RUN_PATH" "$target_dir"

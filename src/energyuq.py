@@ -174,7 +174,7 @@ def refine_sampling_plan(
     save_every: int = 2,
     save_dir: Path | str | None = None,
     force_two: bool = False
-) -> None:
+) -> bool:
     sampler = campaign.sampler
 
     def ensure_order_two():
@@ -291,11 +291,11 @@ def refine_sampling_plan(
 
     while len(analysis.adaptation_errors) < 3:
         if not advance_and_save():
-            return
+            return is_converged()
 
     while i < min_number_of_refinements:
         if not advance_and_save():
-            return
+            return is_converged()
 
     if force_two:
         ensure_order_two()
@@ -303,11 +303,13 @@ def refine_sampling_plan(
     while not is_converged():
         if not advance_and_save():
             print("Ran out of space to explore")
-            return
+            return is_converged()
 
-    print("Converged!!!")
+    if is_converged():
+        print("Converged!!!")
     report()
-    save(campaign, analysis, dir=save_dir, status="converged", converged=True)
+    save(campaign, analysis, dir=save_dir, status="converged", converged=is_converged())
+    return is_converged()
 
 
 def refine_and_analyse(
@@ -319,7 +321,7 @@ def refine_and_analyse(
     save_dir: Path | str | None = None,
     **kwargs,
 ) -> None:
-    refine_sampling_plan(
+    converged = refine_sampling_plan(
         campaign,
         analysis,
         min_number_of_refinements=min_number_of_refinements,
@@ -329,7 +331,7 @@ def refine_and_analyse(
         **kwargs,
     )
     campaign.apply_analysis(analysis)
-    save(campaign, analysis, dir=save_dir, status="completed")
+    save(campaign, analysis, dir=save_dir, status="completed", converged=converged)
 
 
 def run_dir(
