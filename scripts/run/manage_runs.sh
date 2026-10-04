@@ -144,17 +144,17 @@ reconcile() {
         state=$(slurm_state "$jobid")
         note=""
         case "$state" in
-            PENDING) ledger_set "$pair" PENDING "$jobid" "" ;;
-            RUNNING) ledger_set "$pair" RUNNING "$jobid" "" ;;
-            DONE) ledger_set "$pair" DONE "$jobid" "" ;;
-            FAILED)
+            PD|PENDING) ledger_set "$pair" PENDING "$jobid" "" ;;
+            R|RUNNING) ledger_set "$pair" RUNNING "$jobid" "" ;;
+            CD|COMPLETED|DONE) ledger_set "$pair" DONE "$jobid" "" ;;
+            F|FAILED)
                 ledger_set "$pair" FAILED "$jobid" "$state"
                 FAILED_JOBS+=("$pair (job $jobid: $state)")
                 report_job_tail "$pair" "$jobid"
                 ;;
-            UNKNOWN)
-                ledger_set "$pair" FAILED "$jobid" "job $jobid unknown to slurm"
-                FAILED_JOBS+=("$pair (job $jobid unknown to slurm)")
+            CA|CANCELLED)
+                ledger_set "$pair" FAILED "$jobid" "job $jobid cancelled"
+                FAILED_JOBS+=("$pair (job $jobid cancelled)")
                 ;;
             *) note="unexpected state \"$state\"" ;;
         esac
