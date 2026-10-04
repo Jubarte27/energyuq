@@ -36,4 +36,4 @@ export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}$SCRIPT_DIR"
 
 python3 "$SCRIPT_DIR/run.py" "$@"
 
-cd "$DESTINATION" && "$SCRIPT_DIR/slurm_pcad/copy_back.slurm"
+cd "$DESTINATION" && "$SCRIPT_DIR/slurm_pcad/copy_back.slurm" "$@"
