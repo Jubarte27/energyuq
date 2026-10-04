@@ -26,13 +26,11 @@ main() {
     if [ -n "$COPY_FROM" ]; then
         scan_copy_from "$COPY_FROM" true
     elif [ -n "$CHECK_COPY_FROM" ]; then
-        # Checking only reports, so nothing is submitted either.
         scan_copy_from "$CHECK_COPY_FROM" false
         print_matrix
         return 0
     fi
 
-    reconcile
     supervise
     finalize
 }
@@ -64,9 +62,7 @@ supervise() {
             submit_ready
         fi
 
-        if [ "$DRY_RUN" != "true" ]; then
-            ledger_save
-        fi
+        ledger_save
         print_matrix
 
         if [ "$(in_flight)" -eq 0 ]; then
@@ -83,13 +79,13 @@ submit_ready() {
     local partition pair bench node
 
     for partition in "${PARTITIONS[@]}"; do
-        while [ "$(in_flight "$partition")" -lt "$PARALLEL_PER_NODE" ]; do
+        if [ "$(in_flight "$partition")" -lt 1 ]; then
             if ! pair=$(next_pair "$partition"); then
                 break
             fi
             IFS='/' read -r bench node <<< "$pair"
             submit_pair "$bench" "$node"
-        done
+        fi
     done
 }
 
@@ -101,18 +97,14 @@ submit_pair() {
     local env_file
     env_file=$(node_env "$node")
 
-    if [ "$DRY_RUN" == "true" ]; then
-        printf 'DRY RUN: sbatch --job-name=%s --env %s run %s %s\n' \
-            "$job_name" "$env_file" "$bench" "${RUN_ARGS[*]}"
-        # Remembered in memory so the same pair is not proposed again.
-        ledger_set "$pair" DRY "" "not submitted, dry run"
-        return 0
+    if pair_done "$bench" "$node"; then
+        dest=()
+    else
+        dest=(--dest "$(runs_path "$bench" "$node")")
     fi
-
+    
     local output
-    if ! output=$(SBATCH_OPTS="--job-name=$job_name" \
-        "$PROJECT_DIR/scripts/run/run_sbatch_pcad.sh" \
-        --env "$env_file" run "$bench" "${RUN_ARGS[@]}" 2>&1); then
+    if ! output=$(SBATCH_OPTS="--job-name=$job_name" "$PROJECT_DIR/scripts/run/run_sbatch_pcad.sh" --env "$env_file" run "$bench" "${dest[@]}" "${RUN_ARGS[@]}" 2>&1); then
         ledger_set "$pair" FAILED "" "submission failed: $output"
         FAILED_JOBS+=("$pair (not submitted: $output)")
         return 0
@@ -259,14 +251,6 @@ slurm_state() {
     esac
 }
 
-maybe_dry() {
-    if [ "$DRY_RUN" == "true" ]; then
-        echo "$@"
-    else
-        "$@"
-    fi
-}
-
 report_job_tail() {
     local pair="$1"
     local jobid="$2"
@@ -402,11 +386,6 @@ promote() {
         return 0
     fi
 
-    if [ "$DRY_RUN" == "true" ]; then
-        printf 'DRY RUN: cp -r %s %s\n' "$run" "$target"
-        return 0
-    fi
-
     mkdir -p "$(dirname "$target")"
     cp -r "$run" "$target"
     log_info "$run -> $target"
@@ -512,9 +491,7 @@ print_matrix() {
 # First Ctrl-C stops submitting and waits for the running jobs, second one leaves them going.
 on_interrupt() {
     INTERRUPTS=$((INTERRUPTS + 1))
-    if [ "$DRY_RUN" != "true" ]; then
-        ledger_save
-    fi
+    ledger_save
 
     if [ "$INTERRUPTS" -eq 1 ]; then
         SUBMITTING=false
@@ -528,10 +505,6 @@ on_interrupt() {
 
 finalize() {
     local pair
-
-    if [ "$DRY_RUN" == "true" ]; then
-        return 0
-    fi
 
     for pair in "${!L_STATUS[@]}"; do
         case "${L_STATUS[$pair]}" in
@@ -586,10 +559,8 @@ set_env() {
     CHECK_COPY_FROM=""
     BENCH_RAW=""
     NODE_RAW="all"
-    PARALLEL_PER_NODE=1
     POLL=15
     LIST=false
-    DRY_RUN=false
     RUN_ARGS=()
     BENCHMARKS=()
     NODES=()
@@ -624,19 +595,12 @@ _setConfigArgs() {
                 CHECK_COPY_FROM="$2"
                 shift
                 ;;
-            --parallel-per-node)
-                PARALLEL_PER_NODE="$2"
-                shift
-                ;;
             --poll)
                 POLL="$2"
                 shift
                 ;;
             --list|-l)
                 LIST=true
-                ;;
-            --dry-run|-n)
-                DRY_RUN=true
                 ;;
             --)
                 shift
@@ -658,9 +622,6 @@ _setConfigArgs() {
         log_error "First argument must be the run type, use --type <TYPE>"
     fi
 
-    if ! [[ "$PARALLEL_PER_NODE" =~ ^[0-9]+$ ]] || [ "$PARALLEL_PER_NODE" -lt 1 ]; then
-        log_error "The number of jobs per node must be a positive integer"
-    fi
     if ! [[ "$POLL" =~ ^[0-9]+$ ]] || [ "$POLL" -lt 1 ]; then
         log_error "The polling interval must be a positive integer of seconds"
     fi

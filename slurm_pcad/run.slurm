@@ -49,6 +49,11 @@ _setConfigArgs() {
                 export RUN_DIR
                 shift
                 ;;
+            --dest)
+                DESTINATION="$2"
+                export DESTINATION
+                shift
+                ;;
             --save-every|--max-refinements)
                 shift
                 ;;
