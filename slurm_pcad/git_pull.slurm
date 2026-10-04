@@ -22,3 +22,4 @@ trap report_end EXIT
 
 cd "$SCRATCH/energyuq"
 git pull --rebase
+git submodule update --init

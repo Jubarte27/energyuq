@@ -23,6 +23,7 @@ trap report_end EXIT
 cd "$SCRATCH/energyuq"
 
 git pull --rebase
+git submodule update --init
 
 ./hpc-benchmarks/initialize.sh
 ./hpc-benchmarks/compile-hpc-benchmarks.sh "$@"

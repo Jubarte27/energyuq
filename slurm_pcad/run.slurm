@@ -23,6 +23,7 @@ if ! [ -z "$SCRATCH" ]; then cd "$SCRATCH/energyuq"; fi
 SCRIPT_DIR=$(pwd)
 
 git pull --rebase
+git submodule update --init
 
 VENV=.venv/bin/activate
 ROOTV="$SCRIPT_DIR/$VENV"
