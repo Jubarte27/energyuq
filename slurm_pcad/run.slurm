@@ -18,7 +18,7 @@ report_end() {
 trap report_end EXIT
 
 main() {
-    DESTINATION="$(pwd)"
+    origin="$(pwd)"
 
     if ! [ -z "$SCRATCH" ]; then cd "$SCRATCH/energyuq"; fi
     SCRIPT_DIR=$(pwd)
@@ -38,7 +38,7 @@ main() {
 
     python3 "$SCRIPT_DIR/run.py" "$@"
 
-    cd "$DESTINATION" && "$SCRIPT_DIR/slurm_pcad/copy_back.slurm"
+    cd "$origin" && "$SCRIPT_DIR/slurm_pcad/copy_back.slurm"
 }
 
 _setConfigArgs() {
@@ -50,7 +50,7 @@ _setConfigArgs() {
                 shift
                 ;;
             --dest)
-                DESTINATION="$2"
+                DESTINATION="$(realpath -m "$2")"
                 export DESTINATION
                 shift
                 ;;
@@ -71,5 +71,21 @@ _setConfigArgs() {
     done
 }
 
+clean_args() {
+    RUN_ARGS=()
+    while [ "${1:-}" != '' ]; do
+        case "$1" in
+            --dest)
+                shift
+                ;;
+            *)
+                RUN_ARGS+=("$1")
+                ;;
+        esac
+        shift
+    done
+}
+
 _setConfigArgs "$@"
-main "$@"
+clean_args "$@"
+main "${RUN_ARGS[@]}"

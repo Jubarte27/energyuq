@@ -93,18 +93,18 @@ submit_pair() {
     local bench="$1"
     local node="$2"
     local pair="$bench/$node"
-    local job_name="$JOB_NAME_PREFIX-$bench-$node"
+    local job_name="$JOB_NAME_PREFIX-$bench"
     local env_file
     env_file=$(node_env "$node")
 
-    if pair_done "$bench" "$node"; then
-        dest=()
-    else
-        dest=(--dest "$(runs_path "$bench" "$node")")
+    EXTRA_ARGS=()
+
+    if ! pair_done "$bench" "$node"; then
+        EXTRA_ARGS=(--dest "$(runs_path "$bench" "$node")")
     fi
     
     local output
-    if ! output=$(SBATCH_OPTS="--job-name=$job_name" "$PROJECT_DIR/scripts/run/run_sbatch_pcad.sh" --env "$env_file" run "$bench" "${dest[@]}" "${RUN_ARGS[@]}" 2>&1); then
+    if ! output=$(SBATCH_OPTS="--job-name=$job_name" "$PROJECT_DIR/scripts/run/run_sbatch_pcad.sh" --env "$env_file" run "${EXTRA_ARGS[@]}" "${RUN_ARGS[@]}" "$bench" 2>&1); then
         ledger_set "$pair" FAILED "" "submission failed: $output"
         FAILED_JOBS+=("$pair (not submitted: $output)")
         return 0
@@ -129,7 +129,7 @@ reconcile() {
 
     for pair in "${!L_STATUS[@]}"; do
         case "${L_STATUS[$pair]}" in
-            PENDING | RUNNING | HALTED) ;;
+            PD|PENDING | R|RUNNING | HALTED) ;;
             *) continue ;;
         esac
         jobid="${L_JOBID[$pair]}"
@@ -148,6 +148,10 @@ reconcile() {
                 ledger_set "$pair" FAILED "$jobid" "job $jobid cancelled"
                 FAILED_JOBS+=("$pair (job $jobid cancelled)")
                 ;;
+            TIMEOUT)
+                ledger_set "$pair" FAILED "$jobid" "job $jobid timeout"
+                FAILED_JOBS+=("$pair (job $jobid timeout)")
+                ;;
             *) note="unexpected state \"$state\"" ;;
         esac
         if [ -n "$note" ]; then
@@ -160,13 +164,14 @@ reconcile() {
 
 in_flight() {
     local partition="${1:-}"
+    if [ -n "$partition" ]; then partition=$(node_partition "$partition"); fi
     local pair count=0
     for pair in "${!L_STATUS[@]}"; do
-        if [ -n "$partition" ] && [ "${pair#*/}" != "$partition" ]; then
+        if [ -n "$partition" ] && [ "$(node_partition "${pair#*/}")" != "$partition" ]; then
             continue
         fi
         case "${L_STATUS[$pair]}" in
-            PENDING | RUNNING | HALTED) count=$((count + 1)) ;;
+            PD|PENDING|R|RUNNING|HALTED) count=$((count + 1)) ;;
         esac
     done
     printf '%s' "$count"
@@ -205,7 +210,8 @@ pending_pairs() {
 }
 
 pair_done() {
-    local dir="$RUNS_DIR/$TYPE/$1/$2"
+    local dir
+    dir="$(runs_path "$1" "$2")"
     [ -d "$dir" ] && [ -n "$(ls -A "$dir")" ]
 }
 
@@ -508,7 +514,7 @@ finalize() {
 
     for pair in "${!L_STATUS[@]}"; do
         case "${L_STATUS[$pair]}" in
-            PENDING | RUNNING) L_STATUS[$pair]=HALTED ;;
+            PD|PENDING | R|RUNNING) L_STATUS[$pair]=HALTED ;;
         esac
     done
     ledger_save
