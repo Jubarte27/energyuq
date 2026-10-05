@@ -44,15 +44,6 @@ class Plotter(
 
         self.labels: np.ndarray = np.array([], dtype=str)
         self.values: np.ndarray = np.array([], dtype=limit)
-        self.nd_labels: np.ndarray = np.array([])
-        self.nd_values: np.ndarray = np.array([])
-        self.grid_fig_size: tuple[float, float] = (6.0, 6.0)
-        self.L: int = 0
-        self.C: int = 1
-        self.R: int = 1
-        self.full_rows: int = 0
-        self.legend_handles: list[Line2D] = []
-
         if machine is not None:
             self.init(machine, units=units)
 
@@ -74,16 +65,16 @@ class Plotter(
 
         _, vary = energyuq.default_params(mach)
 
-        _, conv_fn = self.get_unit_converter("CLK", self.units)
+        _, convert = self.get_unit_converter("CLK", self.units)
         min_freq = min(mach.freq) if (hasattr(mach, "freq") and mach.freq) else 0
         max_freq = max(mach.freq) if (hasattr(mach, "freq") and mach.freq) else 0
-        if conv_fn is not None:
-            min_freq = conv_fn(min_freq)
-            max_freq = conv_fn(max_freq)
+        if convert is not None:
+            min_freq = convert(min_freq)
+            max_freq = convert(max_freq)
 
         limits = {}
         for k, v in vary.items():
-            if str(k).upper() in ("CLK", "CLK_LEVEL") and hasattr(mach, "freq") and mach.freq:
+            if str(k).upper() == "CLK" and hasattr(mach, "freq") and mach.freq:
                 limits[k] = limit(lower=int(min_freq), upper=int(max_freq))
             else:
                 v_low = int(np.asarray(v.lower).item()) if hasattr(v.lower, "__len__") else int(v.lower)
@@ -92,16 +83,3 @@ class Plotter(
 
         self.labels = np.array(list(limits.keys()), dtype=str)
         self.values = np.array(list(limits.values()), dtype=limit)
-
-        self.L = (self.labels.size + 1) // 2
-        (self.C, self.R), self.grid_fig_size = mostly_square_grid(self.L, 6, 2)
-        self.full_rows = self.L // self.C if self.C > 0 else 0
-
-        self.nd_values = pad_to_even_and_split(self.values, value=limit(lower=0, upper=1))
-        axis_labels = np.array([self.get_axis_label(lbl, self.units) for lbl in self.labels], dtype=str)
-        self.nd_labels = pad_to_even_and_split(axis_labels, value="")
-
-        more_red = Line2D([0], [0], color='red', lw=2, marker="o", linestyle='')
-        more_blue = Line2D([0], [0], color='blue', lw=2, marker="o", linestyle='')
-        self.legend_handles = [more_red, more_blue]
-

@@ -472,7 +472,7 @@ def load(
     machine = loaded_machine if loaded_machine is not None else default_machine
 
     numa_path = (path / "numa")
-    numa = numa_path.read_text() == "1"
+    numa = numa_path.is_file() and numa_path.read_text() == "1"
 
     campaign = create_campaign(
         program, machine, path, numa=numa

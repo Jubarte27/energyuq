@@ -1,16 +1,30 @@
 import inspect
-from typing import Any, Callable, Sequence, Union
+from collections.abc import Callable, Sequence
+from typing import Any
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-from matplotlib.figure import Figure, SubFigure
 from matplotlib.axes import Axes
+from matplotlib.figure import Figure, SubFigure
+from matplotlib.lines import Line2D
+from matplotlib.patches import Patch
 from matplotlib.ticker import MaxNLocator
 
-from .multi_run import RunData, RunCollection
+from ..plotting.units import get_axis_label, get_unit_converter, to_real_clk
+from .multi_run import RunCollection, RunData
 
+RunsInput = RunCollection | Sequence[RunData]
 
-RunsInput = Union[RunCollection, Sequence[RunData]]
+QOI_LABELS: dict[str, str] = {
+    "energy_uj": "Energy (μJ)",
+    "energy_j": "Energy (J)",
+    "energy_scaled": "Scaled Energy",
+    "time": "Execution Time (s)",
+    "power_w": "Power (W)",
+    "edp_j_s": "Energy-Delay Product (J·s)",
+    "EDP": "Energy-Delay Product (J·s)",
+}
 
 
 def _to_run_list(runs: RunsInput) -> list[RunData]:
@@ -20,24 +34,45 @@ def _to_run_list(runs: RunsInput) -> list[RunData]:
     return list(runs)
 
 
-def _format_qoi_label(qoi: str | Callable[..., Any]) -> str:
-    """Format QoI column name or callable into a clean publication label."""
+def format_qoi_label(qoi: str | Callable[..., Any]) -> str:
+    """Format a QoI column name or callable into a clean publication label."""
     if callable(qoi):
         if hasattr(qoi, "name") and isinstance(qoi.name, str) and qoi.name:
-            return _format_qoi_label(qoi.name)
+            return format_qoi_label(qoi.name)
         name = getattr(qoi, "__name__", "")
         if not name or name == "<lambda>":
             return "Computed Metric"
-        return _format_qoi_label(str(name))
-    mapping = {
-        "energy_uj": r"Energy ($\mu$J)",
-        "energy_j": "Energy (J)",
-        "energy_scaled": "Scaled Energy",
-        "time": "Execution Time (s)",
-        "power_w": "Power (W)",
-        "edp_j_s": "Energy-Delay Product (J·s)",
-    }
-    return mapping.get(qoi, qoi.replace("_", " ").title())
+        return format_qoi_label(str(name))
+    return QOI_LABELS.get(qoi, qoi.replace("_", " ").title())
+
+
+def _resolve_axes(
+    runs: RunsInput,
+    figsize: tuple[float, float] | None,
+    ax: Axes | None,
+    empty_message: str | None,
+    show_title: bool,
+) -> tuple[list[RunData], Figure, Axes | None]:
+    """
+    Resolve the run list plus the figure/axes to draw into.
+
+    Returns ``(run_list, fig, ax)``. When there is nothing to plot, ``ax`` is
+    ``None`` and ``fig`` is a placeholder carrying ``empty_message``; callers
+    only need to check ``ax is None`` and return.
+    """
+    run_list = _to_run_list(runs)
+
+    if ax is not None:
+        return run_list, ax.get_figure(), ax
+
+    if not run_list or empty_message is not None:
+        fig, empty_ax = plt.subplots(figsize=figsize or (6, 4))
+        if show_title and empty_message:
+            empty_ax.set_title(empty_message)
+        return run_list, fig, None
+
+    fig, ax = plt.subplots(figsize=figsize or (8.5, 5.0), layout="constrained")
+    return run_list, fig, ax
 
 
 def plot_multi_sobols(
@@ -69,7 +104,6 @@ def plot_multi_sobols(
             empty_ax.set_title("No runs provided")
         return fig
 
-    from .plot import get_axis_label
     single_bench = len({r.benchmark_name for r in run_list}) == 1
     # Collect Sobol data
     records = []
@@ -131,7 +165,7 @@ def plot_multi_sobols(
             fig.colorbar(cax, ax=cur_ax, label=r"$S_i$")
 
         if show_title:
-            fig.suptitle(f"First-Order Sobol Sensitivity Indices for {_format_qoi_label(qoi)}")
+            fig.suptitle(f"First-Order Sobol Sensitivity Indices for {format_qoi_label(qoi)}")
         return fig
 
     # 2. Bar Modes (grouped or stacked)
@@ -147,22 +181,16 @@ def plot_multi_sobols(
     if mode == "stacked_bar":
         bottom = np.zeros(len(tags))
         for p_idx, param in enumerate(params):
-            vals = []
-            for tag in tags:
-                match = df_sobol[(df_sobol["tag"] == tag) & (df_sobol["parameter"] == param)]
-                vals.append(match["sobol"].values[0] if not match.empty else 0.0)
+            vals = _sobol_values_for_tags(df_sobol, tags, param)
             ax.bar(x, vals, bottom=bottom, label=param, color=colors[p_idx % len(colors)], edgecolor="white", width=0.6)
-            bottom += np.array(vals)
+            bottom += vals
         ax.set_ylim(0, 1.1)
     else:
         # Grouped bar
         n_p = len(params)
         width = 0.8 / n_p
         for p_idx, param in enumerate(params):
-            vals = []
-            for tag in tags:
-                match = df_sobol[(df_sobol["tag"] == tag) & (df_sobol["parameter"] == param)]
-                vals.append(match["sobol"].values[0] if not match.empty else 0.0)
+            vals = _sobol_values_for_tags(df_sobol, tags, param)
             offset = (p_idx - (n_p - 1) / 2) * width
             ax.bar(x + offset, vals, width=width, label=param, color=colors[p_idx % len(colors)], edgecolor="white")
         ax.set_ylim(0, 1.05)
@@ -171,12 +199,57 @@ def plot_multi_sobols(
     ax.set_xticklabels(tags, rotation=45, ha="right", fontsize=9)
     ax.set_ylabel(r"First-Order Sobol Index ($S_i$)", fontsize=11)
     if show_title:
-        ax.set_title(f"Parameter Sensitivity Comparison across Runs ({_format_qoi_label(qoi)})", fontsize=12)
+        ax.set_title(f"Parameter Sensitivity Comparison across Runs ({format_qoi_label(qoi)})", fontsize=12)
     ax.legend(title="Parameter", frameon=True)
     ax.grid(axis="y", linestyle="--", alpha=0.5)
 
-    assert fig is not None
     return fig
+
+
+def _sobol_values_for_tags(df_sobol: pd.DataFrame, tags: list[str], param: str) -> np.ndarray:
+    """Return the Sobol index of ``param`` for each tag in ``tags`` (0.0 when absent)."""
+    return np.array([
+        (match["sobol"].values[0] if not (match := df_sobol[(df_sobol["tag"] == tag) & (df_sobol["parameter"] == param)]).empty else 0.0)
+        for tag in tags
+    ], dtype=float)
+
+
+MARKER_CHOICES = ["o", "s", "^", "D", "v", "P", "*"]
+
+
+def _category_styles(
+    benchmarks: Sequence[str],
+    machines: Sequence[str],
+) -> tuple[dict[str, str], dict[str, Any]]:
+    """Map each benchmark to a marker and each machine to a color."""
+    bench_markers = {b: MARKER_CHOICES[i % len(MARKER_CHOICES)] for i, b in enumerate(benchmarks)}
+    cmap = plt.get_cmap("tab10")
+    mach_colors = {m: cmap(i % 10) for i, m in enumerate(machines)}
+    return bench_markers, mach_colors
+
+
+def _category_legend(
+    benchmarks: Sequence[str],
+    machines: Sequence[str],
+    bench_markers: dict[str, str],
+    mach_colors: dict[str, Any],
+) -> list[Line2D]:
+    """Build the shared 'Machine / Benchmark' legend handles."""
+    handles = [Line2D([0], [0], color=mach_colors[m], marker="o", lw=0, label=m, markersize=8) for m in machines]
+    if len(benchmarks) > 1:
+        handles += [
+            Line2D([0], [0], marker=bench_markers[b], color="gray", label=b, linestyle="none", markersize=8)
+            for b in benchmarks
+        ]
+    return handles
+
+
+def _with_unit(base: str, param: str, units: dict[str, str | None] | None) -> str:
+    """Build an axis label like ``'Optimal Threads (N_THREADS)'`` honouring configured units."""
+    target_unit = get_unit_converter(param, units)[0]
+    if target_unit and str(target_unit).strip().lower() not in ("", "none"):
+        return f"{base} ({str(target_unit).strip()})"
+    return f"{base} ({param})"
 
 
 def plot_multi_convergence(
@@ -190,11 +263,10 @@ def plot_multi_convergence(
     """
     Plot convergence histories (adaptation errors, mean, or standard deviation) across iterations.
     """
-    run_list = _to_run_list(runs)
-    if not run_list:
-        fig, empty_ax = plt.subplots(figsize=figsize or (6, 4))
-        if show_title:
-            empty_ax.set_title("No runs provided")
+    run_list, fig, ax = _resolve_axes(
+        runs, figsize, ax, "No runs provided", show_title
+    )
+    if ax is None:
         return fig
 
     if facet_by == "benchmark":
@@ -227,12 +299,6 @@ def plot_multi_convergence(
         return fig
 
     # Single axis mode
-    if ax is None:
-        fig_size = figsize or (8.5, 5.0)
-        fig, ax = plt.subplots(figsize=fig_size, layout="constrained")
-    else:
-        fig = ax.get_figure()
-
     for r in run_list:
         hist = r.get_convergence_history().get(metric, [])
         if hist:
@@ -246,9 +312,9 @@ def plot_multi_convergence(
     if show_title:
         ax.set_title(f"Multi-Run Convergence History ({metric})", fontsize=12)
     ax.grid(True, linestyle="--", alpha=0.5)
-    ax.legend(bbox_to_anchor=(1.04, 1), loc="upper left", fontsize=8)
+    if ax.get_legend_handles_labels()[0]:
+        ax.legend(bbox_to_anchor=(1.04, 1), loc="upper left", fontsize=8)
 
-    assert fig is not None
     return fig
 
 
@@ -265,28 +331,16 @@ def plot_multi_energy_time_pareto(
     """
     Plot energy vs execution time trade-off for multiple runs, highlighting Pareto frontiers.
     """
-    run_list = _to_run_list(runs)
-    if not run_list:
-        fig, empty_ax = plt.subplots(figsize=figsize or (6, 4))
-        if show_title:
-            empty_ax.set_title("No runs provided")
+    run_list, fig, ax = _resolve_axes(
+        runs, figsize or (9.0, 6.0), ax, "No runs provided", show_title
+    )
+    if ax is None:
         return fig
 
-    if ax is None:
-        fig_size = figsize or (9.0, 6.0)
-        fig, ax = plt.subplots(figsize=fig_size, layout="constrained")
-    else:
-        fig = ax.get_figure()
-
     # Distinct markers for benchmarks, colors for machines
-    benchmarks = sorted(list({r.benchmark_name for r in run_list}))
-    machines = sorted(list({r.machine_name for r in run_list}))
-
-    marker_choices = ["o", "s", "^", "D", "v", "P", "*"]
-    bench_markers = {b: marker_choices[i % len(marker_choices)] for i, b in enumerate(benchmarks)}
-
-    cmap = plt.get_cmap("tab10")
-    mach_colors = {m: cmap(i % 10) for i, m in enumerate(machines)}
+    benchmarks = sorted({r.benchmark_name for r in run_list})
+    machines = sorted({r.machine_name for r in run_list})
+    bench_markers, mach_colors = _category_styles(benchmarks, machines)
 
     for r in run_list:
         df = r.df
@@ -313,26 +367,20 @@ def plot_multi_energy_time_pareto(
                 ax.plot(fx, fy, color=color, linestyle="-", linewidth=1.8, label=r.tag)
                 ax.scatter(fx, fy, color=color, marker=marker, s=50, edgecolor="black", zorder=5)
 
-    y_label = "Energy (J)" if qoi_y == "energy_uj" else _format_qoi_label(qoi_y)
-    ax.set_xlabel(_format_qoi_label(qoi_x), fontsize=11)
+    y_label = "Energy (J)" if qoi_y == "energy_uj" else format_qoi_label(qoi_y)
+    ax.set_xlabel(format_qoi_label(qoi_x), fontsize=11)
     ax.set_ylabel(y_label, fontsize=11)
     if show_title:
         ax.set_title("Energy vs Time Pareto Frontier Comparison", fontsize=12)
     ax.grid(True, linestyle="--", alpha=0.5)
 
-    # Custom legends for Machines and Benchmarks
-    from matplotlib.lines import Line2D
-    legend_elements = [
-        Line2D([0], [0], color=mach_colors[m], lw=2, label=m) for m in machines
-    ]
-    if len(benchmarks) > 1:
-        legend_elements += [
-            Line2D([0], [0], marker=bench_markers[b], color="gray", label=b, linestyle="none", markersize=8)
-            for b in benchmarks
-        ]
-    ax.legend(handles=legend_elements, title="Machine / Benchmark", bbox_to_anchor=(1.04, 1), loc="upper left")
+    ax.legend(
+        handles=_category_legend(benchmarks, machines, bench_markers, mach_colors),
+        title="Machine / Benchmark",
+        bbox_to_anchor=(1.04, 1),
+        loc="upper left",
+    )
 
-    assert fig is not None
     return fig
 
 
@@ -402,15 +450,14 @@ def plot_multi_qoi_distribution(
                 positions.append(p_idx + offset)
 
         if data_to_plot:
-            color = colors[s_idx % len(colors)]
-            bp = ax.boxplot(
+            ax.boxplot(
                 data_to_plot,
                 positions=positions,
                 widths=width * 0.85,
                 patch_artist=True,
                 showmeans=True,
                 meanprops={"marker": "x", "markeredgecolor": "black", "markersize": 6},
-                boxprops={"facecolor": color, "alpha": 0.7, "edgecolor": "black"},
+                boxprops={"facecolor": colors[s_idx % len(colors)], "alpha": 0.7, "edgecolor": "black"},
                 medianprops={"color": "black", "linewidth": 1.5},
             )
 
@@ -419,21 +466,22 @@ def plot_multi_qoi_distribution(
     ax.set_xticklabels(primary_groups, fontsize=10)
     ax.set_xlabel(primary_col.title(), fontsize=11)
 
-    y_label = "Energy (J)" if qoi == "energy_uj" else _format_qoi_label(qoi)
+    y_label = "Energy (J)" if qoi == "energy_uj" else format_qoi_label(qoi)
     ax.set_ylabel(y_label, fontsize=11)
     if show_title:
         ax.set_title(f"Distribution of {y_label} by {primary_col.title()}", fontsize=12)
     ax.grid(axis="y", linestyle="--", alpha=0.5)
 
-    # Custom legend
-    from matplotlib.patches import Patch
-    legend_elements = [
-        Patch(facecolor=colors[i % len(colors)], alpha=0.7, edgecolor="black", label=sec_val)
-        for i, sec_val in enumerate(secondary_groups)
-    ]
-    ax.legend(handles=legend_elements, title=secondary_col.title(), bbox_to_anchor=(1.04, 1), loc="upper left")
+    ax.legend(
+        handles=[
+            Patch(facecolor=colors[i % len(colors)], alpha=0.7, edgecolor="black", label=sec_val)
+            for i, sec_val in enumerate(secondary_groups)
+        ],
+        title=secondary_col.title(),
+        bbox_to_anchor=(1.04, 1),
+        loc="upper left",
+    )
 
-    assert fig is not None
     return fig
 
 
@@ -448,22 +496,20 @@ def plot_multi_best_configurations(
     """
     Plot the best configuration (N_THREADS and CLK) found in each run for a given QoI.
     """
-    run_list = _to_run_list(runs)
-    single_bench = len({r.benchmark_name for r in run_list}) == 1
-    if not run_list:
-        fig, empty_ax = plt.subplots(figsize=figsize or (6, 4))
-        if show_title:
-            empty_ax.set_title("No runs provided")
+    run_list, fig, ax = _resolve_axes(
+        runs, figsize or (8.0, 5.5), ax, "No runs provided", show_title
+    )
+    if ax is None:
         return fig
 
-    from .plot import to_real_clk, get_unit_converter
+    single_bench = len({r.benchmark_name for r in run_list}) == 1
     rows = []
     has_real_clk = False
     for r in run_list:
         best = r.best_config(qoi, mode="min")
         if best:
             clk_val = best.get("CLK", best.get("CLK_LEVEL", np.nan))
-            if r.machine and hasattr(r.machine, "freq") and r.machine.freq and not pd.isna(clk_val):
+            if r.machine and getattr(r.machine, "freq", None) and not pd.isna(clk_val):
                 clk_val = to_real_clk(clk_val, r.machine, units)
                 has_real_clk = True
             rows.append({
@@ -483,19 +529,9 @@ def plot_multi_best_configurations(
 
     df_best = pd.DataFrame(rows)
 
-    if ax is None:
-        fig_size = figsize or (8.0, 5.5)
-        fig, ax = plt.subplots(figsize=fig_size, layout="constrained")
-    else:
-        fig = ax.get_figure()
-
     benchmarks = sorted(df_best["benchmark"].unique())
     machines = sorted(df_best["machine"].unique())
-
-    marker_choices = ["o", "s", "^", "D", "v", "P", "*"]
-    bench_markers = {b: marker_choices[i % len(marker_choices)] for i, b in enumerate(benchmarks)}
-    cmap = plt.get_cmap("tab10")
-    mach_colors = {m: cmap(i % 10) for i, m in enumerate(machines)}
+    bench_markers, mach_colors = _category_styles(benchmarks, machines)
 
     for _, row in df_best.iterrows():
         color = mach_colors[row["machine"]]
@@ -503,22 +539,14 @@ def plot_multi_best_configurations(
         ax.scatter(row["threads"], row["clk"], color=color, marker=marker, s=120, edgecolor="black", zorder=4)
         ax.annotate(row["tag"], (row["threads"], row["clk"]), textcoords="offset points", xytext=(5, 5), fontsize=8)
 
-    clk_target_unit, _ = get_unit_converter("CLK", units)
-    if clk_target_unit and str(clk_target_unit).strip().lower() not in ("", "none"):
-        clk_label = f"Optimal Clock Frequency ({str(clk_target_unit).strip()})"
+    ax.set_xlabel(_with_unit("Optimal Threads", "N_THREADS", units), fontsize=11)
+    if get_unit_converter("CLK", units)[0] or has_real_clk:
+        clk_label = _with_unit("Optimal Clock Frequency", "CLK", units)
     else:
-        clk_label = "Optimal Clock Frequency (CLK)" if has_real_clk else "Optimal Clock Frequency Index (CLK)"
-
-    threads_target_unit, _ = get_unit_converter("N_THREADS", units)
-    if threads_target_unit and str(threads_target_unit).strip().lower() not in ("", "none"):
-        threads_label = f"Optimal Threads ({str(threads_target_unit).strip()})"
-    else:
-        threads_label = "Optimal Threads (N_THREADS)"
-
-    ax.set_xlabel(threads_label, fontsize=11)
+        clk_label = "Optimal Clock Frequency Index (CLK)"
     ax.set_ylabel(clk_label, fontsize=11)
     if show_title:
-        ax.set_title(f"Optimal Configurations Found Across Runs (Min {_format_qoi_label(qoi)})", fontsize=12)
+        ax.set_title(f"Optimal Configurations Found Across Runs (Min {format_qoi_label(qoi)})", fontsize=12)
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
 
     clk_series = df_best["clk"].dropna()
@@ -532,18 +560,13 @@ def plot_multi_best_configurations(
     ax.yaxis.set_major_locator(MaxNLocator(integer=bool(is_clk_int)))
     ax.grid(True, linestyle="--", alpha=0.5)
 
-    from matplotlib.lines import Line2D
-    legend_elements = [
-        Line2D([0], [0], color=mach_colors[m], marker="o", lw=0, label=m, markersize=8) for m in machines
-    ]
-    if not single_bench:
-        legend_elements += [
-            Line2D([0], [0], marker=bench_markers[b], color="gray", label=b, linestyle="none", markersize=8)
-            for b in benchmarks
-        ]
-    ax.legend(handles=legend_elements, title="Machine / Benchmark", bbox_to_anchor=(1.04, 1), loc="upper left")
+    ax.legend(
+        handles=_category_legend(benchmarks, machines, bench_markers, mach_colors),
+        title="Machine / Benchmark",
+        bbox_to_anchor=(1.04, 1),
+        loc="upper left",
+    )
 
-    assert fig is not None
     return fig
 
 
@@ -674,10 +697,16 @@ def plot_multi_parameter_effects(
         qoi == "energy_uj" and 1.0 otherwise.
     """
     run_list = _to_run_list(runs)
+    if not run_list:
+        fig, empty_ax = plt.subplots(figsize=figsize or (6, 4))
+        if show_title:
+            empty_ax.set_title("No runs provided")
+        return fig
+
     eff_scale = scale if scale is not None else (1e-6 if qoi == "energy_uj" else 1.0)
 
     group_col = facet_by
-    group_values = sorted(list({getattr(r, f"{group_col}_name") for r in run_list}))
+    group_values = sorted({getattr(r, f"{group_col}_name") for r in run_list})
     n_groups = len(group_values)
 
     fig_size = figsize or (5.5 * n_groups, 4.5)
@@ -706,14 +735,10 @@ def plot_multi_parameter_effects(
                     continue
                 target_col = qoi
 
-            if str(param).upper() in ("CLK", "CLK_LEVEL") and r.machine and hasattr(r.machine, "freq") and r.machine.freq:
-                from .plot import to_real_clk
-                r_df[param] = r_df[param].map(lambda v: to_real_clk(v, r.machine, units))
-            else:
-                from .plot import get_unit_converter
-                _, p_conv = get_unit_converter(param, units)
-                if p_conv is not None:
-                    r_df[param] = r_df[param].map(lambda v: p_conv(float(v)) if not pd.isna(v) else v)
+            if str(param).upper() in ("CLK", "CLK_LEVEL") and getattr(r.machine, "freq", None):
+                r_df[param] = r_df[param].map(lambda v, mach=r.machine: to_real_clk(v, mach, units))
+            elif (p_conv := get_unit_converter(param, units)[1]) is not None:
+                r_df[param] = r_df[param].map(lambda v, conv=p_conv: conv(float(v)) if not pd.isna(v) else v)
 
             r_df = r_df.dropna(subset=[param, target_col])
             if r_df.empty:
@@ -730,9 +755,7 @@ def plot_multi_parameter_effects(
             )
 
         cur_ax.set_title(f"{group_col.title()}: {g_val}")
-        from .plot import get_axis_label
-        param_label = get_axis_label(param, units)
-        cur_ax.set_xlabel(param_label)
+        cur_ax.set_xlabel(get_axis_label(param, units))
 
         if all_x_vals:
             try:
@@ -754,13 +777,14 @@ def plot_multi_parameter_effects(
     elif qoi == "energy_uj":
         y_label = "Energy (J)"
     else:
-        y_label = _format_qoi_label(qoi)
+        y_label = format_qoi_label(qoi)
 
     axes[0, 0].set_ylabel(y_label, fontsize=11)
     if show_title:
-        from .plot import get_axis_label
-        param_label = get_axis_label(param, units)
-        fig.suptitle(f"Effect of {param_label} on {y_label} across {facet_by.title()}s", fontsize=13)
+        fig.suptitle(
+            f"Effect of {get_axis_label(param, units)} on {y_label} across {facet_by.title()}s",
+            fontsize=13,
+        )
 
     return fig
 
@@ -782,7 +806,7 @@ def plot_multi_dashboard(
     run_list = _to_run_list(runs)
     fig = plt.figure(figsize=figsize, layout="constrained")
     if show_title:
-        fig.suptitle(f"Multi-Run Comparative Analysis Dashboard ({_format_qoi_label(qoi)})", fontsize=15, fontweight="bold")
+        fig.suptitle(f"Multi-Run Comparative Analysis Dashboard ({format_qoi_label(qoi)})", fontsize=15, fontweight="bold")
 
     gs = fig.add_gridspec(2, 2)
     ax1 = fig.add_subplot(gs[0, 0])

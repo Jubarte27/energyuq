@@ -106,29 +106,19 @@ class PlotterLayoutMixin:
         span = high - low
         return low - span / 10.0, high + span / 10.0
 
-    def get_result_params(self, result: Any, df: DataFrame | None = None) -> list[str]:
+    def get_result_params(self, result: EasyResult, df: DataFrame | None = None) -> list[str]:
         """Identify which parameter names belong to the given result and are present in df."""
-        if df is None and hasattr(result, "df"):
-            df = result.df
-
+        df = result.df
         df_cols: list[str] = []
-        if df is not None and hasattr(df, "columns"):
-            df_cols = [c[0] if isinstance(c, tuple) else c for c in df.columns]
+        df_cols = [c[0] if isinstance(c, tuple) else c for c in df.columns]
 
         sampler_params = get_sampler_params(result)
-        candidates = sampler_params or df_cols
-        if len(self.labels) > 0:
-            matching = [lbl for lbl in self.labels if lbl in candidates and (not df_cols or lbl in df_cols)]
-            if matching:
-                return matching
+        candidates = sampler_params
 
-        if df_cols:
-            known = ["N_THREADS", "CLK", "CLK_LEVEL", "PLACES", "BINDING", "BOOST", "NUMA"]
-            matching = [c for c in df_cols if c in known or c in candidates]
-            if matching:
-                return matching
+        known = ["N_THREADS", "CLK", "PLACES", "BINDING", "BOOST", "NUMA"]
+        matching = [c for c in df_cols if c in known or c in candidates]
+        return matching
 
-        return list(self.labels) if len(self.labels) > 0 else ["N_THREADS", "CLK"]
 
     def colors_for(self, qoi: str) -> dict[str, tuple[str, str, str, str]]:
         return {

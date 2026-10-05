@@ -1,35 +1,21 @@
 import json
-import pickle
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Union, cast
+from typing import Any, cast
+from unittest.mock import patch
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib.figure import Figure
 
 from .. import programs
 from ..machines.machine import NONE as NONE_MACHINE
-from ..machines.machine import Machine
+from ..machines.machine import Machine, load_machine
+from ..plotting.plotter import Plotter
 from ..programs.program import Program
-
-
-def _to_json_serializable(obj: Any) -> Any:
-    """Convert numpy and pandas types to standard JSON-serializable types."""
-    if isinstance(obj, (np.integer, int)):
-        return int(obj)
-    elif isinstance(obj, (np.floating, float)):
-        return float(obj)
-    elif isinstance(obj, (np.ndarray, list, tuple)):
-        return [_to_json_serializable(x) for x in obj]
-    elif isinstance(obj, dict):
-        return {str(k): _to_json_serializable(v) for k, v in obj.items()}
-    elif isinstance(obj, Path):
-        return str(obj)
-    elif pd.isna(obj):
-        return None
-    return obj
+from .data import to_serializable_primitive
 
 
 def _flatten_columns(df: pd.DataFrame) -> pd.DataFrame:
@@ -75,16 +61,33 @@ def _compute_pareto_front(df: pd.DataFrame, x_col: str, y_col: str) -> pd.DataFr
     return sorted_df.loc[pareto_indices].sort_values(by=x_col)
 
 
+#: QoIs produced by the campaign pipeline, in reporting order.
+MEASURED_QOIS: tuple[str, ...] = ("energy_uj", "time", "EDP", "energy_scaled")
+
+#: Figure families :meth:`RunData.analyze_individually` knows how to build.
+#: Pass a subset as ``figures=`` to build only what a caller will render.
+FIGURE_FAMILIES: tuple[str, ...] = (
+    "projections",     # grid_2d_best, single_dimension_projections
+    "distributions",   # sorted_evaluations, boxplot_per_dimension
+    "sobols",          # sobol_indices, sobol_treemap
+    "convergence",     # adaptation_error_history, moments, histogram, table
+)
+
+
 @dataclass
 class RunData:
-    """Encapsulates data and analysis state for a single experimental run."""
+    """Encapsulates data and analysis state for a single experimental run.
+
+    ``qois`` and ``input_params`` default to ``None``, meaning "detect from the
+    data". Pass an explicit list to pin them down instead.
+    """
     path: Path
     benchmark_name: str
     machine_name: str
     machine: Machine | None = None
     df: pd.DataFrame = field(default_factory=pd.DataFrame)
-    qois: list[str] = field(default_factory=lambda: ["energy_uj", "time"])
-    input_params: list[str] = field(default_factory=lambda: ["N_THREADS", "CLK"])
+    qois: list[str] | None = None
+    input_params: list[str] | None = None
     campaign: Any = None
     analysis: Any = None
     results: Any = None
@@ -100,15 +103,19 @@ class RunData:
             self.df = _flatten_columns(self.df)
             self.df = _compute_derived_qois(self.df)
 
-            # Auto-detect QoIs and input params if defaults aren't fully matching
             existing_cols = set(self.df.columns)
-            potential_qois = ["energy_uj", "energy_j", "energy_scaled", "time", "power_w", "edp_j_s"]
-            self.qois = [q for q in potential_qois if q in existing_cols]
+            if self.qois is None:
+                self.qois = [q for q in MEASURED_QOIS if q in existing_cols]
+            if self.input_params is None:
+                self.input_params = [
+                    p for p in ("N_THREADS", "THREADS", "CLK", "CLK_LEVEL", "POWER_CAP", "PLACE_WIDE", "AFF_DISTANCE")
+                    if p in existing_cols
+                ] or ["N_THREADS", "CLK"]
 
-            potential_inputs = ["N_THREADS", "CLK", "THREADS", "CLK_LEVEL", "POWER_CAP", "PLACE_WIDE", "AFF_DISTANCE"]
-            detected_inputs = [p for p in potential_inputs if p in existing_cols]
-            if detected_inputs:
-                self.input_params = detected_inputs
+        if self.qois is None:
+            self.qois = ["energy_uj", "time"]
+        if self.input_params is None:
+            self.input_params = ["N_THREADS", "CLK"]
 
     @property
     def sample_count(self) -> int:
@@ -195,23 +202,28 @@ class RunData:
         """Return Pareto frontier between two QoIs."""
         return _compute_pareto_front(self.df, qoi_x, qoi_y)
 
-    def as_easy_result(self, qois: Sequence[str] | None = None) -> Any:
-        """Return this run wrapped in EasyResult for compatibility with single-run plot functions."""
-        from .data import EasyResult
-        use_qois = list(qois) if qois else self.qois
-        return EasyResult(
-            df=self.df,
-            qois=use_qois,
-            analysis=self.analysis,
-            campaign=self.campaign,
-            sampler=self.sampler,
-            results=self.results,
-        )
+    def plotter(self) -> Plotter:
+        """Return a Plotter configured for this run's machine."""
+        return Plotter(self.machine)
+
+    def _sobol_treemap(self, qoi: str) -> Any:
+        """Render the EasyVVUQ Sobol treemap headlessly and return the current figure."""
+        with patch("matplotlib.pyplot.show", lambda *a, **k: None), \
+                patch.object(Figure, "show", lambda self: None):
+            self.results.plot_sobols_treemap(qoi)
+        fig = plt.gcf()
+        if not fig.axes:
+            plt.close(fig)
+            return None
+        for ax in fig.axes:
+            ax.set_title("")
+        return fig
 
     def analyze_individually(
         self,
-        output_dir: Union[str, Path, None] = None,
+        output_dir: str | Path | None = None,
         qois: Sequence[str] | None = None,
+        figures: Sequence[str] | None = None,
         save_plots: bool = True,
         fmt: str = "png",
         dpi: int = 200,
@@ -219,24 +231,23 @@ class RunData:
         show: bool = False,
     ) -> dict[str, Any]:
         """
-        Perform complete individual analysis and generate single-run plots.
-        
+        Perform individual analysis and generate single-run plots.
+
         Parameters
         ----------
         output_dir : Optional folder to save plots, metrics JSON, and summary tables.
         qois : List of QoIs to evaluate (defaults to ["energy_uj", "time"]).
+        figures : Subset of :data:`FIGURE_FAMILIES` to build (default: all of them).
         save_plots : Whether to save plots to output_dir / "plots".
         fmt : Figure image format ('png', 'pdf', 'svg').
         dpi : Resolution for saved figures.
         quiet : Suppress print statements.
         show : Whether to display plots interactively.
-        
+
         Returns
         -------
         dict with run metadata, metrics, and figure objects.
         """
-        from . import plot
-
         out_path = Path(output_dir) if output_dir is not None else None
         plots_dir = (out_path / "plots") if (out_path and save_plots) else None
         if plots_dir:
@@ -245,146 +256,87 @@ class RunData:
         if not quiet:
             print(f"[{self.tag}] Running individual analysis...")
 
-        # Initialize plot settings for this machine
-        if self.machine is not None and self.machine.name != "NONE":
-            try:
-                plot.init(self.machine)
-            except Exception as e:
-                if not quiet:
-                    print(f"[{self.tag}] Note: plot.init encountered: {e}")
+        plotter = self.plotter()
 
         target_qois = [q for q in (qois or ["energy_uj", "time"]) if q in self.df.columns]
         if not target_qois and not self.df.empty:
             target_qois = [self.df.columns[-1]]
 
-        easy_res = self.as_easy_result(target_qois)
-        figures: dict[str, Any] = {}
+        wanted = set(figures) if figures is not None else set(FIGURE_FAMILIES)
+        unknown = wanted - set(FIGURE_FAMILIES)
+        if unknown:
+            raise ValueError(f"Unknown figure families {sorted(unknown)}; expected {list(FIGURE_FAMILIES)}")
 
-        # 1. Generate individual plots for each QoI
+        figs: dict[str, Any] = {}
+
+        def add(key: str, make: Callable[[], Any]) -> None:
+            """Build one figure, recording it (or the failure reason) under ``key``."""
+            try:
+                fig = make()
+            except Exception as e:
+                if not quiet:
+                    print(f"[{self.tag}] {key} skipped: {e}")
+                return
+            if fig is not None:
+                figs[key] = fig
+
+        # 1. Per-QoI figures
         for qoi in target_qois:
-            # 2D Grid best evaluations
-            try:
-                fig = plot.plot_grid_2D_best(easy_res, qoi=qoi)
-                figures[f"grid_2d_best_{qoi}"] = fig
-            except Exception as e:
-                if not quiet:
-                    print(f"[{self.tag}] grid_2D_best ({qoi}) skipped: {e}")
+            if "projections" in wanted:
+                add(f"grid_2d_best_{qoi}", lambda q=qoi: plotter.plot_grid_2D_best(self, qoi=q))
+                add(f"single_dimension_projections_{qoi}", lambda q=qoi: plotter.plot_2D_single_dimension(self, qoi=q))
+            if "distributions" in wanted:
+                add(f"sorted_evaluations_{qoi}", lambda q=qoi: plotter.plot_sorted(self, qoi=q))
+                add(f"boxplot_per_dimension_{qoi}", lambda q=qoi: plotter.plot_boxplot(self, qoi=q))
 
-            # Sorted evaluations
-            try:
-                fig = plot.plot_sorted(easy_res, qoi=qoi)
-                figures[f"sorted_evaluations_{qoi}"] = fig
-            except Exception as e:
-                if not quiet:
-                    print(f"[{self.tag}] plot_sorted ({qoi}) skipped: {e}")
-
-            # 2D Single dimension projection
-            try:
-                fig = plot.plot_2D_single_dimension(easy_res, qoi=qoi)
-                figures[f"single_dimension_projections_{qoi}"] = fig
-            except Exception as e:
-                if not quiet:
-                    print(f"[{self.tag}] plot_2D_single_dimension ({qoi}) skipped: {e}")
-
-            # Boxplot per dimension
-            try:
-                fig = plot.plot_boxplot(easy_res, qoi=qoi)
-                figures[f"boxplot_per_dimension_{qoi}"] = fig
-            except Exception as e:
-                if not quiet:
-                    print(f"[{self.tag}] plot_boxplot ({qoi}) skipped: {e}")
-
-            # First-order Sobol bar chart
-            if self.results is not None and hasattr(self.results, "sobols_first"):
-                try:
-                    if not hasattr(self.results, "qois") or qoi in self.results.qois:
-                        fig = plot.plot_sobols1(easy_res, qoi=qoi)
-                        figures[f"sobol_indices_{qoi}"] = fig
-                except Exception as e:
-                    if not quiet:
-                        print(f"[{self.tag}] plot_sobols1 ({qoi}) skipped: {e}")
-
-            # Sobol treemap if available
-            if self.results is not None and hasattr(self.results, "plot_sobols_treemap"):
-                try:
-                    if not hasattr(self.results, "qois") or qoi in self.results.qois:
-                        from unittest.mock import patch
-                        with patch("matplotlib.pyplot.show", lambda *args, **kwargs: None), \
-                             patch.object(plt.Figure, "show", lambda self: None):
-                            self.results.plot_sobols_treemap(qoi)
-                        fig_tm = plt.gcf()
-                        if len(fig_tm.axes) > 0:
-                            for ax in fig_tm.axes:
-                                ax.set_title("")
-                            figures[f"sobol_treemap_{qoi}"] = fig_tm
-                        else:
-                            plt.close(fig_tm)
-                except Exception as e:
-                    if not quiet:
-                        print(f"[{self.tag}] plot_sobols_treemap ({qoi}) skipped: {e}")
+            # Sobol-based figures need analysis results for this QoI.
+            results_qois = getattr(self.results, "qois", None)
+            if "sobols" in wanted and self.results is not None \
+                    and hasattr(self.results, "sobols_first") \
+                    and (results_qois is None or qoi in results_qois):
+                add(f"sobol_indices_{qoi}", lambda q=qoi: plotter.plot_sobols1(self, qoi=q))
+                if hasattr(self.results, "plot_sobols_treemap"):
+                    add(f"sobol_treemap_{qoi}", lambda q=qoi: self._sobol_treemap(q))
 
         # 2. Convergence & UQ plots
-        hist = self.get_convergence_history()
-        errors = hist.get("adaptation_error", [])
-        if errors:
-            try:
-                fig_err, ax_err = plt.subplots(figsize=(7, 4.5), layout="constrained")
-                ax_err.semilogy(range(1, len(errors) + 1), errors, marker="o", color="crimson")
-                ax_err.set_xlabel("Iteration", fontsize=11)
-                ax_err.set_ylabel("Adaptation Surplus Error", fontsize=11)
-                ax_err.grid(True, linestyle="--", alpha=0.5)
-                figures["adaptation_error_history"] = fig_err
-            except Exception as e:
-                if not quiet:
-                    print(f"[{self.tag}] adaptation_errors plot skipped: {e}")
+        if "convergence" in wanted:
+            errors = self.get_convergence_history().get("adaptation_error", [])
+            if errors:
+                def _adaptation_error_history() -> Figure:
+                    fig, ax = plt.subplots(figsize=(7, 4.5), layout="constrained")
+                    ax.semilogy(range(1, len(errors) + 1), errors, marker="o", color="crimson")
+                    ax.set_xlabel("Iteration", fontsize=11)
+                    ax.set_ylabel("Adaptation Surplus Error", fontsize=11)
+                    ax.grid(True, linestyle="--", alpha=0.5)
+                    return fig
 
-        if self.analysis is not None:
-            try:
-                fig_sc = plot.plot_stat_convergence(self, title=None)
-                if fig_sc is not None:
-                    figures["statistical_moments_convergence"] = fig_sc
-            except Exception as e:
-                if not quiet:
-                    print(f"[{self.tag}] plot_stat_convergence skipped: {e}")
+                add("adaptation_error_history", _adaptation_error_history)
 
-            try:
-                fig_ah = plot.plot_adaptation_histogram(self, title=None)
-                if fig_ah is not None:
-                    figures["adaptation_histogram"] = fig_ah
-            except Exception as e:
-                if not quiet:
-                    print(f"[{self.tag}] plot_adaptation_histogram skipped: {e}")
-
-            try:
-                fig_at = plot.plot_adaptation_table(self, title=None)
-                if fig_at is not None:
-                    figures["adaptation_table"] = fig_at
-            except Exception as e:
-                if not quiet:
-                    print(f"[{self.tag}] plot_adaptation_table skipped: {e}")
+            if self.analysis is not None:
+                add("statistical_moments_convergence", lambda: plotter.plot_stat_convergence(self, title=None))
+                add("adaptation_histogram", lambda: plotter.plot_adaptation_histogram(self, title=None))
+                add("adaptation_table", lambda: plotter.plot_adaptation_table(self, title=None))
 
         # Save figures if requested
         if plots_dir:
-            for fig_name, fig_obj in figures.items():
-                if fig_obj is not None:
-                    if getattr(fig_obj, "_suptitle", None) is not None:
-                        fig_obj._suptitle.set_text("")
-                    for ax in getattr(fig_obj, "axes", []):
-                        ax.set_title("")
-                    fig_file = plots_dir / f"{fig_name}.{fmt}"
-                    fig_obj.savefig(fig_file, dpi=dpi, bbox_inches="tight")
-                    if not show:
-                        plt.close(fig_obj)
+            for fig_name, fig_obj in figs.items():
+                if getattr(fig_obj, "_suptitle", None) is not None:
+                    fig_obj._suptitle.set_text("")
+                for ax in getattr(fig_obj, "axes", []):
+                    ax.set_title("")
+                fig_obj.savefig(plots_dir / f"{fig_name}.{fmt}", dpi=dpi, bbox_inches="tight")
+                if not show:
+                    plt.close(fig_obj)
 
         if not show:
             plt.close("all")
         else:
-            for fig_obj in figures.values():
-                if fig_obj is not None:
-                    plt.figure(fig_obj.number)
-                    plt.show()
+            for fig_obj in figs.values():
+                plt.figure(fig_obj.number)
+                plt.show()
 
         # 3. Compute metrics
+        hist = self.get_convergence_history()
         metrics: dict[str, Any] = {
             "run_tag": self.tag,
             "benchmark": self.benchmark_name,
@@ -443,7 +395,7 @@ class RunData:
                 self.df.to_csv(out_path / "evaluated_samples.csv", index=False)
 
             with open(out_path / "metrics.json", "w") as f:
-                json.dump(_to_json_serializable(metrics), f, indent=2)
+                json.dump(to_serializable_primitive(metrics), f, indent=2)
 
             # Summary text report
             summary_lines = [
@@ -481,9 +433,23 @@ class RunData:
             "benchmark": self.benchmark_name,
             "machine": self.machine_name,
             "metrics": metrics,
-            "figures": figures,
+            "figures": figs,
             "output_dir": out_path,
         }
+
+
+#: Benchmark names recognised when inferring a run's benchmark from its path.
+KNOWN_PATH_BENCHMARKS: tuple[str, ...] = ("HPCG", "JA", "LULESH", "FFT", "ST", "MW", "PO", "FLETCHER", "FAKEWORK")
+
+#: Files/entries whose presence marks a directory as a loadable run.
+RUN_MARKERS: tuple[str, ...] = (
+    "campaign.db",
+    "campaign/campaign.db",
+    "analysis",
+    "compilation.csv",
+    "machine.msgpack",
+    "machine.pkl",
+)
 
 
 def _resolve_benchmark_class(name: str) -> type[Program]:
@@ -496,17 +462,19 @@ def _resolve_benchmark_class(name: str) -> type[Program]:
 
     for attr in dir(programs):
         obj = getattr(programs, attr)
-        if isinstance(obj, type):
-            if attr.upper() == name_clean or getattr(obj, "name", "").upper() == name_clean:
-                return cast(type[Program], obj)
+        if isinstance(obj, type) and (
+            attr.upper() == name_clean or getattr(obj, "name", "").upper() == name_clean
+        ):
+            return cast(type[Program], obj)
     return programs.NONE
 
 
 def load_run(
-    path: Union[str, Path],
-    benchmark: Union[str, type[Program], None] = None,
-    machine: Union[Machine, None] = None,
+    path: str | Path,
+    benchmark: str | type[Program] | None = None,
+    machine: Machine | None = None,
     campaign_name: str = "energy",
+    quiet: bool = True,
 ) -> RunData:
     """
     Load a single run directory containing an EasyVVUQ campaign, Dakota results, or compilation CSV.
@@ -515,53 +483,23 @@ def load_run(
     if not p.is_dir():
         raise FileNotFoundError(f"Run directory '{p}' does not exist.")
 
-    # 1. Infer benchmark and machine names from path if not provided
-    parts = p.parts
-    path_bench = None
-    path_mach = None
+    active_machine = machine if machine is not None else (load_machine(p) or NONE_MACHINE)
+    machine_name = active_machine.name
 
-    # Check parts against known programs
-    for part in reversed(parts):
-        for b_name in ["HPCG", "JA", "LULESH", "FFT", "FAKEWORK", "FLETCHER"]:
-            if part.upper() == b_name:
-                path_bench = b_name
-                break
-        if path_bench:
-            break
+    from ..programs.benchmark import ExecuteSH
 
     if benchmark is None:
-        benchmark_name = path_bench or (parts[-2] if len(parts) >= 2 else "UNKNOWN_BENCH")
+        #gambiarra
+        benches = {b.__name__.lower() for b in ExecuteSH.__subclasses__()}
+        benchmark_name = next((part for part in reversed(p.parts) if part.lower() in benches), None)
+        if benchmark_name is None:
+            raise RuntimeError(f"Don't know the benchmark for {p}")
     elif isinstance(benchmark, str):
         benchmark_name = benchmark
     else:
         benchmark_name = getattr(benchmark, "name", benchmark.__name__)
 
-    # 2. Load machine.pkl if available
-    loaded_machine = None
-    machine_file = p / "machine.pkl"
-    if machine_file.exists():
-        try:
-            with open(machine_file, "rb") as f:
-                loaded_machine = pickle.load(f)
-        except Exception:
-            pass
-
-    if machine is not None:
-        active_machine = machine
-    elif loaded_machine is not None:
-        active_machine = loaded_machine
-    else:
-        active_machine = NONE_MACHINE
-
-    # Infer machine name
-    if loaded_machine and loaded_machine.name != "NONE":
-        machine_name = p.name  # Use folder name for clean label (e.g. 'cei' rather than 'cei6')
-    else:
-        machine_name = p.name
-
-    # 3. Attempt loading EasyVVUQ campaign and analysis
     from .. import energyuq
-    from easyvvuq.analysis.sc_analysis import SCAnalysisResults
 
     camp = None
     anal = None
@@ -569,28 +507,19 @@ def load_run(
     sampler = None
     df = pd.DataFrame()
 
-    campaign_db = p / "campaign" / "campaign.db"
-    alt_campaign_db = p / "campaign.db"
-
-    if campaign_db.exists() or alt_campaign_db.exists():
-        bench_cls = _resolve_benchmark_class(benchmark_name)
+    if (p / "campaign" / "campaign.db").exists() or (p / "campaign.db").exists():
         try:
             camp, anal, active_machine = energyuq.load(
-                bench_cls, active_machine, campaign_name, dir=str(p)
+                _resolve_benchmark_class(benchmark_name), active_machine, campaign_name, dir=str(p)
             )
             df = camp.get_collation_result()
-            last_res = cast(SCAnalysisResults, camp.get_last_analysis())
-            sampler = energyuq.get_sampler(camp)
+            last_res = camp.get_last_analysis()
+            sampler = camp.sampler
         except Exception as e:
-            # Fallback if campaign load fails
-            pass
-
-    # 4. Fallback to compilation.csv if campaign loading didn't produce df
-    if df.empty and (p / "compilation.csv").exists():
-        try:
-            df = pd.read_csv(p / "compilation.csv")
-        except Exception:
-            pass
+            if not quiet:
+                print(f"Warning: campaign load failed for '{p}': {e}")
+    elif (p / "compilation.csv").exists():
+        df = pd.read_csv(p / "compilation.csv")
 
     # 5. Build and return RunData
     return RunData(
@@ -606,67 +535,60 @@ def load_run(
     )
 
 
+def _is_run_dir(candidate: Path) -> bool:
+    """True when ``candidate`` carries any of the recognised run markers."""
+    return candidate.name != "campaign" and any((candidate / m).exists() for m in RUN_MARKERS)
+
+
 def discover_runs(
-    base_dir: Union[str, Path] = "runs",
-    pattern: str = "*/*/*",
-    benchmark_filter: Union[str, Sequence[str], None] = None,
-    machine_filter: Union[str, Sequence[str], None] = None,
+    base_dir: str | Path = "runs",
+    pattern: str = "*/*",
+    benchmark_filter: str | Sequence[str] | None = None,
+    machine_filter: str | Sequence[str] | None = None,
 ) -> list[RunData]:
     """
     Search recursively for all valid run directories under base_dir.
-    Matches directories containing campaign.db, analysis, machine.pkl, or compilation.csv.
+    A directory qualifies when it contains any of :data:`RUN_MARKERS`.
     """
     base = Path(base_dir).resolve()
     if not base.exists():
         return []
 
-    # Normalize filters
-    if isinstance(benchmark_filter, str):
-        benchmark_filter = [benchmark_filter.upper()]
-    elif benchmark_filter is not None:
-        benchmark_filter = [b.upper() for b in benchmark_filter]
+    # Normalize filters to comparable, case-normalized lists
+    benchmarks = _normalize_filter(benchmark_filter, upper=True)
+    machines = _normalize_filter(machine_filter)
 
-    if isinstance(machine_filter, str):
-        machine_filter = [machine_filter.lower()]
-    elif machine_filter is not None:
-        machine_filter = [m.lower() for m in machine_filter]
+    candidate_dirs = {c for c in base.glob(pattern) if c.is_dir() and _is_run_dir(c)}
 
-    # Find potential run directories
-    candidate_dirs = set()
-
-    # Match by glob pattern
-    for candidate in base.glob(pattern):
-        if candidate.is_dir() and candidate.name != "campaign":
-            if (candidate / "campaign" / "campaign.db").exists() or \
-               (candidate / "campaign.db").exists() or \
-               (candidate / "compilation.csv").exists() or \
-               (candidate / "machine.pkl").exists() or \
-               (candidate / "analysis").exists():
-                candidate_dirs.add(candidate)
-
-    # Also search any subdirectory containing campaign.db
-    for db_path in base.glob("**/campaign.db"):
-        run_folder = db_path.parent.parent if db_path.parent.name == "campaign" else db_path.parent
-        if run_folder.name != "campaign":
-            candidate_dirs.add(run_folder)
-
-    for comp_path in base.glob("**/compilation.csv"):
-        if comp_path.parent.name != "campaign":
-            candidate_dirs.add(comp_path.parent)
+    # Also pick up nested layouts that the glob pattern does not reach
+    for marker in ("campaign.db", "compilation.csv", "analysis"):
+        for hit in base.glob(f"**/{marker}"):
+            run_folder = hit.parent.parent if hit.parent.name == "campaign" else hit.parent
+            if _is_run_dir(run_folder):
+                candidate_dirs.add(run_folder)
 
     runs: list[RunData] = []
     for candidate in sorted(candidate_dirs):
         try:
             run_data = load_run(candidate)
-            if benchmark_filter and run_data.benchmark_name.upper() not in benchmark_filter:
-                continue
-            if machine_filter and run_data.machine_name.lower() not in machine_filter:
-                continue
-            runs.append(run_data)
         except Exception as e:
             print(f"Warning: Failed to load run from {candidate}: {e}")
+            continue
+        if benchmarks and run_data.benchmark_name.upper() not in benchmarks:
+            continue
+        if machines and run_data.machine_name.lower() not in machines:
+            continue
+        runs.append(run_data)
 
     return runs
+
+
+def _normalize_filter(value: str | Sequence[str] | None, upper: bool = False) -> list[str]:
+    """Normalize a string-or-sequence filter into a list of comparable names."""
+    if value is None:
+        return []
+    items = [value] if isinstance(value, str) else list(value)
+    return [str(v).upper() if upper else str(v).lower() for v in items]
 
 
 class RunCollection:
@@ -681,7 +603,7 @@ class RunCollection:
     def __iter__(self):
         return iter(self.runs)
 
-    def __getitem__(self, idx: int | str | slice) -> Union[RunData, "RunCollection"]:
+    def __getitem__(self, idx: int | str | slice) -> "RunData | RunCollection":
         if isinstance(idx, slice):
             return RunCollection(self.runs[idx])
         if isinstance(idx, int):
@@ -694,10 +616,10 @@ class RunCollection:
     @classmethod
     def discover(
         cls,
-        base_dir: Union[str, Path] = "runs",
+        base_dir: str | Path = "runs",
         pattern: str = "*/*/*",
-        benchmarks: Union[str, Sequence[str], None] = None,
-        machines: Union[str, Sequence[str], None] = None,
+        benchmarks: str | Sequence[str] | None = None,
+        machines: str | Sequence[str] | None = None,
     ) -> "RunCollection":
         runs = discover_runs(base_dir, pattern, benchmark_filter=benchmarks, machine_filter=machines)
         return cls(runs)
@@ -715,32 +637,20 @@ class RunCollection:
 
     def filter(
         self,
-        benchmarks: Union[str, Sequence[str], None] = None,
-        machines: Union[str, Sequence[str], None] = None,
-        predicate: Union[Callable[[RunData], bool], None] = None,
+        benchmarks: str | Sequence[str] | None = None,
+        machines: str | Sequence[str] | None = None,
+        predicate: Callable[[RunData], bool] | None = None,
     ) -> "RunCollection":
         """Return a new filtered RunCollection."""
-        if isinstance(benchmarks, str):
-            benchmarks = [benchmarks.upper()]
-        elif benchmarks is not None:
-            benchmarks = [b.upper() for b in benchmarks]
+        wanted_benchmarks = _normalize_filter(benchmarks, upper=True)
+        wanted_machines = _normalize_filter(machines)
 
-        if isinstance(machines, str):
-            machines = [machines.lower()]
-        elif machines is not None:
-            machines = [m.lower() for m in machines]
-
-        filtered: list[RunData] = []
-        for r in self.runs:
-            if benchmarks and r.benchmark_name.upper() not in benchmarks:
-                continue
-            if machines and r.machine_name.lower() not in machines:
-                continue
-            if predicate and not predicate(r):
-                continue
-            filtered.append(r)
-
-        return RunCollection(filtered)
+        return RunCollection([
+            r for r in self.runs
+            if (not wanted_benchmarks or r.benchmark_name.upper() in wanted_benchmarks)
+            and (not wanted_machines or r.machine_name.lower() in wanted_machines)
+            and (predicate is None or predicate(r))
+        ])
 
     def summary_table(self) -> pd.DataFrame:
         """
@@ -832,7 +742,7 @@ class RunCollection:
                 })
         return pd.DataFrame(rows)
 
-    def export_csv(self, output_dir: Union[str, Path]):
+    def export_csv(self, output_dir: str | Path):
         """Export summary, Sobols, and best configuration tables to CSV files."""
         out = Path(output_dir)
         out.mkdir(parents=True, exist_ok=True)
@@ -857,7 +767,7 @@ class RunCollection:
 
     def analyze_each(
         self,
-        output_dir: Union[str, Path] = "individual_analyses",
+        output_dir: str | Path = "individual_analyses",
         qois: Sequence[str] | None = None,
         save_plots: bool = True,
         fmt: str = "png",
@@ -934,36 +844,40 @@ class RunCollection:
 
         return reports
 
-    def compile_pdf(
+    def compile_html(
         self,
-        output_path: Union[str, Path] = "reports/energyuq_compiled_report.pdf",
+        output_path: str | Path = "reports/index.html",
         qoi: str = "energy_uj",
         qois: Sequence[str] = ("energy_uj", "time"),
-        include_global: bool = False,
-        sobol_modes: Sequence[str] = ("grouped_bar", "heatmap"),
+        include_global: bool = True,
+        sobol_modes: Sequence[str] = ("grouped_bar", "heatmap", "stacked_bar"),
         dpi: int = 150,
         quiet: bool = False,
         **kwargs,
     ) -> Path:
         """
-        Compile all multi-run and individual run plots into a structured, indexed, and bookmarked master PDF report.
+        Compile all multi-run and individual run plots into the interactive HTML report.
+
+        Thin wrapper around :func:`scripts.compile_plots_html.compile_plots_html`, which
+        is the single entry point for report generation.
 
         Parameters
         ----------
-        output_path : Destination path for the output PDF.
+        output_path : Destination path for the HTML shell.
         qoi : Primary QoI for multi-run evaluations (e.g. 'energy_uj').
         qois : Sequence of QoIs for individual single-run evaluations.
-        include_global : Whether to include a global cross-benchmark comparison section at the start.
+        include_global : Whether to include a global cross-benchmark section.
         sobol_modes : Sobol visualization modes ('grouped_bar', 'heatmap', 'stacked_bar').
         dpi : DPI resolution for rendered figures.
         quiet : Suppress progress logging.
 
         Returns
         -------
-        Path to compiled PDF report.
+        Path to the compiled HTML report.
         """
-        from scripts.compile_plots_pdf import compile_plots_pdf
-        return compile_plots_pdf(
+        from scripts.compile_plots_html import compile_plots_html
+
+        return compile_plots_html(
             runs=self,
             output_path=output_path,
             qoi=qoi,
@@ -977,8 +891,8 @@ class RunCollection:
 
 
 def analyze_runs_individually(
-    runs: Union[RunCollection, Sequence[RunData]],
-    output_dir: Union[str, Path] = "individual_analyses",
+    runs: RunCollection | Sequence[RunData],
+    output_dir: str | Path = "individual_analyses",
     qois: Sequence[str] | None = None,
     save_plots: bool = True,
     fmt: str = "png",

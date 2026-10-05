@@ -10,6 +10,8 @@
     currentBenchmark: null,
     currentMachine: null, // null indicates benchmark multi-plot view
     currentScope: "all",  // "all" or specific machine name in multi-plot view
+    primaryQoI: "energy_uj",
+    qoiLabels: {},        // QoI key -> display label, from report metadata
     currentQoI: "energy_uj",
     currentPlotKey: null,
     searchQuery: "",
@@ -66,6 +68,7 @@
     state.benchmarks = state.data.benchmarks || [];
     state.machines = state.data.machines || [];
     state.primaryQoI = state.data.primary_qoi || "energy_uj";
+    state.qoiLabels = state.data.qoi_labels || {};
     state.currentQoI = state.primaryQoI;
 
     // Build flat runs index for Previous/Next navigation
@@ -108,7 +111,7 @@
         state.currentBenchmark = state.benchmarks[0];
         state.currentMachine = null; // default to benchmark overview
         state.currentScope = "all";
-        state.currentPlotKey = "dashboard";
+        state.currentPlotKey = null; // renderBenchmarkView picks the first tab
       }
       return;
     }
@@ -151,17 +154,13 @@
     }
     if (plotKey) {
       state.currentPlotKey = plotKey;
+    } else if (!machine) {
+      state.currentPlotKey = null; // renderBenchmarkView picks the first tab
     } else {
-      if (!machine) {
-        state.currentPlotKey = "dashboard";
-      } else {
-        const run = getActiveRunData();
-        if (run && run.plots && run.plots.length > 0) {
-          state.currentPlotKey = run.plots[0].key;
-        } else {
-          state.currentPlotKey = null;
-        }
-      }
+      const run = getActiveRunData();
+      state.currentPlotKey = run && run.plots && run.plots.length > 0
+        ? run.plots[0].key
+        : null;
     }
     updateHash();
     renderSidebar();
@@ -345,13 +344,13 @@
     const machines = bData.machines || [];
 
     if (!state.currentPlotKey || !multiPlots[state.currentPlotKey]) {
-      state.currentPlotKey = plotKeys[0] || "dashboard";
+      state.currentPlotKey = plotKeys[0] || null;
     }
 
     const activePlot = multiPlots[state.currentPlotKey] || {
-      title: "Multi-Run Comparative Dashboard",
-      tab_label: "Dashboard",
-      description: "Overview of benchmark performance across evaluated machines.",
+      title: "Sobol Sensitivities",
+      tab_label: "Sobols",
+      description: "Variance-based sensitivity indices across evaluated machines.",
       scopes: {},
     };
 
@@ -703,16 +702,18 @@
       if (e.target === lightboxModal) closeLightbox();
     };
 
-    btnHelpKbd.onclick = () => {
-      alert(
-        "EnergyUQ Navigation Shortcuts:\\n\\n" +
-        "• ArrowLeft / ArrowRight : Navigate to Previous / Next Machine Run\\n" +
-        "• ArrowUp / ArrowDown   : Switch between Diagnostic Plot Tabs\\n" +
-        "• S                     : Toggle swap Machine Scope (All vs Machine)\\n" +
-        "• Escape                : Close Lightbox Zoom\\n" +
-        "• /                     : Focus Search Input"
-      );
-    };
+    if (btnHelpKbd) {
+      btnHelpKbd.onclick = () => {
+        alert(
+          "EnergyUQ Navigation Shortcuts:\n\n" +
+          "• ArrowLeft / ArrowRight : Navigate to Previous / Next Machine Run\n" +
+          "• ArrowUp / ArrowDown   : Switch between Diagnostic Plot Tabs\n" +
+          "• S                     : Toggle swap Machine Scope (All vs Machine)\n" +
+          "• Escape                : Close Lightbox Zoom\n" +
+          "• /                     : Focus Search Input"
+        );
+      };
+    }
 
     // Keyboard navigation
     window.addEventListener("keydown", (e) => {
@@ -757,14 +758,9 @@
 
   // Helpers
   function _formatQoILabel(qoi) {
-    const map = {
-      "energy_uj": "Energy (μJ)",
-      "energy_j": "Energy (J)",
-      "time": "Time (s)",
-      "power_w": "Power (W)",
-      "edp_j_s": "EDP (J·s)",
-    };
-    return map[qoi] || qoi;
+    // Labels come from the report metadata (src.util.multi_plot.QOI_LABELS),
+    // so the QoI -> label mapping is defined in exactly one place.
+    return state.qoiLabels[qoi] || qoi;
   }
 
   function _formatMetricVal(val, qoi) {
