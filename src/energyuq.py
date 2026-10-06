@@ -94,12 +94,16 @@ def create_campaign(
     machine: Machine,
     root: Path,
     numa: bool = False,
+    qoi: str = QOI,
+    qois: list[str] = QOIS,
+    params_vary: tuple[params_type,vary_type] | None = None,
+    actions: Actions | None = None
 ) -> EnergyUQCampaign:
     path = campaign_path(root)
     create_dir(path)
     change_dir_permissions(path, 0o755)
 
-    params, vary = default_params(machine, numa=numa)
+    params, vary = default_params(machine, numa=numa) if params_vary is None else params_vary
     campaign = uq.Campaign(
         name="energy",
         db_location="sqlite:///" + path.as_posix() + "/campaign.db",
@@ -110,7 +114,7 @@ def create_campaign(
         campaign.add_app(
             name=campaign.campaign_name,
             params=params,
-            actions=energy_wraper_actions(program, machine, root, numa=numa),
+            actions=energy_wraper_actions(program, machine, root, numa=numa) if actions is None else actions,
         )
         sampler = uq.sampling.SCSampler(
             vary=vary,
@@ -127,6 +131,8 @@ def create_campaign(
         root_path=root,
         machine=machine,
         numa=numa,
+        qoi=qoi,
+        qois=qois,
     )
 
 
@@ -135,12 +141,16 @@ def prepare_campaign(
     machine: Machine,
     root: Path,
     numa: bool = False,
+    qoi: str = QOI,
+    qois: list[str] = QOIS,
+    params_vary: tuple[params_type,vary_type] | None = None,
+    actions: Actions | None = None,
 ) -> EnergyUQCampaign:
     """
     Creates a campaign and runs the first execution
     """
     campaign = create_campaign(
-        program, machine, root, numa=numa
+        program, machine, root, numa=numa, qoi=qoi, qois=qois, params_vary=params_vary, actions=actions
     )
 
     campaign.execute(sequential=True).collate(progress_bar=True)
@@ -149,7 +159,7 @@ def prepare_campaign(
 
 def prepare_analysis(campaign: EnergyUQCampaign) -> uq.analysis.SCAnalysis:
     sampler: SCSampler = cast(SCSampler, campaign.get_active_sampler())
-    analysis = uq.analysis.SCAnalysis(sampler=sampler, qoi_cols=QOIS)
+    analysis = uq.analysis.SCAnalysis(sampler=sampler, qoi_cols=campaign.qois)
     # if not hasattr(analysis, "l_norm"):
     #     analysis.l_norm = sampler.l_norm
     return analysis
@@ -213,7 +223,7 @@ def refine_sampling_plan(
         if len(sampler.admissible_idx) == 0:
             return False
         campaign.execute(sequential=True).collate(progress_bar=True)
-        analysis.adapt_dimension(QOI, campaign.get_collation_result(), method="var")
+        analysis.adapt_dimension(campaign.qoi, campaign.get_collation_result(), method="var")
 
         nonlocal stable_steps
         stable_steps = stable_steps + 1 if settling() else 0
@@ -360,6 +370,10 @@ def create(
     dir: str | None = None,
     resume: bool = False,
     numa: bool = False,
+    qoi: str = QOI,
+    qois: list[str] = QOIS,
+    params_vary: tuple[params_type,vary_type] | None = None,
+    actions: Actions | None = None,
 ) -> tuple[EnergyUQCampaign, uq.analysis.SCAnalysis]:
     if resume:
         target_dir = Path(dir) if dir else latest_dir(RESULTS_DIR, "energy")
@@ -374,7 +388,7 @@ def create(
         elif dir is not None:
             raise FileNotFoundError(f"Cannot resume: checkpoint directory '{dir}' not found or invalid")
         else:
-            print("No existing campaign found to resume. Starting fresh campaign...")
+            raise RuntimeError("No existing campaign found to resume.")
 
     root = run_dir(dir=dir)
     create_dir(root)
@@ -389,6 +403,10 @@ def create(
         machine,
         root,
         numa=use_numa,
+        qoi=qoi,
+        qois=qois,
+        params_vary=params_vary,
+        actions=actions,
     )
 
     analysis = prepare_analysis(campaign)
@@ -418,7 +436,8 @@ def save(
         raise ValueError("No machine information available to save for this campaign")
 
     (path / "numa").write_text("1" if campaign.numa else "0")
-
+    (path / "qoi").write_text(f"{campaign.qoi}:{','.join(campaign.qois)}")
+ 
     analysis.save_state((path / "analysis").as_posix())
 
     sampler = campaign.sampler
@@ -471,11 +490,18 @@ def load(
     loaded_machine = load_machine(path)
     machine = loaded_machine if loaded_machine is not None else default_machine
 
-    numa_path = (path / "numa")
+    numa_path = path / "numa"
     numa = numa_path.is_file() and numa_path.read_text() == "1"
+    qoi_path = path / "qoi"
+    if qoi_path.is_file():
+        raw = qoi_path.read_text().split(":")
+        qoi = raw[0]
+        qois = ":".join(raw[1:]).split(",")
+    else:
+        qoi, qois = QOI, QOIS
 
     campaign = create_campaign(
-        program, machine, path, numa=numa
+        program, machine, path, numa=numa, qoi=qoi, qois=qois
     )
 
     sampler_path = path / "sampler"

@@ -12,6 +12,8 @@ from easyvvuq.campaign import Campaign
 from easyvvuq.sampling.stochastic_collocation import SCSampler
 from pandas import DataFrame
 
+from src.util.constants import QOI, QOIS
+
 from ..machines.machine import Machine
 
 
@@ -138,12 +140,16 @@ class EnergyUQCampaign:
         campaign: Campaign,
         root_path: Path | str,
         machine: Machine,
-        numa: bool = False
+        numa: bool = False,
+        qoi: str = QOI,
+        qois: list[str] = QOIS,
     ):
         self.campaign: Campaign = campaign
         self.root_path = Path(root_path)
         self.machine: Machine = machine
         self.numa = numa
+        self.qoi = qoi
+        self.qois = qois
 
     @property
     def sampler(self) -> SCSampler:
@@ -157,7 +163,7 @@ class EnergyUQCampaign:
         return (
             f"EnergyUQCampaign(name={camp_name!r}, "
             f"root_path={self.root_path}, machine={self.machine.name}, "
-            f"numa={self.numa}, "
+            f"numa={self.numa}, qoi={self.qoi} "
         )
 
 @dataclass
