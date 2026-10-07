@@ -54,8 +54,8 @@ supervise() {
 
         if [ ${#FAILED_JOBS[@]} -gt 0 ]; then
             # Not log_error: the jobs still running have to be waited for.
-            log "$ERROR" "Job(s) failed: ${FAILED_JOBS[*]}. Submission halted." 0
-            SUBMITTING=false
+            # Halt submissions only for the failed machine(s); others continue.
+            log "$ERROR" "Job(s) failed: ${FAILED_JOBS[*]}. Submission halted for failed machine(s) only." 0
         fi
 
         if [ "$SUBMITTING" == "true" ]; then
@@ -81,7 +81,7 @@ submit_ready() {
     for partition in "${PARTITIONS[@]}"; do
         if [ "$(in_flight "$partition")" -lt 1 ]; then
             if ! pair=$(next_pair "$partition"); then
-                break
+                continue
             fi
             IFS='/' read -r bench node <<< "$pair"
             submit_pair "$bench" "$node"
@@ -177,12 +177,26 @@ in_flight() {
     printf '%s' "$count"
 }
 
+node_blocked() {
+    local node="$1"
+    local pair
+    for pair in "${!L_STATUS[@]}"; do
+        if [ "${pair#*/}" == "$node" ] && [ "${L_STATUS[$pair]}" == "FAILED" ]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
 next_pair() {
     local partition="$1"
     local bench node pair
 
     for bench in "${BENCHMARKS[@]}"; do
         for node in "${NODES[@]}"; do
+            if node_blocked "$node"; then
+                continue
+            fi
             if [ "$(node_partition "$node")" != "$partition" ]; then
                 continue
             fi

@@ -176,14 +176,15 @@ def refine_sampling_plan(
     campaign: EnergyUQCampaign,
     analysis: uq.analysis.SCAnalysis,
     min_number_of_refinements: int = -1,
+    min_number_of_samples: int = 100,
     max_number_of_refinements: int = 200,
-    mean_tol: float = 0.05,
+    mean_tol: float = 0.01,
     var_tol: float = 0.05,
     patience: int = 3,
     epsilon: float = 1e-12,
     save_every: int = 2,
     save_dir: Path | str | None = None,
-    force_two: bool = False
+    force_two: bool = False,
 ) -> bool:
     sampler = campaign.sampler
 
@@ -205,7 +206,7 @@ def refine_sampling_plan(
         force = adm[adm[:, np.array(dims)].max(axis=1) == 2]
         print(f"{force} will be added to l_norm")
 
-        analysis.l_norm = np.unique(np.concatenate((np.asarray(analysis.l_norm), force)), axis=0)
+        analysis.l_norm = np.concatenate((analysis.l_norm, force), axis=0)
         campaign.apply_analysis(analysis)
         max_orders = np.max(analysis.l_norm, 0)
         dims = []
@@ -218,7 +219,7 @@ def refine_sampling_plan(
         raise
 
     def single_iteration(idx: int) -> bool:
-        anouce_run(idx)
+        anouce_run()
         sampler.look_ahead(analysis.l_norm)
         if len(sampler.admissible_idx) == 0:
             return False
@@ -239,14 +240,7 @@ def refine_sampling_plan(
         norm_prev = np.linalg.norm(history[-2], np.inf)
         return float(delta / (norm_prev + epsilon))
 
-    def anouce_run(idx):
-        why = (
-            "too few runs"
-            if len(analysis.adaptation_errors) < 3
-            else "min refinements"
-            if idx < min_number_of_refinements
-            else "not converged"
-        )
+    def anouce_run():
         print(f"\n{_ordinal(len(analysis.adaptation_errors) + 1)} iteration, {why}\n")
 
     def anouce_end_run():
@@ -300,10 +294,17 @@ def refine_sampling_plan(
         return stable_steps >= patience
 
     while len(analysis.adaptation_errors) < 3:
+        why = "too few runs"
         if not advance_and_save():
             return is_converged()
 
     while i < min_number_of_refinements:
+        why = "min refinements"
+        if not advance_and_save():
+            return is_converged()
+
+    while np.sum(sampler.n_new_points) < min_number_of_samples:
+        why = "min samples"
         if not advance_and_save():
             return is_converged()
 
@@ -311,6 +312,7 @@ def refine_sampling_plan(
         ensure_order_two()
 
     while not is_converged():
+        why = "not converged"
         if not advance_and_save():
             print("Ran out of space to explore")
             return is_converged()
@@ -325,18 +327,12 @@ def refine_sampling_plan(
 def refine_and_analyse(
     campaign: EnergyUQCampaign,
     analysis: uq.analysis.SCAnalysis,
-    min_number_of_refinements: int = -1,
-    max_number_of_refinements: int = 100,
-    save_every: int = 2,
     save_dir: Path | str | None = None,
     **kwargs,
 ) -> None:
     converged = refine_sampling_plan(
         campaign,
         analysis,
-        min_number_of_refinements=min_number_of_refinements,
-        max_number_of_refinements=max_number_of_refinements,
-        save_every=save_every,
         save_dir=save_dir,
         **kwargs,
     )

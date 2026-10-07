@@ -178,10 +178,6 @@ class PlotterSobolMixin:
         ret = analysis.get_pce_sobol_indices(qoi, typ="all", **kwargs)
         if isinstance(ret, tuple) and len(ret) == 4:
             mean, D, _, S_u = ret
-        elif isinstance(ret, tuple) and len(ret) == 3:
-            mean, D, S_u = ret
-        elif isinstance(ret, dict):
-            mean, D, _, S_u = None, None, {}, ret
         else:
             raise ValueError(f"Unexpected return format from get_pce_sobol_indices: {type(ret)}")
 
