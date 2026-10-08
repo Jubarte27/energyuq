@@ -143,9 +143,24 @@ reconcile() {
         state=$(slurm_state "$jobid")
         note=""
         case "$state" in
-            PD|PENDING) ledger_set "$pair" PENDING "$jobid" "" ;;
-            R|RUNNING) ledger_set "$pair" RUNNING "$jobid" "" ;;
-            CD|COMPLETED|DONE) ledger_set "$pair" DONE "$jobid" "" ;;
+            PD|PENDING)
+                if [ "${L_STATUS[$pair]}" != "PENDING" ]; then
+                    log_info "$pair: job $jobid pending"
+                fi
+                ledger_set "$pair" PENDING "$jobid" ""
+                ;;
+            R|RUNNING)
+                if [ "${L_STATUS[$pair]}" != "RUNNING" ]; then
+                    log_info "$pair: job $jobid running"
+                fi
+                ledger_set "$pair" RUNNING "$jobid" ""
+                ;;
+            CD|COMPLETED|DONE)
+                if [ "${L_STATUS[$pair]}" != "DONE" ]; then
+                    log_info "$pair: job $jobid finished"
+                fi
+                ledger_set "$pair" DONE "$jobid" ""
+                ;;
             F|FAILED)
                 ledger_set "$pair" FAILED "$jobid" "$state"
                 FAILED_JOBS+=("$pair (job $jobid: $state)")
@@ -282,16 +297,61 @@ slurm_state() {
     esac
 }
 
+job_log_files() {
+    local jobid="$1"
+    local f
+
+    shopt -s nullglob
+    for f in "$PROJECT_DIR"/execlog/*_"$jobid".out "$PROJECT_DIR"/execlog/*_"$jobid".err; do
+        printf '%s\n' "$f"
+    done
+    shopt -u nullglob
+}
+
 report_job_tail() {
     local pair="$1"
     local jobid="$2"
-    local log="$PROJECT_DIR/execlog/$JOB_NAME_PREFIX-${pair%%/*}-${pair#*/}_$jobid.out"
+    local node="${pair#*/}"
+    local log="$PROJECT_DIR/execlog/$JOB_NAME_PREFIX-${pair%%/*}_$jobid.out"
+    local job_files
+    local src=""
+    local f
+
+    job_files=$(job_log_files "$jobid")
+
+    while IFS= read -r f; do
+        case "$f" in
+            *.out) if [ -z "$src" ]; then src="$f"; fi ;;
+        esac
+    done <<< "$job_files"
 
     log_warn "$pair: tail of $log"
-    if [ -f "$log" ]; then
-        tail -n 5 "$log" || true
+    if [ -n "$src" ]; then
+        if ! tail -n 5 "$src"; then
+            log_warn "$pair: could not read $src"
+        fi
     else
         log_warn "$log not found"
+    fi
+
+    # Keep the full job logs in the per-node log file.
+    if [ -n "${LOG_DIR:-}" ] && [ "${LIST:-false}" != "true" ]; then
+        if ! {
+            printf '[%s] ===== job %s (%s) logs =====\n' "$(now)" "$jobid" "$pair"
+            if [ -z "$job_files" ]; then
+                printf '[%s] no job log file found for job %s\n' "$(now)" "$jobid"
+            else
+                while IFS= read -r f; do
+                    printf '[%s] --- %s ---\n' "$(now)" "$f"
+                    if ! cat "$f"; then
+                        printf '[%s] could not read %s\n' "$(now)" "$f"
+                    fi
+                done <<< "$job_files"
+            fi
+            printf '[%s] ===== end job %s =====\n' "$(now)" "$jobid"
+        } >> "$(node_log_file "$node")"; then
+            log_write_failed
+        fi
     fi
 }
 
@@ -491,33 +551,38 @@ print_matrix() {
     fi
 
     log_info "Results of $TYPE, jobs in flight: $(in_flight)"
-    printf '%-22s' 'BENCHMARK'
-    for node in "${NODES[@]}"; do
-        printf '%-14s' "$node"
-    done
-    printf '\n'
-    for bench in "${BENCHMARKS[@]}"; do
-        printf '%-22s' "$bench"
+    local table
+    table=$(
+        printf '%-22s' 'BENCHMARK'
         for node in "${NODES[@]}"; do
-            pair="$bench/$node"
-            if pair_done "$bench" "$node"; then
-                target=$(runs_path "$bench" "$node")
-                printf '%-14s' "done($(du -sh "$target" 2>/dev/null | cut -f1))"
-            else
-                case "${L_STATUS[$pair]:-}" in
-                    PENDING) printf '%-14s' "pending" ;;
-                    RUNNING) printf '%-14s' "running" ;;
-                    HALTED) printf '%-14s' "halted" ;;
-                    FAILED) printf '%-14s' "failed" ;;
-                    TIMEOUT) printf '%-14s' "timeout" ;;
-                    COPIED) printf '%-14s' "copied" ;;
-                    DONE) printf '%-14s' "finished" ;;
-                    *) printf '%-14s' '-' ;;
-                esac
-            fi
+            printf '%-14s' "$node"
         done
         printf '\n'
-    done
+        for bench in "${BENCHMARKS[@]}"; do
+            printf '%-22s' "$bench"
+            for node in "${NODES[@]}"; do
+                pair="$bench/$node"
+                if pair_done "$bench" "$node"; then
+                    target=$(runs_path "$bench" "$node")
+                    printf '%-14s' "done($(du -sh "$target" 2>/dev/null | cut -f1))"
+                else
+                    case "${L_STATUS[$pair]:-}" in
+                        PENDING) printf '%-14s' "pending" ;;
+                        RUNNING) printf '%-14s' "running" ;;
+                        HALTED) printf '%-14s' "halted" ;;
+                        FAILED) printf '%-14s' "failed" ;;
+                        TIMEOUT) printf '%-14s' "timeout" ;;
+                        COPIED) printf '%-14s' "copied" ;;
+                        DONE) printf '%-14s' "finished" ;;
+                        *) printf '%-14s' '-' ;;
+                    esac
+                fi
+            done
+            printf '\n'
+        done
+    )
+    printf '%s\n' "$table"
+    snapshot_matrix "$table"
 }
 
 # First Ctrl-C stops submitting and waits for the running jobs, second one leaves them going.
@@ -592,6 +657,8 @@ abs_path() {
 
 set_env() {
     RUNS_DIR="$PROJECT_DIR/runs"
+    LOG_DIR=""
+    LOG_WRITABLE=true
     COPY_FROM=""
     CHECK_COPY_FROM=""
     BENCH_RAW=""
@@ -669,6 +736,13 @@ _setConfigArgs() {
 
     mkdir -p "$RUNS_DIR"
     LEDGER="$RUNS_DIR/$LEDGER_SUBDIR/$TYPE.tsv"
+    # Log folder besides the ledger, one file per node.
+    # Best-effort: if it cannot be created, warn once and continue
+    # with stdout and ledger logging only.
+    LOG_DIR="$(dirname "$LEDGER")/logs/$TYPE"
+    if ! mkdir -p "$LOG_DIR"; then
+        log_write_failed
+    fi
 
     local line
     while read -r line; do
@@ -709,7 +783,147 @@ contains() {
     return 1
 }
 
+# Per-node logging is best-effort: the ledger and stdout stay authoritative.
+# On the first write failure, warn once to stderr (not via log(), to avoid
+# re-entering persist) and stop attempting file writes.
+log_write_failed() {
+    if [ "${LOG_WRITABLE:-true}" == "true" ]; then
+        LOG_WRITABLE=false
+        printf '%s - WARN: cannot write to %s, per-node log files disabled\n' \
+            "$(date '+%Y-%m-%d %H:%M:%S')" "${LOG_DIR:-unknown}" >&2
+    fi
+    return 0
+}
+
+node_log_file() {
+    local node="$1"
+    local safe
+    safe=$(printf '%s' "$node" | tr -c 'A-Za-z0-9._-' '_')
+    printf '%s/%s.log' "${LOG_DIR:?}" "$safe"
+}
+
+node_log() {
+    local node="$1"
+    shift
+    local file
+    if [ -z "${LOG_DIR:-}" ] || [ "${LIST:-false}" == "true" ]; then
+        return 0
+    fi
+    if [ "${LOG_WRITABLE:-true}" != "true" ]; then
+        return 0
+    fi
+    if ! mkdir -p "$LOG_DIR"; then
+        log_write_failed
+        return 0
+    fi
+    file=$(node_log_file "$node")
+    if [ ! -f "$file" ]; then
+        if ! printf '[%s] log started for node %s (type %s)\n' "$(now)" "$node" "${TYPE:-?}" >> "$file"; then
+            log_write_failed
+            return 0
+        fi
+    fi
+    if ! printf '[%s] %s\n' "$(now)" "$*" >> "$file"; then
+        log_write_failed
+        return 0
+    fi
+}
+
+persist_log_line() {
+    local level="${1:-}"
+    local message="${2:-}"
+    local level_name="${level%%;*}"
+    local plain
+    local node targets=()
+    local file
+
+    if [ -z "${LOG_DIR:-}" ]; then
+        return 0
+    fi
+    if [ "${LIST:-false}" == "true" ]; then
+        return 0
+    fi
+    if [ "${#NODES[@]}" -eq 0 ]; then
+        return 0
+    fi
+
+    plain="$(date '+%Y-%m-%d %H:%M:%S') - ${level_name:-INFO}: $message"
+
+    for node in "${NODES[@]}"; do
+        if printf '%s' "$message" | grep -F -q "[$node]"; then
+            targets+=("$node")
+        elif printf '%s' "$message" | grep -F -q "/$node"; then
+            targets+=("$node")
+        elif printf '%s' "$message" | grep -F -q -- "-$node"; then
+            targets+=("$node")
+        fi
+    done
+    if [ ${#targets[@]} -eq 0 ]; then
+        targets=("${NODES[@]}")
+    fi
+
+    if [ "${LOG_WRITABLE:-true}" != "true" ]; then
+        return 0
+    fi
+    if ! mkdir -p "$LOG_DIR"; then
+        log_write_failed
+        return 0
+    fi
+    for node in "${targets[@]}"; do
+        file=$(node_log_file "$node")
+        if [ ! -f "$file" ]; then
+            if ! printf '[%s] log started for node %s (type %s)\n' "$(now)" "$node" "${TYPE:-?}" >> "$file"; then
+                log_write_failed
+                return 0
+            fi
+        fi
+        if ! printf '%s\n' "$plain" >> "$file"; then
+            log_write_failed
+            return 0
+        fi
+    done
+}
+
+snapshot_matrix() {
+    local table="$1"
+    local node file
+    if [ -z "${LOG_DIR:-}" ]; then
+        return 0
+    fi
+    if [ "${LIST:-false}" == "true" ]; then
+        return 0
+    fi
+    if [ "${#NODES[@]}" -eq 0 ]; then
+        return 0
+    fi
+    if [ "${LOG_WRITABLE:-true}" != "true" ]; then
+        return 0
+    fi
+    if ! mkdir -p "$LOG_DIR"; then
+        log_write_failed
+        return 0
+    fi
+    for node in "${NODES[@]}"; do
+        file=$(node_log_file "$node")
+        if ! {
+            printf '[%s] --- status matrix ---\n' "$(now)"
+            printf '%s\n' "$table"
+        } >> "$file"; then
+            log_write_failed
+            return 0
+        fi
+    done
+}
+
 SCRIPT_DIR=$(dirname "$(readlink -e "${BASH_SOURCE[0]}")") && source "$SCRIPT_DIR/util.bash"
+# Persist every log() line to the per-node log files besides the ledger.
+if declare -F log >/dev/null 2>&1; then
+    eval "$(declare -f log | sed '1s/^log/base_log/')"
+    log() {
+        base_log "$@"
+        persist_log_line "$@"
+    }
+fi
 trap on_interrupt INT
 set_env
 _setConfigArgs "$@"
