@@ -102,7 +102,14 @@ submit_pair() {
     if ! pair_done "$bench" "$node"; then
         EXTRA_ARGS=(--dest "$(runs_path "$bench" "$node")")
     fi
-    
+
+    if [ "${L_STATUS[$pair]:-}" == "TIMEOUT" ]; then
+        if ! contains "--resume" "${EXTRA_ARGS[@]}" "${RUN_ARGS[@]}"; then
+            EXTRA_ARGS+=(--resume)
+        fi
+        log_info "[$node] $bench retrying timed out job with --resume"
+    fi
+
     local output
     if ! output=$(SBATCH_OPTS="--job-name=$job_name" "$PROJECT_DIR/scripts/run/run_sbatch_pcad.sh" --env "$env_file" run "${EXTRA_ARGS[@]}" "${RUN_ARGS[@]}" "$bench" 2>&1); then
         ledger_set "$pair" FAILED "" "submission failed: $output"
@@ -129,7 +136,7 @@ reconcile() {
 
     for pair in "${!L_STATUS[@]}"; do
         case "${L_STATUS[$pair]}" in
-            PD|PENDING | R|RUNNING | HALTED) ;;
+            PD|PENDING|R|RUNNING|HALTED) ;;
             *) continue ;;
         esac
         jobid="${L_JOBID[$pair]}"
@@ -149,8 +156,9 @@ reconcile() {
                 FAILED_JOBS+=("$pair (job $jobid cancelled)")
                 ;;
             TIMEOUT)
-                ledger_set "$pair" FAILED "$jobid" "job $jobid timeout"
-                FAILED_JOBS+=("$pair (job $jobid timeout)")
+                ledger_set "$pair" TIMEOUT "$jobid" "job $jobid timeout"
+                log_warn "$pair: job $jobid timed out, will retry with --resume"
+                report_job_tail "$pair" "$jobid"
                 ;;
             *) note="unexpected state \"$state\"" ;;
         esac
@@ -204,8 +212,11 @@ next_pair() {
             if pair_done "$bench" "$node"; then
                 continue
             fi
-            if [ -n "${L_STATUS[$pair]+set}" ]; then
-                continue
+            if [[ -v L_STATUS[$pair] ]]; then
+                # Timed out pairs are retried with --resume
+                if [ "${L_STATUS[$pair]}" != "TIMEOUT" ]; then
+                    continue
+                fi
             fi
             printf '%s' "$pair"
             return 0
@@ -498,6 +509,7 @@ print_matrix() {
                     RUNNING) printf '%-14s' "running" ;;
                     HALTED) printf '%-14s' "halted" ;;
                     FAILED) printf '%-14s' "failed" ;;
+                    TIMEOUT) printf '%-14s' "timeout" ;;
                     COPIED) printf '%-14s' "copied" ;;
                     DONE) printf '%-14s' "finished" ;;
                     *) printf '%-14s' '-' ;;
@@ -525,16 +537,21 @@ on_interrupt() {
 
 finalize() {
     local pair
+    local timeouts=()
 
     for pair in "${!L_STATUS[@]}"; do
         case "${L_STATUS[$pair]}" in
-            PD|PENDING | R|RUNNING) L_STATUS[$pair]=HALTED ;;
+            PD|PENDING|R|RUNNING) L_STATUS[$pair]=HALTED ;;
+            TIMEOUT) timeouts+=("$pair") ;;
         esac
     done
     ledger_save
 
     if [ "$(in_flight)" -gt 0 ]; then
         log_warn "$(in_flight) job(s) still running, recorded in '$LEDGER'. Run this command again to follow them."
+    fi
+    if [ ${#timeouts[@]} -gt 0 ]; then
+        log_warn "Timed out pairs pending retry with --resume: ${timeouts[*]}. Run this command again to retry them."
     fi
     if [ ${#FAILED_JOBS[@]} -gt 0 ]; then
         log_warn "Failed pairs: ${FAILED_JOBS[*]}. Remove their lines from '$LEDGER' to try them again."
