@@ -176,7 +176,7 @@ def refine_sampling_plan(
     campaign: EnergyUQCampaign,
     analysis: uq.analysis.SCAnalysis,
     min_number_of_refinements: int = -1,
-    min_number_of_samples: int = 100,
+    min_number_of_samples: int = -1,
     max_number_of_refinements: int = 200,
     mean_tol: float = 0.01,
     var_tol: float = 0.05,
