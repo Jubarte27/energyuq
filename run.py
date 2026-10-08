@@ -43,8 +43,8 @@ def parse_args():
     parser.add_argument(
         "--min-runs",
         type=int,
-        default=100,
-        help="Minimum number of total runs (default: 100)",
+        default=75,
+        help="Minimum number of total runs (default: 75)",
     )
     parser.add_argument(
         "--numa",
