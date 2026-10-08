@@ -41,6 +41,12 @@ def parse_args():
         help="Maximum number of refinement iterations (default: 100)",
     )
     parser.add_argument(
+        "--min-runs",
+        type=int,
+        default=100,
+        help="Minimum number of total runs (default: 100)",
+    )
+    parser.add_argument(
         "--numa",
         action="store_true",
         help="Include kernel numa balancing, if available",
@@ -83,6 +89,7 @@ if __name__ == "__main__":
         campaign,
         analysis,
         max_number_of_refinements=args.max_refinements,
+        min_number_of_samples=args.min_runs,
         save_every=args.save_every,
         save_dir=args.dir,
         force_two=args.force_two
