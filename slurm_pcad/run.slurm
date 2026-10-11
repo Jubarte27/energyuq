@@ -54,7 +54,7 @@ _setConfigArgs() {
                 export DESTINATION
                 shift
                 ;;
-            --save-every|--max-refinements)
+            --save-every|--max-refinements|--patience|--relaxed-patience|--stable-mode|--mean-tol|--var-tol|--repeats|--min-runs)
                 shift
                 ;;
             --resume|--numa|--force-two|--pack)
@@ -64,7 +64,7 @@ _setConfigArgs() {
                 break
                 ;;
             *)
-                log "$WARN" "Unknown option \"$1\", ignoring" 0 
+                echo "Unknown option \"$1\", ignoring" 
             ;;
         esac
         shift

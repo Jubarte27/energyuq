@@ -56,7 +56,7 @@ def parse_args():
     parser.add_argument(
         "--relaxed-patience",
         type=int,
-        default=3,
+        default=2,
         help="How many stable stable steps inside the window are needed for convergence",
     )
     parser.add_argument(
