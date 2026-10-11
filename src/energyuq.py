@@ -49,6 +49,14 @@ def default_params(
 
     return params, vary
 
+def make_wrapper(program: type[Program], machine: Machine, parent_path: Path):
+    def wrapper(params: dict):
+        params_str = " and ".join(f"{k} = {v}" for k, v in params.items())
+        print(f"Running {program.name} on {machine.name} with {params_str}")
+        file_path = next_file(parent_path, program.name)
+        with open(file_path.as_posix(), "w") as f, redirect_stdout(f):
+            easy_wrapper.main(program, machine)
+    return wrapper
 
 def energy_wraper_actions(
     program: type[Program], machine: Machine, root: Path, numa: bool = False,
@@ -67,17 +75,10 @@ def energy_wraper_actions(
     parent_path = root.joinpath("output").absolute()
     create_dir(parent_path)
 
-    def wrapper(params: dict):
-        params_str = " and ".join(f"{k} = {v}" for k, v in params.items())
-        print(f"Running {program.name} on {machine.name} with {params_str}")
-        file_path = next_file(parent_path, program.name)
-        with open(file_path.as_posix(), "w") as f, redirect_stdout(f):
-            easy_wrapper.main(program, machine)
-
     return Actions(
         CreateRunDirectory(root=campaign_path(root), flatten=True),
         Encode(encoder),
-        ExecuteWrapper(wrapper),
+        ExecuteWrapper(make_wrapper(program, machine, parent_path)),
         Decode(decoder),
     )
 
@@ -171,6 +172,19 @@ def _ordinal(n: int) -> str:
     suffix = {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
     return f"{n}{suffix}"
 
+def _rel_change(history: list[np.ndarray]) -> float:
+        delta = np.linalg.norm(history[-1] - history[-2], np.inf)
+        norm_prev = np.linalg.norm(history[-2], np.inf)
+        return float(delta / norm_prev)
+
+def _rel_change_series(history: list[np.ndarray], n=2) -> list[float]:
+    history = history[-n-1:]
+    return [
+        float(
+            np.linalg.norm(curr - prev, np.inf) / np.linalg.norm(prev, np.inf)
+        )
+        for curr, prev in zip(history, history[1:], strict=False)
+    ]
 
 def refine_sampling_plan(
     campaign: EnergyUQCampaign,
@@ -181,8 +195,9 @@ def refine_sampling_plan(
     mean_tol: float = 0.01,
     var_tol: float = 0.05,
     patience: int = 3,
+    relaxed_patience: int = 2,
     epsilon: float = 1e-12,
-    save_every: int = 2,
+    stable_mode: str = "consecutive",
     save_dir: Path | str | None = None,
     force_two: bool = False,
 ) -> bool:
@@ -226,19 +241,11 @@ def refine_sampling_plan(
         campaign.execute(sequential=True).collate(progress_bar=True)
         analysis.adapt_dimension(campaign.qoi, campaign.get_collation_result(), method="var")
 
-        nonlocal stable_steps
-        stable_steps = stable_steps + 1 if settling() else 0
         anouce_end_run()
         report()
         return True
 
     i = 0
-    stable_steps = 0
-
-    def _rel_change(history: list[np.ndarray]) -> float:
-        delta = np.linalg.norm(history[-1] - history[-2], np.inf)
-        norm_prev = np.linalg.norm(history[-2], np.inf)
-        return float(delta / (norm_prev + epsilon))
 
     def anouce_run():
         print(f"\n{_ordinal(len(analysis.adaptation_errors) + 1)} iteration, {why}\n")
@@ -250,24 +257,72 @@ def refine_sampling_plan(
         d_mean = _rel_change(analysis.mean_history)
         d_var = _rel_change(analysis.std_history)
         return d_mean, d_var
-        
 
-    def settling() -> bool:
-        if len(analysis.adaptation_errors) < 3: return False
-        d_mean, d_var = deltas()
-        settling = d_mean < mean_tol and d_var < var_tol
-        return settling
+    if stable_mode == "window_mean":
+        def is_converged() -> bool:
+            if len(analysis.mean_history) <= patience:
+                return False
+            mean_series = _rel_change_series(analysis.mean_history, patience)
+            var_series = _rel_change_series(analysis.std_history, patience)
+            w_mean = float(np.mean(mean_series))
+            w_var = float(np.mean(var_series))
+            return w_mean < mean_tol and w_var < var_tol
+        
+        def window_deltas() -> tuple[float, float] | None:
+            if len(analysis.mean_history) <= patience:
+                return None
+            mean_series = _rel_change_series(analysis.mean_history, patience)
+            var_series = _rel_change_series(analysis.std_history, patience)
+            return (float(np.mean(mean_series)), float(np.mean(var_series)))
+    elif stable_mode == "relaxed":
+        def is_converged() -> bool:
+            if len(analysis.mean_history) <= relaxed_patience:
+                return False
+            return stable_steps(patience) >= relaxed_patience
+
+        def stable_steps(window=-1):
+            mean_series = np.array(_rel_change_series(analysis.mean_history, window))
+            var_series = np.array(_rel_change_series(analysis.std_history, window))
+            return int(np.count_nonzero((mean_series < mean_tol) & (var_series < var_tol)))
+    else:
+        def is_converged() -> bool:
+            if len(analysis.mean_history) <= patience:
+                return False
+            mean_series = np.array(_rel_change_series(analysis.mean_history, patience))
+            var_series = np.array(_rel_change_series(analysis.std_history, patience))
+            return bool(np.all(mean_series < mean_tol) and np.all(var_series < var_tol))
+        
+        def consecutive_stable_steps(window=-1):
+            mean_series = _rel_change_series(analysis.mean_history, window)
+            var_series = _rel_change_series(analysis.std_history, window)
+            count = 0
+            for mean, var in zip(reversed(mean_series), reversed(var_series), strict=False):
+                if mean < mean_tol and var < var_tol:
+                    count += 1
+                else:
+                    break
+            return count
 
     def report():
         if len(analysis.adaptation_errors) < 3: return
         d_mean, d_var = deltas()
 
-        mark = "ok" if settling() else "--"
+        if stable_mode == "window_mean":
+            w = window_deltas()
+            stability = (
+                f"  window{patience} mean {w[0]:.2e}, var {w[1]:.2e}"
+                if w is not None
+                else f"  window{patience} n/a"
+            )
+        elif stable_mode == "relaxed":
+            stability = f"  relaxed progress stable {stable_steps(patience)}/{patience}, "
+        else:
+            stability = f"  progress stable {consecutive_stable_steps()}/{patience}, "
         print(
-            f"  samples   {len(campaign.get_collation_result()):,} run, "
+            f"  samples {len(campaign.get_collation_result()):,} run, "
             f"+{sampler.n_new_points[-1]} planned, {np.sum(sampler.n_new_points):,} total\n"
-            f"  changes   mean {d_mean:.2e}, var {d_var:.2e}  [{mark}]\n"
-            f"  progress  stable {stable_steps}/{patience}, "
+            f"  changes mean {d_mean:.2e}, var {d_var:.2e}\n"
+            f"{stability}\n"
             f"{len(analysis.l_norm)} PCE terms at level {sampler.L}, "
             f"orders [{' '.join(str(o) for o in np.max(analysis.l_norm, 0))}]"
         )
@@ -285,13 +340,10 @@ def refine_sampling_plan(
             save(campaign, analysis, dir=save_dir, status="completed", converged=False)
             return False
         total_adaptations = len(analysis.adaptation_errors)
-        if save_every > 0 and (total_adaptations % save_every == 0):
-            print(f"[Checkpoint] Periodic save at iteration {total_adaptations} (every {save_every} iterations)...")
-            save(campaign, analysis, dir=save_dir, status="in_progress")
+        print(f"[Checkpoint] Saving at iteration {total_adaptations}...")
+        save(campaign, analysis, dir=save_dir, status="in_progress")
         return True
 
-    def is_converged() -> bool:
-        return stable_steps >= patience
 
     while len(analysis.adaptation_errors) < 3:
         why = "too few runs"
@@ -445,16 +497,16 @@ def save(
     if collation is not None and not collation.empty:
         total_samples = len(collation)
 
-    latest_surplus = None
+    latest_error = None
     if hasattr(analysis, "adaptation_errors") and len(analysis.adaptation_errors) > 0:
-        latest_surplus = float(analysis.adaptation_errors[-1])
+        latest_error = float(analysis.adaptation_errors[-1])
 
     checkpoint_data = {
         "iteration": len(getattr(analysis, "adaptation_errors", [])),
         "total_samples": total_samples,
         "status": status,
         "converged": converged,
-        "latest_surplus": latest_surplus,
+        "latest_error": latest_error,
         "timestamp": datetime.datetime.now().isoformat(),
     }
     with open(path / "checkpoint.json", "w", encoding="utf-8") as f:
@@ -465,6 +517,27 @@ def save(
         pack_dir(path)
 
     return path
+
+
+def _prune_failed_runs(campaign: EnergyUQCampaign) -> int:
+    """Mark interrupted (never-collated) runs as IGNORED so resume re-adds them."""
+
+    from easyvvuq.constants import Status
+    from sqlalchemy.exc import SQLAlchemyError
+
+    inner = campaign.campaign
+    failed_ids: list[int] = []
+    for status in (Status.NEW, Status.ENCODED):
+        try:
+            for run_id, _ in inner.campaign_db.runs(status=status):
+                failed_ids.append(int(run_id))
+        except SQLAlchemyError:
+            continue
+    failed_ids = sorted(set(failed_ids))
+    if failed_ids:
+        inner.ignore_runs(failed_ids)
+        print(f"[Resume] Ignored {len(failed_ids)} interrupted (non-collated) run(s).")
+    return len(failed_ids)
 
 
 def load(
@@ -510,6 +583,8 @@ def load(
     analysis_path = path / "analysis"
     if analysis_path.exists():
         analysis.load_state(analysis_path.as_posix())
+
+    _prune_failed_runs(campaign)
 
     collation = campaign.get_collation_result()
     if collation is not None and not collation.empty:

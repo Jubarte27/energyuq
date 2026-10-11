@@ -29,12 +29,6 @@ def parse_args():
         help="Run directory to save to or resume from",
     )
     parser.add_argument(
-        "--save-every",
-        type=int,
-        default=2,
-        help="Periodic checkpoint saving frequency in iterations (default: 2)",
-    )
-    parser.add_argument(
         "--max-refinements",
         type=int,
         default=100,
@@ -45,6 +39,31 @@ def parse_args():
         type=int,
         default=75,
         help="Minimum number of total runs (default: 75)",
+    )
+    parser.add_argument(
+        "--stable-mode",
+        type=str,
+        default="consecutive",
+        choices=["consecutive", "window_mean"],
+        help="Convergence mode: consecutive stable steps or mean of last stable_window relative changes (default: consecutive)",
+    )
+    parser.add_argument(
+        "--stable-window",
+        type=int,
+        default=3,
+        help="Window size for window_mean mode (default: 3)",
+    )
+    parser.add_argument(
+        "--mean-tol",
+        type=float,
+        default=0.01,
+        help="Relative mean-change tolerance (default: 0.01)",
+    )
+    parser.add_argument(
+        "--var-tol",
+        type=float,
+        default=0.05,
+        help="Relative variance-change tolerance (default: 0.05)",
     )
     parser.add_argument(
         "--numa",
@@ -90,7 +109,10 @@ if __name__ == "__main__":
         analysis,
         max_number_of_refinements=args.max_refinements,
         min_number_of_samples=args.min_runs,
-        save_every=args.save_every,
+        mean_tol=args.mean_tol,
+        var_tol=args.var_tol,
+        stable_mode=args.stable_mode,
+        stable_window=args.stable_window,
         save_dir=args.dir,
         force_two=args.force_two
     )
