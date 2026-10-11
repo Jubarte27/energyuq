@@ -49,17 +49,17 @@ def default_params(
 
     return params, vary
 
-def make_wrapper(program: type[Program], machine: Machine, parent_path: Path):
+def make_wrapper(program: type[Program], machine: Machine, parent_path: Path, repeats: int = 1):
     def wrapper(params: dict):
         params_str = " and ".join(f"{k} = {v}" for k, v in params.items())
         print(f"Running {program.name} on {machine.name} with {params_str}")
         file_path = next_file(parent_path, program.name)
         with open(file_path.as_posix(), "w") as f, redirect_stdout(f):
-            easy_wrapper.main(program, machine)
+            easy_wrapper.main(program, machine, repeats=repeats)
     return wrapper
 
 def energy_wraper_actions(
-    program: type[Program], machine: Machine, root: Path, numa: bool = False,
+    program: type[Program], machine: Machine, root: Path, numa: bool = False, repeats: int = 1,
 ) -> Actions:
     params_def, _ = default_params(machine, numa=numa)
     template = ",".join(f"${param}" for param in params_def)
@@ -78,7 +78,7 @@ def energy_wraper_actions(
     return Actions(
         CreateRunDirectory(root=campaign_path(root), flatten=True),
         Encode(encoder),
-        ExecuteWrapper(make_wrapper(program, machine, parent_path)),
+        ExecuteWrapper(make_wrapper(program, machine, parent_path, repeats=repeats)),
         Decode(decoder),
     )
 
@@ -98,7 +98,8 @@ def create_campaign(
     qoi: str = QOI,
     qois: list[str] = QOIS,
     params_vary: tuple[params_type,vary_type] | None = None,
-    actions: Actions | None = None
+    actions: Actions | None = None,
+    repeats: int = 1,
 ) -> EnergyUQCampaign:
     path = campaign_path(root)
     create_dir(path)
@@ -115,7 +116,7 @@ def create_campaign(
         campaign.add_app(
             name=campaign.campaign_name,
             params=params,
-            actions=energy_wraper_actions(program, machine, root, numa=numa) if actions is None else actions,
+            actions=energy_wraper_actions(program, machine, root, numa=numa, repeats=repeats) if actions is None else actions,
         )
         sampler = uq.sampling.SCSampler(
             vary=vary,
@@ -134,6 +135,7 @@ def create_campaign(
         numa=numa,
         qoi=qoi,
         qois=qois,
+        repeats=repeats,
     )
 
 
@@ -146,12 +148,13 @@ def prepare_campaign(
     qois: list[str] = QOIS,
     params_vary: tuple[params_type,vary_type] | None = None,
     actions: Actions | None = None,
+    repeats: int = 1,
 ) -> EnergyUQCampaign:
     """
     Creates a campaign and runs the first execution
     """
     campaign = create_campaign(
-        program, machine, root, numa=numa, qoi=qoi, qois=qois, params_vary=params_vary, actions=actions
+        program, machine, root, numa=numa, qoi=qoi, qois=qois, params_vary=params_vary, actions=actions, repeats=repeats
     )
 
     campaign.execute(sequential=True).collate(progress_bar=True)
@@ -422,6 +425,7 @@ def create(
     qois: list[str] = QOIS,
     params_vary: tuple[params_type,vary_type] | None = None,
     actions: Actions | None = None,
+    repeats: int = 1,
 ) -> tuple[EnergyUQCampaign, uq.analysis.SCAnalysis]:
     if resume:
         target_dir = Path(dir) if dir else latest_dir(RESULTS_DIR, "energy")
@@ -455,6 +459,7 @@ def create(
         qois=qois,
         params_vary=params_vary,
         actions=actions,
+        repeats=repeats,
     )
 
     analysis = prepare_analysis(campaign)
@@ -485,6 +490,7 @@ def save(
 
     (path / "numa").write_text("1" if campaign.numa else "0")
     (path / "qoi").write_text(f"{campaign.qoi}:{','.join(campaign.qois)}")
+    (path / "repeats").write_text(str(campaign.repeats))
  
     analysis.save_state((path / "analysis").as_posix())
 
@@ -569,8 +575,11 @@ def load(
     else:
         qoi, qois = QOI, QOIS
 
+    repeats_path = path / "repeats"
+    repeats = int(repeats_path.read_text().strip()) if repeats_path.is_file() else 1
+
     campaign = create_campaign(
-        program, machine, path, numa=numa, qoi=qoi, qois=qois
+        program, machine, path, numa=numa, qoi=qoi, qois=qois, repeats=repeats
     )
 
     sampler_path = path / "sampler"

@@ -80,6 +80,12 @@ def parse_args():
         action="store_true",
         help="Compress into tar.gz at the end",
     )
+    parser.add_argument(
+        "--repeats",
+        type=int,
+        default=1,
+        help="Number of times to run each program per sample; mean is returned as energy_uj (default: 1)",
+    )
     return parser.parse_args()
 
 
@@ -102,6 +108,7 @@ if __name__ == "__main__":
         dir=args.dir,
         resume=args.resume,
         numa=args.numa,
+        repeats=args.repeats,
     )
 
     energyuq.refine_and_analyse(

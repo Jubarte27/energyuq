@@ -9,7 +9,8 @@ def main(
         program: type[Program],
         machine: Machine,
         input_file: str = "input.csv",
-        output_file: str = "output.csv"
+        output_file: str = "output.csv",
+        repeats: int = 1,
     ):
     with open(input_file) as f:
         args = f.readline().split(",")
@@ -18,7 +19,7 @@ def main(
         args[6:] if has_arg(args, 5) and params.numa is not None
         else args[5:]
     )
-    result = base_wrapper.prepare_and_execute(machine, program, params, program_args)
+    result = base_wrapper.prepare_and_execute(machine, program, params, program_args, repeats=repeats)
 
     ks, vs = zip(*result.items())
     header = ",".join(ks)

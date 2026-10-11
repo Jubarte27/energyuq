@@ -12,7 +12,7 @@ from ..util.data import EnergyReading, ExecutionParams, compute_edp
 from ..util.system import try_exec, try_exec_shell
 
 
-def prepare_and_execute(machine: Machine, program: type[Program], params: ExecutionParams, args: None | Iterable[str]):
+def prepare_and_execute(machine: Machine, program: type[Program], params: ExecutionParams, args: None | Iterable[str], repeats: int = 1):
     if not args:
         args = []
 
@@ -20,9 +20,20 @@ def prepare_and_execute(machine: Machine, program: type[Program], params: Execut
     set_boost(machine, params.boost)
     if params.numa is not None and machine.has_numa:
         set_numa(machine, params.numa)
-    
-    accum, t = run(machine, program, params, args)
-    return report(accum, t)
+
+    n = max(1, int(repeats))
+    energies, times, edps = [], [], []
+    for _ in range(n):
+        accum, t = run(machine, program, params, args)
+        r = report(accum, t)
+        energies.append(r["energy_uj"])
+        times.append(r["time"])
+        edps.append(r["EDP"])
+    return {
+        "energy_uj": sum(energies) / len(energies),
+        "EDP": sum(edps) / len(edps),
+        "time": sum(times) / len(times),
+    }
 
 
 def set_boost(machine: Machine, value: int):

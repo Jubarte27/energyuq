@@ -143,6 +143,7 @@ class EnergyUQCampaign:
         numa: bool = False,
         qoi: str = QOI,
         qois: list[str] = QOIS,
+        repeats: int = 1,
     ):
         self.campaign: Campaign = campaign
         self.root_path = Path(root_path)
@@ -150,6 +151,7 @@ class EnergyUQCampaign:
         self.numa = numa
         self.qoi = qoi
         self.qois = qois
+        self.repeats = repeats
 
     @property
     def sampler(self) -> SCSampler:
@@ -163,7 +165,7 @@ class EnergyUQCampaign:
         return (
             f"EnergyUQCampaign(name={camp_name!r}, "
             f"root_path={self.root_path}, machine={self.machine.name}, "
-            f"numa={self.numa}, qoi={self.qoi} "
+            f"numa={self.numa}, qoi={self.qoi}, repeats={self.repeats} "
         )
 
 @dataclass
