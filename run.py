@@ -44,14 +44,20 @@ def parse_args():
         "--stable-mode",
         type=str,
         default="consecutive",
-        choices=["consecutive", "window_mean"],
-        help="Convergence mode: consecutive stable steps or mean of last stable_window relative changes (default: consecutive)",
+        choices=["consecutive", "relaxed", "window_mean"],
+        help="Convergence mode",
     )
     parser.add_argument(
-        "--stable-window",
+        "--patience",
         type=int,
         default=3,
-        help="Window size for window_mean mode (default: 3)",
+        help="How many stable steps are needed for convergence, or the window size for window_mean and relaxed",
+    )
+    parser.add_argument(
+        "--relaxed-patience",
+        type=int,
+        default=3,
+        help="How many stable stable steps inside the window are needed for convergence",
     )
     parser.add_argument(
         "--mean-tol",
@@ -119,7 +125,8 @@ if __name__ == "__main__":
         mean_tol=args.mean_tol,
         var_tol=args.var_tol,
         stable_mode=args.stable_mode,
-        stable_window=args.stable_window,
+        patience=args.patience,
+        relaxed_patience=args.relaxed_patience,
         save_dir=args.dir,
         force_two=args.force_two
     )
