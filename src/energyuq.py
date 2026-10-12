@@ -198,10 +198,9 @@ def refine_sampling_plan(
     max_number_of_refinements: int = 200,
     mean_tol: float = 0.01,
     var_tol: float = 0.05,
-    patience: int = 3,
-    relaxed_patience: int = 2,
-    epsilon: float = 1e-12,
-    stable_mode: str = "consecutive",
+    patience: int = 4,
+    relaxed_patience: int = 3,
+    stable_mode: str = "relaxed",
     save_dir: Path | str | None = None,
     force_two: bool = False,
 ) -> bool:
@@ -405,11 +404,7 @@ def run_dir(
     if dir:
         return Path(dir)
     if campaign:
-        if hasattr(campaign, "root_path"):
-            return Path(campaign.root_path)
-        app = campaign.get_active_app()
-        if app:
-            name = app["name"]
+        return Path(campaign.root_path)
 
     create_dir(RESULTS_DIR)
     return next_dir(RESULTS_DIR, name)

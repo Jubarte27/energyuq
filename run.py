@@ -38,25 +38,25 @@ def parse_args():
         "--min-runs",
         type=int,
         default=0,
-        help="Minimum number of total runs (default: 75)",
+        help="Minimum number of total runs (default: 0)",
     )
     parser.add_argument(
         "--stable-mode",
         type=str,
         default="consecutive",
-        choices=["consecutive", "relaxed", "window_mean"],
+        choices=["consecutive", "relaxed"],
         help="Convergence mode",
     )
     parser.add_argument(
         "--patience",
         type=int,
-        default=3,
-        help="How many stable steps are needed for convergence, or the window size for window_mean and relaxed",
+        default=4,
+        help="How many stable steps are needed for convergence, or the window size for relaxed",
     )
     parser.add_argument(
         "--relaxed-patience",
         type=int,
-        default=2,
+        default=3,
         help="How many stable stable steps inside the window are needed for convergence",
     )
     parser.add_argument(
@@ -72,11 +72,6 @@ def parse_args():
         help="Relative variance-change tolerance (default: 0.05)",
     )
     parser.add_argument(
-        "--numa",
-        action="store_true",
-        help="Include kernel numa balancing, if available",
-    )
-    parser.add_argument(
         "--force-two",
         action="store_true",
         help="Enforces at least order 2 for every dimension at the beginning",
@@ -89,8 +84,8 @@ def parse_args():
     parser.add_argument(
         "--repeats",
         type=int,
-        default=1,
-        help="Number of times to run each program per sample; mean is returned as energy_uj (default: 1)",
+        default=3,
+        help="Number of times to run each program per sample; means are returned as qois (default: 3)",
     )
     return parser.parse_args()
 
@@ -113,7 +108,7 @@ if __name__ == "__main__":
         mach,
         dir=args.dir,
         resume=args.resume,
-        numa=args.numa,
+        numa=True,
         repeats=args.repeats,
     )
 
