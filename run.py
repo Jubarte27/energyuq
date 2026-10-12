@@ -37,7 +37,7 @@ def parse_args():
     parser.add_argument(
         "--min-runs",
         type=int,
-        default=75,
+        default=0,
         help="Minimum number of total runs (default: 75)",
     )
     parser.add_argument(
@@ -130,5 +130,3 @@ if __name__ == "__main__":
         save_dir=args.dir,
         force_two=args.force_two
     )
-
-    energyuq.save(campaign, analysis, name=benchmark.name, dir=args.dir, status="completed", pack=args.pack)

@@ -5,8 +5,7 @@ set -e
 #
 # Suites shipping a single benchmark are named after the suite itself
 # (HPCG, JA, LULESH, MW, PO, ST); suites shipping several are named
-# SUITE_BENCHMARK (NAS_BT, PARBOIL_SPMV, RODINIA_HOTSPOT). Run with -l to get
-# the full list.
+# SUITE_BENCHMARK (NAS_BT, PARBOIL_SPMV, RODINIA_HOTSPOT).
 
 NAS_KERNELS=(BT CG EP FT IS LU MG SP UA)
 RODINIA_APPS=(BFS HOTSPOT HOTSPOT3D SRAD_V1 SRAD_V2 STREAMCLUSTER)
@@ -14,11 +13,6 @@ RODINIA_APPS=(BFS HOTSPOT HOTSPOT3D SRAD_V1 SRAD_V2 STREAMCLUSTER)
 main() {
 	
     set_log_depth 0
-
-    if [ "$LIST" == "true" ]; then
-        list_benchmarks
-        return 0
-    fi
 
 	if (( ${#EXEC[@]} == 0 )); then
         log_error "No benchmark selected"
@@ -169,7 +163,7 @@ find_exec() {
 			NAME="$1"
 			;;
         *)
-            log_error "Unknown benchmark \"$1\". Run with -l for the list of benchmarks"
+            log_error "Unknown benchmark \"$1\"."
             ;;
     esac
     NAME="$1"
@@ -185,37 +179,6 @@ contains() {
         fi
     done
     return 1
-}
-
-list_benchmarks() {
-    local kernel app
-
-    echo "Benchmarks:"
-    _list_benchmark "FFT" "not built by compile-hpc-benchmarks.sh"
-    _list_benchmark "FAKE_WORK" "fake OpenMP work, for testing the harness"
-    _list_benchmark "NONE" "no benchmark at all, for testing the harness"
-    _list_benchmark "TESTE_ERRO_OMP" "the OpenMP error reproduction under teste/"
-    _list_benchmark "HPCG" "hpc-benchmarks/HPCG"
-    _list_benchmark "JA" "hpc-benchmarks/JA"
-    _list_benchmark "LULESH" "hpc-benchmarks/LULESH"
-    _list_benchmark "MW" "hpc-benchmarks/MW (MPI + OpenMP, single rank)"
-    _list_benchmark "PO" "hpc-benchmarks/PO"
-    _list_benchmark "ST" "hpc-benchmarks/ST"
-    for kernel in "${NAS_KERNELS[@]}"; do
-        _list_benchmark "NAS_$kernel" "hpc-benchmarks/NAS (NPB class C)"
-    done
-    for app in "${RODINIA_APPS[@]}"; do
-        _list_benchmark "RODINIA_$app" "hpc-benchmarks/RODINIA"
-    done
-    for app in $(parboil_benchmarks); do
-        _list_benchmark "PARBOIL_${app^^}" "hpc-benchmarks/PARBOIL ($PARBOIL_VERSION)"
-    done
-    echo
-    echo "RODINIA is accepted as an alias of RODINIA_HOTSPOT."
-}
-
-_list_benchmark() {
-    printf '  %-22s %s\n' "$1" "$2"
 }
 
 # PARBOIL ships many benchmarks, but only the ones with downloaded datasets can
@@ -312,7 +275,9 @@ rodinia_srad_v2() {
 }
 
 fake_work() {
-    local iters=${1:-500}
+    local iters
+    iters=$(nproc)
+    iters=$(( iters * 20 ))
 
     echo "Fake work: $iters"
 
@@ -320,7 +285,7 @@ fake_work() {
         (
             local acc=0
             local i
-            for ((i = 0; i < iters; i++)); do
+            for ((i = 0; i < 1000; i++)); do
                 acc=$(( (acc + i + thread_i) % 420 ))
             done
             printf '%d' "$acc"
@@ -335,9 +300,6 @@ _setConfigArgs() {
             ## Options
             -b)
                 BUFF=false
-                ;;
-            -l|--list)
-                LIST=true
                 ;;
             -n|--dry-run)
                 DRY_RUN=true
@@ -356,9 +318,6 @@ _setConfigArgs() {
         esac
         shift
     done
-	if [ "$LIST" == "true" ]; then
-		return
-	fi
 	if [ "${1:-}" == '' ]; then
 		log_error "First argument must be the name of a benchmark"
 	fi
@@ -393,7 +352,6 @@ set_env() {
 	EXEC=()
 	NAME=""
     BUFF=true
-    LIST=false
     DRY_RUN=false
     # Workload sizes, kept overridable so the runs can be tuned without editing
     # this script.

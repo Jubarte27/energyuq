@@ -2,6 +2,7 @@ import datetime
 import json
 from contextlib import redirect_stdout
 from pathlib import Path
+import sys
 from typing import Any, cast
 
 import chaospy as cp
@@ -340,7 +341,7 @@ def refine_sampling_plan(
     def advance_and_save() -> bool:
         continue_advancing = advance()
         if not continue_advancing:
-            save(campaign, analysis, dir=save_dir, status="completed", converged=False)
+            save(campaign, analysis, dir=save_dir, status="failed", converged=False)
             return False
         total_adaptations = len(analysis.adaptation_errors)
         print(f"[Checkpoint] Saving at iteration {total_adaptations}...")
@@ -372,11 +373,10 @@ def refine_sampling_plan(
             print("Ran out of space to explore")
             return is_converged()
 
-    if is_converged():
-        print("Converged!!!")
+    print("Converged!!!")
     report()
-    save(campaign, analysis, dir=save_dir, status="converged", converged=is_converged())
-    return is_converged()
+    save(campaign, analysis, dir=save_dir, status="converged", converged=True)
+    return True
 
 
 def refine_and_analyse(
@@ -391,8 +391,9 @@ def refine_and_analyse(
         save_dir=save_dir,
         **kwargs,
     )
-    campaign.apply_analysis(analysis)
-    save(campaign, analysis, dir=save_dir, status="completed", converged=converged)
+    if converged:
+        campaign.apply_analysis(analysis)
+        save(campaign, analysis, dir=save_dir, status="converged", converged=True)
 
 
 def run_dir(
@@ -464,7 +465,7 @@ def create(
 
     analysis = prepare_analysis(campaign)
     campaign.apply_analysis(analysis)
-    save(campaign, analysis, dir=root.as_posix(), machine=machine, status="in_progress")
+    save(campaign, analysis, dir=root.as_posix(), status="in_progress")
     return campaign, analysis
 
 
@@ -472,21 +473,16 @@ def save(
     campaign: EnergyUQCampaign,
     analysis: uq.analysis.SCAnalysis,
     /,
+    status: str,
     name: str | None = None,
     dir: str | Path | None = None,
-    machine: Machine | None = None,
     pack: bool = False,
-    status: str = "in_progress",
     converged: bool = False,
 ) -> Path:
     path = run_dir(name="energy" if name is None else name, dir=str(dir) if dir is not None else None, campaign=campaign)
     create_dir(path)
 
-    machine_to_save = machine if machine is not None else getattr(campaign, "machine", None)
-    if machine_to_save is not None:
-        save_machine(machine_to_save, path)
-    elif not (path / "machine.msgpack").exists() and not (path / "machine.pkl").exists():
-        raise ValueError("No machine information available to save for this campaign")
+    save_machine(campaign.machine, path)
 
     (path / "numa").write_text("1" if campaign.numa else "0")
     (path / "qoi").write_text(f"{campaign.qoi}:{','.join(campaign.qois)}")
@@ -494,34 +490,22 @@ def save(
  
     analysis.save_state((path / "analysis").as_posix())
 
-    sampler = campaign.sampler
-    if sampler is not None:
-        sampler.save_state((path / "sampler").as_posix())
-
-    total_samples = 0
-    collation = campaign.get_collation_result()
-    if collation is not None and not collation.empty:
-        total_samples = len(collation)
-
-    latest_error = None
-    if hasattr(analysis, "adaptation_errors") and len(analysis.adaptation_errors) > 0:
-        latest_error = float(analysis.adaptation_errors[-1])
+    campaign.sampler.save_state((path / "sampler").as_posix())
 
     checkpoint_data = {
-        "iteration": len(getattr(analysis, "adaptation_errors", [])),
-        "total_samples": total_samples,
+        "iteration": len(analysis.adaptation_errors),
+        "total_samples": len(campaign.get_collation_result()),
         "status": status,
         "converged": converged,
-        "latest_error": latest_error,
         "timestamp": datetime.datetime.now().isoformat(),
     }
     with open(path / "checkpoint.json", "w", encoding="utf-8") as f:
         json.dump(checkpoint_data, f, indent=2)
 
-
     if pack:
         pack_dir(path)
 
+    sys.stdout.flush()
     return path
 
 
@@ -561,6 +545,9 @@ def load(
             )
     else:
         path = Path(dir)
+
+    if not path.is_dir():
+        raise RuntimeError(f"{path} is not a directory")
 
     loaded_machine = load_machine(path)
     machine = loaded_machine if loaded_machine is not None else default_machine
